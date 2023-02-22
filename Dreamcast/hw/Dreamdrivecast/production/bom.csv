@@ -1,0 +1,10 @@
+Designator,Footprint,Quantity,Value,LCSC Part #
+MCU1,WeAct-RP2040-Pico,1,WeAct-RP2040-Pico,
+R1,R_Axial_DIN0207_L6.3mm_D2.5mm_P5.08mm_Vertical,1,R,
+MCU2,WeAct-RP2040-Pico,1,WeAct-RP2040-Pico,
+SW1,SW_DIP_SPSTx01_Slide_9.78x4.72mm_W7.62mm_P2.54mm,1,Lid,
+J2,PinHeader_1x05_P2.54mm_Vertical,1,POWER,
+JP1,SolderJumper-2_P1.3mm_Open_RoundedPad1.0x1.5mm,1,Use Dreamcast Power,
+J4,microSD_HC_Molex_104031-0811,1,Micro_SD_Card,
+J1,PinHeader_2x20_P2.54mm_Vertical_SMD,1,Breakout,
+CN1,Molex_52602_0579,1,Molex_52602_0579,
