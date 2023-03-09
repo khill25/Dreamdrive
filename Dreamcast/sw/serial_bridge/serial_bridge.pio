@@ -1,0 +1,34 @@
+.program inter_mcu_tx
+.side_set 1 ; side pin is used for clk/or latch
+; use side set for 'data available' line?
+get_data:
+    pull ;; autopull??
+
+;; Shift out 4 bits at a time, waiting until the ack line is set high before
+;; continuing. 
+;; Shift 16 bits of data total
+.wrap_target
+send_data:
+    out pins, 4      side 1; Shift out 4 bits at a time
+    wait 1 gpio ack  side 0; wait for signal line to go high
+.wrap
+
+
+;; Push 16 bits, 4 bits at a time
+;; Side set (ack) goes high once data has been sampled
+;; then ack brought low 
+.program inter_mcu_rx
+    set x, 3 ;; loop 4 times to get 16 bits of data
+get_data:
+    wait 1 gpio ack     side 0;
+    in pins, 4          side 1;
+    jmp x--, get_data   side 0; loop 4 times, set ack pin low so the other processor will send data
+    push                side 0;; push the gathered data back to c code
+
+; 4 data pins
+; 1 clk pin
+; 1 reciever ack pin
+; put 4 bits of data on lines, [set line low]
+; wait for ack high [set line high]
+; shift out 4 more bits [set line low]
+;
