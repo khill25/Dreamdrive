@@ -3,6 +3,11 @@ add_executable(dreamdrivecast_mcu1
     # sdcard/internal_sd_card.c
     # sdcard/hw_config.c
     # sdcard/simple.c
+    ide_databus/ide_databus.c
+)
+
+pico_generate_pio_header(dreamdrivecast_shared
+    ${CMAKE_CURRENT_LIST_DIR}/ide_databus/ide_databus.pio
 )
 
 target_include_directories(dreamdrivecast_mcu1 PRIVATE
@@ -18,7 +23,7 @@ target_link_libraries(dreamdrivecast_mcu1
 
     # 3rd party libs
     # FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
-    # FatFs_SPI # SDCard and FatFS
+    FatFs_SPI # SDCard and FatFS
 
     dreamdrivecast_shared
 )

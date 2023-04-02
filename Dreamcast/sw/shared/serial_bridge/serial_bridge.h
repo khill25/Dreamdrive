@@ -17,6 +17,8 @@ void interconnect_set_direction(bool isTx);
 
 // Send data - Blocking
 void interconnect_tx(uint8_t* buf, int len);
+// Send a single 16bit value - Blocking
+void interconnect_tx16(uint16_t value); 
 
 bool interconnect_rx_buffer_has_data();
 bool interconnect_rx_has_data();

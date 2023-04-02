@@ -30,3 +30,5 @@
 #define MCU2_PIN_PIO_COMMS_D1       (27)
 #define MCU2_PIN_PIO_COMMS_D2       (28)
 #define MCU2_PIN_PIO_COMMS_D3       (29)
+
+// TODO define which pins are input, output, or both

@@ -12,6 +12,14 @@
 #include "serial_bridge/serial_bridge.h"
 #include "hardware/pio.h"
 
+#include "ff.h" /* Obtains integer types */
+#include "diskio.h" /* Declarations of disk functions */
+#include "f_util.h"
+
+void sdcard_read_test() {
+    
+}
+
 int main(void) {
     stdio_init_all();
     current_mcu = MCU1;

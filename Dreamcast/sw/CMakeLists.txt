@@ -28,6 +28,7 @@ pico_sdk_init()
 
 # Add shared code
 add_subdirectory(shared)
+add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
 # Add applications
 add_subdirectory(mcu1)

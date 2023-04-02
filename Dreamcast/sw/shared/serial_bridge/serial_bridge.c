@@ -135,6 +135,10 @@ void interconnect_tx(uint8_t* buf, int len) {
     }
 }
 
+void interconnect_tx16(uint16_t value) {
+    pio_sm_put_blocking(tx_interconnect_config.pio, tx_interconnect_config.sm, value);
+}
+
 bool interconnect_rx_has_data() {
     return !pio_sm_is_rx_fifo_empty(rx_interconnect_config.pio, rx_interconnect_config.sm);
 }
