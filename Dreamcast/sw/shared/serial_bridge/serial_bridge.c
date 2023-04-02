@@ -136,7 +136,6 @@ void interconnect_tx(uint8_t* buf, int len) {
 }
 
 bool interconnect_rx_has_data() {
-    //if (!isUartRXRunning) { return false; }
     return !pio_sm_is_rx_fifo_empty(rx_interconnect_config.pio, rx_interconnect_config.sm);
 }
 
@@ -158,12 +157,6 @@ static inline void interconnect_tx_program_init(PIO pio, uint sm, uint offset, u
     for (int i = pin_tx_start; i < pin_tx_start+NUM_INTERCONNECT_DAT_TX_PINS; i++) {
         pio_gpio_init(pio, i);
     }
-    // gpio_init(26);
-    // gpio_set_function(26, GPIO_FUNC_PIO0);
-    // pio_gpio_init(pio, 26);
-    // pio_gpio_init(pio, 27);
-    // pio_gpio_init(pio, 28);
-    // pio_gpio_init(pio, 29);
 
     // 24, 26, 27, 28, 29 = output
     // 22 = input
@@ -176,11 +169,11 @@ static inline void interconnect_tx_program_init(PIO pio, uint sm, uint offset, u
 
     // Setup autopull, grab 16 bits at a time
     sm_config_set_out_shift(&c, true, true, 16);
-    sm_config_set_in_pins(&c, 22);
+    sm_config_set_in_pins(&c, 22); 
     sm_config_set_out_pins(&c, 26, 4);
 
     // ctrl pin (24) is used to signal we have put data on the lines
-    sm_config_set_sideset_pins(&c, 24);
+    sm_config_set_sideset_pins(&c, pin_ctrl);
 
     // sm_config_set_clkdiv(&c, divider);
     pio_sm_init(pio, sm, offset, &c);

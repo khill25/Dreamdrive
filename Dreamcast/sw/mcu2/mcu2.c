@@ -41,6 +41,6 @@ int main(void) {
         numSentValues++;
         halfWordToSend = numSentValues;
 
-        sleep_ms(100);
+        sleep_ms(500);
     }
 }

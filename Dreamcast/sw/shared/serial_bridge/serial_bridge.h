@@ -18,7 +18,6 @@ void interconnect_set_direction(bool isTx);
 // Send data - Blocking
 void interconnect_tx(uint8_t* buf, int len);
 
-// Get data -- uses irq
-// void interconnect_rx(uint8_t* buf, int len);
 bool interconnect_rx_buffer_has_data();
+bool interconnect_rx_has_data();
 uint16_t interconnect_rx_get(); // Read 16 bits of the rx buffer
