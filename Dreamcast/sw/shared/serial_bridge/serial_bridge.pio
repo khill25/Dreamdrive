@@ -16,8 +16,8 @@
 .wrap_target
     ;; side set is applied at the START of an instruction
     out pins, 4         side 0; Shift out 4 bits at a time
-    nop                 side 1
-    wait 1 gpio rx_ack; wait for rx to sample
+    nop                 side 1 [3]
+    wait 1 gpio rx_ack  side 0; wait for rx to sample
 .wrap
 
     ; wait 1 gpio rx_ack  side 0; Wait for rx mcu to be ready
@@ -29,7 +29,7 @@
 .define tx_ack 24
 .side_set 1 opt ;; pin 22
 .wrap_target
-    wait 0 gpio tx_ack  side 0
+    wait 0 gpio tx_ack  side 1
     wait 1 gpio tx_ack  side 0
     in pins, 4          side 0
     nop                 side 1
