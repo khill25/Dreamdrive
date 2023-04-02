@@ -65,7 +65,7 @@ pio_interconnect_inst_t rx_interconnect_config = {
 
 #define RX_RING_BUFFER_SIZE 1024
 typedef struct RXRingBuffer_t {                                                                  
-    uint16_t buf[RX_RING_BUFFER_SIZE / sizeof(uint16_t)];
+    uint16_t buf[RX_RING_BUFFER_SIZE]; // 1024 * 16bit = bytes
     uint32_t head;                                                   
     uint32_t tail;                                                   
 } RXRingBuffer_t;
@@ -146,7 +146,7 @@ bool interconnect_rx_buffer_has_data() {
 // Read 16 bits of the rx buffer
 uint16_t interconnect_rx_get() {
     uint16_t ret = rxRingBuffer.buf[rxRingBuffer.tail++];
-    if (rxRingBuffer.tail >= RX_RING_BUFFER_SIZE/2) {
+    if (rxRingBuffer.tail >= RX_RING_BUFFER_SIZE) {
         rxRingBuffer.tail = 0;
     }
     return ret;

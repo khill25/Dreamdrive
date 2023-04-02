@@ -12,15 +12,6 @@
 #include "serial_bridge/serial_bridge.h"
 #include "hardware/pio.h"
 
-// #include "hardware/structs/ssi.h"
-// #include "hardware/structs/ioqspi.h"
-// #include "FreeRTOS.h"
-// #include "task.h"
-// #include "mcu1.h"
-// #include "mcu2.h"
-// #include "qspi_helper.h"
-// #include "sdcard/internal_sd_card.h"
-
 int main(void) {
     stdio_init_all();
     current_mcu = MCU1;
@@ -44,11 +35,6 @@ int main(void) {
             
             numReadValues++;
         }
-
-        // uint32_t word = pio_sm_get_blocking(pio0, 1);
-        // printf("%08x ", word);
-
-        // numReadValues++;
     }
 
     return 0;

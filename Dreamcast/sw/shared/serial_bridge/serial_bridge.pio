@@ -6,9 +6,9 @@
 
 ;; tx_ack == intermcu_rx_program.sideSet
 ;; rx_ack == intermcu_tx_program.sideSet
-
 ;; rx_ack == pin 22 // ctrl1
 ;; tx_ack == pin 24 // ctrl2
+;; side set is applied at the START of an instruction
 
 .program inter_mcu_tx
 .define rx_ack 22
@@ -20,10 +20,6 @@
     wait 1 gpio rx_ack  side 0; wait for rx to sample
 .wrap
 
-    ; wait 1 gpio rx_ack  side 0; Wait for rx mcu to be ready
-    ;; autopull after 16 bits
-
-
 ;; Push 16 bits of data into rx fifo
 .program inter_mcu_rx
 .define tx_ack 24
@@ -34,16 +30,3 @@
     in pins, 4          side 0
     nop                 side 1
 .wrap
-
-; .wrap_target
-;     ;; Loop 4 times to sample 16 bits of data
-;     ;; Also set side pin high to let the tx mcu know we are ready for data
-    
-;     set x, 3            side 0;; loop 4 times to get 16 bits of data
-; get_data:
-;     wait 1 gpio tx_ack  side 0;
-;     wait 0 gpio tx_ack  side 0;
-;     in pins, 4          side 0;
-;     jmp x--, get_data   side 1; loop 4 times, set ack pin low so the other processor will send data
-;     push                side 0;; push the gathered data back to c code
-; .wrap
