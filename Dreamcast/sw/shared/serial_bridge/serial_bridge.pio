@@ -1,34 +1,52 @@
-.program inter_mcu_tx
-.side_set 1 ; side pin is used for clk/or latch
-; use side set for 'data available' line?
-get_data:
-    pull ;; autopull??
+/**
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2023 Kaili Hill
+ */
 
-;; Shift out 4 bits at a time, waiting until the ack line is set high before
-;; continuing. 
-;; Shift 16 bits of data total
+;; tx_ack == intermcu_rx_program.sideSet
+;; rx_ack == intermcu_tx_program.sideSet
+
+;; rx_ack == pin 22 // ctrl1
+;; tx_ack == pin 24 // ctrl2
+
+.program inter_mcu_tx
+.define rx_ack 22
+.side_set 1 opt ;; pin 24
 .wrap_target
-send_data:
-    out pins, 4      side 1; Shift out 4 bits at a time
-    wait 1 gpio ack  side 0; wait for signal line to go high
+    ;; side set is applied at the START of an instruction
+    pull
+    set x, 3
+data_loop:
+    ;; Send out 4 bits, assert "data on line" pin
+    out pins, 4         side 1; Shift out 4 bits at a time
+    nop                 side 0 [5]
+    jmp x-- data_loop   side 0
 .wrap
 
+    ; wait 1 gpio rx_ack  side 0; Wait for rx mcu to be ready
+    ;; autopull after 16 bits
 
-;; Push 16 bits, 4 bits at a time
-;; Side set (ack) goes high once data has been sampled
-;; then ack brought low 
+
+;; Push 16 bits of data into rx fifo
 .program inter_mcu_rx
-    set x, 3 ;; loop 4 times to get 16 bits of data
-get_data:
-    wait 1 gpio ack     side 0;
-    in pins, 4          side 1;
-    jmp x--, get_data   side 0; loop 4 times, set ack pin low so the other processor will send data
-    push                side 0;; push the gathered data back to c code
+.define tx_ack 24
+.side_set 1 opt ;; pin 22
+.wrap_target
+    wait 1 gpio tx_ack  side 0
+    wait 0 gpio tx_ack  side 0
+    in pins, 4          side 1
+.wrap
 
-; 4 data pins
-; 1 clk pin
-; 1 reciever ack pin
-; put 4 bits of data on lines, [set line low]
-; wait for ack high [set line high]
-; shift out 4 more bits [set line low]
-;
+; .wrap_target
+;     ;; Loop 4 times to sample 16 bits of data
+;     ;; Also set side pin high to let the tx mcu know we are ready for data
+    
+;     set x, 3            side 0;; loop 4 times to get 16 bits of data
+; get_data:
+;     wait 1 gpio tx_ack  side 0;
+;     wait 0 gpio tx_ack  side 0;
+;     in pins, 4          side 0;
+;     jmp x--, get_data   side 1; loop 4 times, set ack pin low so the other processor will send data
+;     push                side 0;; push the gathered data back to c code
+; .wrap

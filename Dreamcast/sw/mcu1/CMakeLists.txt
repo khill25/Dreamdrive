@@ -14,17 +14,18 @@ target_include_directories(dreamdrivecast_mcu1 PRIVATE
 target_link_libraries(dreamdrivecast_mcu1
     pico_multicore
     pico_stdlib
-    stdio_async_uart
     hardware_pio
 
     # 3rd party libs
     # FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
-    FatFs_SPI # SDCard and FatFS
+    # FatFs_SPI # SDCard and FatFS
+
+    dreamdrivecast_shared
 )
 
 # stdio config
-pico_enable_stdio_usb(dreamdrivecast_mcu1 0)
-pico_enable_stdio_uart(dreamdrivecast_mcu1 1)
+pico_enable_stdio_usb(dreamdrivecast_mcu1 1)
+pico_enable_stdio_uart(dreamdrivecast_mcu1 0)
 
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(dreamdrivecast_mcu1)
