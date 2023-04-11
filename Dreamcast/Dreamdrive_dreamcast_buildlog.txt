@@ -1,0 +1,4 @@
+Finding a copy of the "GD-ROM protocol SPI specification design" doc mentioned in the Dreamcast Hardware spec. I managed to track down a copy on archive.org.
+
+I originally found just a text version on archive.org but was able to get the original PDF version, with tables intact. Was really difficult to figure out a protocol spec without columns and the data spaced all over.
+
