@@ -6,13 +6,160 @@
 
 #pragma once
 
+#include "pico/stdlib.h"
+
+#define POWER_ON_OR_HARDWARE_RESET  0
+#define SPI_SOFT_RESET              1
+#define ATA_SRST_RESET              2
+
+/* ATA Stuff */
+// Commands
+#define ATA_CMD_NOP                         (0x00)
+#define ATA_CMD_SOFT_RESET                  (0x08)
+#define ATA_CMD_PACKET_COMMAND              (0xA0)
+#define ATA_CMD_IDENTIFY_DEVICE             (0xA1)
+#define ATA_CMD_EXECUTE_DEVICE_DIAGNOSTIC   (0x90)
+#define ATA_CMD_SET_FEATURES                (0xEF)
+
+typedef enum ATA_TASK_FILE_REGISTER_INDEX {
+    ATA_TFR_STATUS = 0,
+    ATA_TFR_ERROR,
+    ATA_TFR_SECTOR_COUNT,
+    ATA_TFR_SECTOR_NUMBER,
+    ATA_TFR_CYLINDER_LOW,
+    ATA_TFR_CYLINDER_HIGH,
+    ATA_TFR_DRIVE_HEAD,
+    ATA_TFR_REGISTER_COUNT,
+};
+uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
+    0x00,
+    0x01,
+    0x01,
+    0x01,
+    0x14,
+    0xEB,
+    0x00,
+};
+
+/* Sega Packet Interface stuff */
+typedef enum SPI_REGISTER_INDEX {
+    SPI_ATA_IO_REGISTER_INDEX = 0       ,
+    SPI_STATUS_REGISTER_INDEX           ,
+    SPI_ALTERNATE_STATUS_REGISTER_INDEX ,
+    SPI_COMMAND_REGISTER_INDEX         ,
+    SPI_BYTE_COUNT_REGISTER_LOW_INDEX      , // Low bits
+    SPI_BYTE_COUNT_REGISTER_HIGH_INDEX      , // high bits
+    SPI_DATA_REGISTER_INDEX             , // use `SPI_data_register` to access this register
+    SPI_DEVICE_CONTROL_REGISTER_INDEX   ,
+    SPI_DRIVE_SELECT_REGISTER_INDEX     ,// ATA Drive/Head register
+    SPI_ERROR_REGISTER_INDEX            ,
+    SPI_FEATURES_REGISTER_INDEX         ,
+    SPI_INTERRUPT_REASON_REGISTER_INDEX , // Read only
+    SPI_SECTOR_COUNT_REGISTER_INDEX     , // Write only
+    SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
+    SPI_REGISTER_COUNT
+} ;
+uint8_t SPI_registers[SPI_REGISTER_COUNT] = {0};
+uint16_t SPI_data_register; // since this is the only 16 bit register...
+
+/*
+ * Bit index enums for various registers that have specific bit indexing
+ */
+typedef enum {
+    SPI_STATUS_CHECK            = 0,
+    SPI_STATUS_Reserved         = 1,
+    SPI_STATUS_CORR             = 2,
+    SPI_STATUS_DRQ              = 3, // Data request
+    SPI_STATUS_DSC              = 4, // Data seek
+    SPI_STATUS_DF               = 5, // Drive fault
+    SPI_STATUS_DRDY             = 6, // Drive ready (able to respond to ATA command)
+    SPI_STATUS_BSY              = 7,
+} SPI_STATUS_REGISTER;
+
+typedef enum {
+    SPI_ALTERNATE_STATUS_CHECK            = 0,
+    SPI_ALTERNATE_STATUS_Reserved         = 1,
+    SPI_ALTERNATE_STATUS_CORR             = 2,
+    SPI_ALTERNATE_STATUS_DRQ              = 3,
+    SPI_ALTERNATE_STATUS_DSC              = 4,
+    SPI_ALTERNATE_STATUS_DF               = 5,
+    SPI_ALTERNATE_STATUS_DRDY             = 6,
+    SPI_ALTERNATE_STATUS_BSY              = 7,
+} SPI_ALTERNATE_STATUS_REGISTER;
+
+typedef enum {
+    SPI_DEVICE_CONTROL_Zero = 0, // always 0?
+    SPI_DEVICE_CONTROL_nIEN = 1, // Sets up interrupt for the host
+    SPI_DEVICE_CONTROL_SRST = 2, // Software reset from the host
+    SPI_DEVICE_CONTROL_One  = 3, // always 1?
+    // rest of the bits are reserved
+} SPI_DEVICE_CONTROL_REGISTER;
+
+typedef enum {
+    // LUN = Logical unit number, 4 bits
+    SPI_DRIVE_SELECT_LUN_LSB    = 0,
+    SPI_DRIVE_SELECT_Zero       = 4, // always 0?
+    SPI_DRIVE_SELECT_One        = 5,
+    // 6 is reserved
+    SPI_DRIVE_SELECT_One2       = 7,
+} SPI_DRIVE_SELECT_REGISTER;
+
+typedef enum {
+    SPI_ERROR_ILI              = 0, // Command length is not correct
+    SPI_ERROR_EMOF             = 1, // End of media detected
+    SPI_ERROR_ABRT             = 2, // Drive is not ready and command is invalid
+    SPI_ERROR_MCR              = 3, // Media change request, media may have been ejected
+    SPI_ERROR_SENSE_KEY_LSB    = 4, // Sense key LSB
+} SPI_ERROR_REGISTER;
+#define SPI_SENSE_KEY_NO_SENSE                  (0x0)
+#define SPI_SENSE_KEY_RECOVERED_ERROR           (0x1)
+#define SPI_SENSE_KEY_NO_SENSE_NOT_READY        (0x2)
+#define SPI_SENSE_KEY_NO_SENSE_MEDIUM_ERROR     (0x3)
+#define SPI_SENSE_KEY_NO_SENSE_HARDWARE_ERROR   (0x4)
+#define SPI_SENSE_KEY_NO_SENSE_ILLEGAL_REQUEST  (0x5)
+#define SPI_SENSE_KEY_NO_SENSE_UNIT_ATTENTION   (0x6)
+#define SPI_SENSE_KEY_NO_SENSE_DATA_PROTECT     (0x7)
+#define SPI_SENSE_KEY_NO_SENSE_ABORTED_COMMAND  (0xB)
+
+typedef enum {
+    SPI_FEATURES_DMA_OR_FEATURE_NUMBER_LSB  = 0, // 1 = DMA, 0 = PIO
+    SPI_FEATURES_FEATURE_NUMBER_MSB         = 6, // Feature number is 7 bits, bits 0-6
+    SPI_FEATURES_FEATURE_SET_CLEAR          = 7, // set = 1, clear = 0
+} SPI_FEATURES_REGISTER;
+#define SPI_FEATURES_REGISTER_SET_MODE  (0x83) // 0x83: Set = 1, Feature Number = 3, Transfer mode is then specified in the Sector Count Register
+
+typedef enum {
+    SPI_INTERRUPT_REASON_CoD  = 0, // 0 = data, 1 = command
+    SPI_INTERRUPT_REASON_IO = 1
+} SPI_INTERRUPT_REASON_REGISTER;
+#define SPI_INTERRUPT_REASON_CMD_PACKET_RDY_TO_RX   (0x3) // 011b Command packet can be received
+#define SPI_INTERRUPT_REASON_MSG_RDY_TO_TX          (0x7) // 111b Message can be sent from device to host
+#define SPI_INTERRUPT_REASON_DATA_RDY_TO_TX         (0x6) // 110b Data can be sent to host
+#define SPI_INTERRUPT_REASON_DATA_RDY_TO_RX         (0x2) // 010b Data can be received from host
+#define SPI_INTERRUPT_REASON_STATUS_COMPLETION      (0x5) // 101b Status register completion status
+
+typedef enum {
+    SPI_SECTOR_COUNT_MODE_VALUE_LSB = 0,
+    SPI_SECTOR_COUNT_TRANSFER_MODE_LSB = 4,
+} SPI_SECTOR_COUNT_REGISTER;    
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT      (0x0)  // 0000000xb 
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_FLOW_CONTROL (0x08) // 00001xxxb 
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_SINGLE_WORD_DMA  (0x10) // 00010xxxb 
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_MULTI_WORD_DMA   (0x40) // 00100xxxb 
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_PSEUDO_DMA       (0x18) // 00011xxxb apparently reserved?
+
+typedef enum {
+    SPI_SECTOR_NUMBER_STATUS_LSB = 0, // 4 bits
+    SPI_SECTOR_NUMBER_DISC_FORMAT_LSB = 4, // 4 bits
+} SPI_SECTOR_NUMBER_REGISTER;
+
 /*
  * SPI(Sega Packet Interface) commands are 12 bytes
  */
 
 // Byte 0 is the command code
 // Byte 1-11 are parameters or empty
-uint8_t SEGA_PACKET_CMD[12] = {0};
+uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
 
 #define TEST_UNIT_SEGA_PACKET_CMD       0x00
 #define REQ_STAT_SEGA_PACKET_CMD        0x10
@@ -236,34 +383,34 @@ Bit 3,
     1 = 4-channel audio
 */
 
-uint8_t TOC_TRACK_INFO_1[4] = { 0
+// uint8_t TOC_TRACK_INFO_1[4] = { 0
 /*
  * Byte 0, upper 4 bits = Control, lower 4 bits = ADR
  * Byte 1, FAD for track 1 start (MSB)
  * Byte 2, FAD for track 1 start
  * Byte 3, FAD for track 1 start (LSB)
  */
-};
+// };
 
-uint8_t TOC_TRACK_INFO_2[4] = { 0
+// uint8_t TOC_TRACK_INFO_2[4] = { 0
 /*
  * Byte 0, upper 4 bits = Control, lower 4 bits = ADR
  * Byte 1, Start track number
  */
-};
+// };
 
-uint8_t TOC_TRACK_INFO_3[4] = { 0
+// uint8_t TOC_TRACK_INFO_3[4] = { 0
 /*
  * Byte 0, upper 4 bits = Control, lower 4 bits = ADR
  * Byte 1, End track number
  */
-};
+// };
 
-uint8_t TOC_TRACK_INFO_1[4] = { 0
+// uint8_t TOC_TRACK_INFO_1[4] = { 0
 /*
  * Byte 0, upper 4 bits = Control, lower 4 bits = ADR
  * Byte 1, FAD for lead-out start (MSB)
  * Byte 2, FAD for lead-out start
  * Byte 3, FAD for lead-out start (LSB)
  */
-};
+// };
