@@ -16,8 +16,10 @@
 #include "diskio.h" /* Declarations of disk functions */
 #include "f_util.h"
 
+#include "sega_packet_interface.h"
+
 void sdcard_read_test() {
-    
+
 }
 
 int main(void) {

@@ -245,25 +245,226 @@ The information obtained by this register is the same as the status data obtaine
 * Applies to `Identify Device` command
 * Command is accompanied by transfer of one or multiple data blocks from the device to the host
 
-1) Host continues to read the `Status Register` or `Alternate Status Register` until `BSY` bit becomes `0`
-2) Host writes params for the commands to be issued to following registers:
+1) Host waits for `BSY` bit to become `0` in `Status Register` or `Alternate Status Register`
+2) Host writes params for the command to relevant registers:
     * `Features Register`, `Sector Count Register`, `Sector Number Register`, `Cylinder High Register`, `Cylinder Low Register`, `Device/Head Register`
 3) Host writes the command code to the `Command Register`
-4) Device sets the `BSY` bit to `1` preparing to execute the command for sending the first data block to the host.
-5) When the data block is prepared the device sets the `DRQ` bit. The device asserts `INTRQ` after clearing the `BSY` bit.
-    * `DRQ` is optional for certain error conditions.
-    * If an error condition has occured, the device sets an appropriate status and error bit for the error condition.
-    * When the operation to set the `BSY` bit in step 6 and clear it in step 7 is accomplished very fast, the host may not always notice that the `BSY` bit was set once.
-6) After polling the `Alternate Status Register` and waiting for the `BSY` bit to become `0`, or after detecting `INTRQ`, the host reads out and saves the contents of the `Status Register`.
-7) If the `DRQ` bit was set, the host reads out and transfers one block Data Register from the `Data Register`. 
-    * If an error condition has occurred in the status read-out of step 8, the data transfer will not be legal.
-8) When the `Status Register` is read out 
-    * The device negates `INTRQ`. 
-    * After read-out of one entire data block, one of the following operations is executed.
-        * If status has been communicated to the host without any errors occurring in step 8 (this step), and transmission of further blocks is required, the device sets the `BSY` bit and repeats the above sequence from step 7 (last step).
-        * If an error status was reported during read-out of the status during step 8 (this step), the device clears the `DRQ` bit and completes the execution of the command.
-        * When the final block is transferred, the device clears the `DRQ` bit and completes the execution of the command.
+4) Device sets `BSY` bit to `1` and prepares to send the first data block.
+5) Device sets `DRQ` bit and asserts `INTRQ` when data block is ready
+    * `DRQ` is optional for some error conditions
+    * If an error occurs, the device sets the corresponding status and error bits
+    * If `BSY` bit transitions are too fast, the host may not notice
+6) Host reads and saves `Status Register` after detecting `INTRQ` or `BSY` bit becoming `0` in the `Alternate Status Register`
+7) If the `DRQ` bit is set, host reads one data block from `Data Register`. 
+    * Illegal transfer if an error occurs in the next ste (step 8)
+8) After the `Status Register` is read out 
+    * Device negates `INTRQ`
+    * Executes one of the following based on the status read-out:
+        * If no errors and more blocks needed, set `BSY` bit and repeat step 7
+        * If an error occurred during this step, clear `DRQ` bit and complete command execution
+        * If the final block is transferred, clear `DRQ` bit and complete command execution
 
 ---
 
-    
+#### Non-data Command Flow
+Applies to:
+* `NOP`
+* `Soft Reset`
+* `Execute Device Diagnostic`
+* `Set Features`
+1) Host polls the `Status Register` or `Alternate Status Register` until `BSY` bit becomes `0`
+2) Host writes params for the command to relevant registers
+3) Host writes the command code to `Command Register`
+4) Device sets `BSY` bit to `1` and executes command.
+    * If an error occurs during execution the device sets an appropriate status and error bit
+5) When command execution is complete device asserts `INTRQ` and clears the `BSY` bit.
+
+---
+
+#### ATA Command (Task File Command)
+When a command is issued from the host, the device should:
+* Load the command in a suitable register in the command block
+* write the command code to the `Command Register`
+* Device must set the `BSY` bit within 400ns.
+
+|Command|Code|
+|---|---|
+|`Soft Reset`| `0x08`|
+|`Execute Device Diagnostic`| `0x90`|
+|`NOP`| `0x00`|
+|`Packet Command`| `0xA0`|
+|`Identify Device`| `0xA1`|
+|`Set Features`| `0xEF`|
+
+<ul>
+<li><code>Soft Reset</code> Executes a software reset of the device. This command can also be received when `BSY` bit = `1`
+</li>
+<li><code>Execute Drive Diagnostic</code> Initiates self-diagnostic routine of the device.
+    <ul>
+        <li> Device reports the result of the self-diagnostic routine </li>
+        <li> The device clears the `BSY` bit and issues an interrupt </li>
+        <li> Error code is an 8-bit value written to the error register</li>
+        <li>
+        <table>
+            <tbody>
+                <tr>
+                <th>Error Code</th>
+                <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>0x01</td>
+                    <td>Normal</td>
+                </tr>
+                <tr>
+                    <td><code>0x03</td>
+                    <td>Data buffer error</td>
+                </tr>
+                <tr>
+                    <td><code>0x04</td>
+                    <td>ODC error</td>
+                </tr>
+                <tr>
+                    <td><code>0x05</td>
+                    <td>CPU error</td>
+                </tr>
+                <tr>
+                    <td><code>0x06</td>
+                    <td>DSC error</td>
+                </tr>
+                <tr>
+                    <td><code>0x07</td>
+                    <td>Other error</td>
+                </tr>
+                </tbody>
+            </table>
+        </li>
+    </ul>
+</ul>
+
+* `Set Features`
+    * For the GD-ROM, only the transfer mode settings are supported
+    * This setting can be made individually for `DMA` mode and `PIO` mode
+    1) Set `3` in the `Set` bit of the `Feature Register` and `Feature Number`
+    2) In the `Sector Count Register`
+        * Specify the transfer mode in the upper 5 bits 
+        * Mode number in the lower 3 bits
+    3) Execute the `Set Features` command
+
+* `NOP`
+    * Device status access for hosts with 16-bit registers (?? Does the Dreamcast support 16-bit registers ??)
+    * Command can be received when `BSY` bit is `1` and device should terminate the command currently in execution
+        * If the termination is performed correctly only the termination interrupt of this command is returned.
+    * The device responds to commands that are not recognized by the following:
+        * Setting "abort" in the error register
+        * Setting an error in the status register
+        * Clearing "busy" in the status register
+        * Asserting the `INTRQ` signal
+
+* `Packet Command`
+    * TODO see SPI Packet Command section
+
+* `Identify Device`
+    * Always conducted in PIO Mode
+    <ul>
+    <li>
+    <table>
+        <tbody>
+            <tr>
+            <th>Byte</th>
+            <th>Content</th>
+            </tr>
+            <tr>
+                <td><code>0</td>
+                <td>Manufacturer ID</td>
+            </tr>
+            <tr>
+                <td><code>1</td>
+                <td>Model ID</td>
+            </tr>
+            <tr>
+                <td><code>2</td>
+                <td>Version ID</td>
+            </tr>
+            <tr>
+                <td><code>0x3-0xF</td>
+                <td>Reserved</td>
+            </tr>
+            <tr>
+                <td><code>0x10-0x1F</td>
+                <td>Manufacturer name (16 ASCII characters)</td>
+            </tr>
+            <tr>
+                <td><code>0x20-0x2F</td>
+                <td>Model name (16 ASCII characters)</td>
+            </tr>
+            <tr>
+                <td><code>0x30-0x3F</td>
+                <td>Firmware version (16 ASCII characters)</td>
+            </tr>
+            <tr>
+                <td><code>0x40-0x4F</td>
+                <td>Reserved</td>
+            </tr>
+            </tbody>
+        </table>
+    </li>
+    </ul>
+
+---
+### SPI Packet Commands
+|Command|Function|OP Code|
+---|---|---|
+|`TEST_UNIT`|Verify access readiness|`0x00`|
+|`REQ_STAT`|Get CD Status|`0x10`|
+|`REQ_MODE`|Get various settings|`0x11`|
+|`SET_MODE`|Make various settings|`0x12`|
+|`REQ_ERROR`|Get error details|`0x13`|
+|`GET_TOC`|Get all `TOC` data|`0x14`|
+|`REQ_SES`|Get specified session data|`0x15`|
+|`CD_OPEN`|Open tray|`0x16`|
+|`CD_PLAY`|Play CD|`0x20`|
+|`CD_SEEK`|Seek for playback position|`0x21`|
+|`CD_SCAN`|Perform scan|`0x22`|
+|`CD_READ`|Read CD|`0x30`|
+|`CD_READ2`|CD read (pre-read position)|`0x31`|
+|`GET_SCD`|Get subcode|`0x40`|
+
+#### Command Packet Format
+|Bit|7|6|5|4|3|2|1|0|
+|---|---|---|---|---|---|---|---|---|
+|Byte|||||||||
+|0|Command Code||||||||
+|1|Command parameter||||||||
+|2|Command parameter||||||||
+|3|Command parameter||||||||
+|4|Command parameter||||||||
+|5|Command parameter||||||||
+|6|Command parameter||||||||
+|7|Command parameter||||||||
+|8|Command parameter||||||||
+|9|Command parameter||||||||
+|10|Command parameter||||||||
+|11|Command parameter||||||||
+* **Command code**
+    * The codes allotted to the various commands required to control the devices
+* **Command parameter**
+    * `Transfer Length`
+        * Data length to be transfer
+        * Typically represents the block count
+        * For some commands it represents the byte count
+        * For commands with multiple byte transfers, the transfer length `0` indicates no transfer
+    * `Allocation Length`
+        * Max length of data that host can receive
+        * `0` indicates no transfer
+    * `Starting Address`
+        * Position to start data transfer
+        * Some cases it may indicate transfer starting address
+
+
+
+----
+#### SPI Command Flow Sequence
+
+
+---
+#### CD Drive
