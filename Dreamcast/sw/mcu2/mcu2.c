@@ -39,6 +39,8 @@ void setup_gpio() {
     }
 }
 
+uint16_t cached_control_line_data = 0;
+
 int main(void) {
     stdio_init_all();
     current_mcu = MCU2;
@@ -49,20 +51,19 @@ int main(void) {
 
     printf("MCU2- Setting up interconnect\n");
     interconnect_init(MCU2_PIN_PIO_COMMS_CTRL1, MCU2_PIN_PIO_COMMS_CTRL2, MCU2_PIN_PIO_COMMS_D0, true);
-
-    uint16_t numSentValues = 0;
-    uint16_t halfWordToSend = 0;
+    
     while(1) {
-        interconnect_tx((uint8_t*)(&halfWordToSend), 2);   
-        printf("Sent %04x\n", halfWordToSend);
+        process_dreamlink_data();
 
-        numSentValues++;
-        halfWordToSend = numSentValues;
+        if (mcu2_fetch_control_lines) {
+            mcu2_fetch_control_lines = false;
+            
+            // fetch control line data
+            uint16_t values = (uint16_t)(gpio_get_all() & MCU2_CONTROL_LINE_PIN_MASK);
+            cached_control_line_data = values;
 
-        if (numSentValues % 16 == 0) {
-            sleep_ms(500);
-        } else {
-            sleep_ms(10);
+            // send control line data
+            dreamlink_send_control_line_data_cmd(values);
         }
     }
 }

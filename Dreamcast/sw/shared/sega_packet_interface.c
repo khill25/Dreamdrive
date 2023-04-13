@@ -147,11 +147,11 @@ void SPI_assert_INTRQ(bool valueHigh) {
 }
 
 uint16_t SPI_decode_mcu2_control_lines(uint16_t mcu2ControlLineValue) {
+    // MCU2 has 16 lines, Easier to sample them all at this point
     /* LSB ... MSB
      * a0, a1, a2, cs0, cs1, read, write, iordy, 
-     * intrq, x, x, emph, dmarq, dmack, x, x
+     * intrq, x, x, x, dmarq, dmack, x, x
      */
-
 }
 
 // Handles calling the right functions based on the command function
@@ -179,7 +179,6 @@ void SPI_execute_cmd() {
  */
 void SPI_read_status_register() {
     // TODO: Send status register
-
     SPI_assert_INTRQ(false);
 }
 
