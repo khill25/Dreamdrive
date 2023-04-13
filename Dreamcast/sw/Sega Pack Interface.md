@@ -56,6 +56,28 @@ These are listed in priority order. With **Power-on Reset** being higher than **
 * Except for the data register, all registers are read/written in 8-bits (byte units)
 * The data register is always accessed in 16-bit words.
 
+#### Function Select Table
+This table represents which registers are read or written based on the CS, Address, and Read/Write lines. Data is valid on falling edge of `READ`/`WRITE`. There is 100-300ns of time to sample the pins before the data becomes valid on the next rising edge.
+
+|CS1|CS0| A2 | A1 | A0 | READ | WRITE |
+---|---|---|---|---|---|---|
+1|0|1|1|0|`Alternate Status Register`|`Device Control Register`|
+0|1|0|0|0|`Data Register`| `Data Register`|
+0|1|0|0|1|`Error Register`|`Features Register`|
+0|1|0|1|0|`Interrupt Reason Register`|!!NOT USED!!|
+0|1|0|1|1|`Sector Number Register`|!!NOTE USED!!|
+0|1|1|0|0|`Byte Count Register (0-7)`|`Byte Count Register (0-7)`|
+0|1|1|0|1|`Byte Count Register (8-15)`|`Byte Count Register (8-15)`|
+0|1|1|1|0|`Drive Select Register`|`Drive Select Register`|
+0|1|1|1|1|`Status Register`|`Command Register`|
+1|1|x|x|x|INVALID ADDRESS|INVALID ADDRESS|
+
+** There seems to be an error in the GM-ROM Protocol SPI Specifications PDF I was reading to create this doc. I have fixed this table with information based on findings from a logic analyzer and analyzing the iceGDROM verilog.
+
+***These pins are also know as: `CS1` = CS3FX, `CS0` = CS1FX, `READ` = DIOR, `WRITE` = DIOW
+
+---
+
 #### Status Register
 <ul>
 

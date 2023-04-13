@@ -30,16 +30,8 @@ typedef enum ATA_TASK_FILE_REGISTER_INDEX {
     ATA_TFR_CYLINDER_HIGH,
     ATA_TFR_DRIVE_HEAD,
     ATA_TFR_REGISTER_COUNT,
-};
-uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
-    0x00,
-    0x01,
-    0x01,
-    0x01,
-    0x14,
-    0xEB,
-    0x00,
-};
+} ATA_TASK_FILE_REGISTER_INDEX;
+extern uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT];
 
 /* Sega Packet Interface stuff */
 typedef enum SPI_REGISTER_INDEX {
@@ -58,9 +50,9 @@ typedef enum SPI_REGISTER_INDEX {
     SPI_SECTOR_COUNT_REGISTER_INDEX     , // Write only
     SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
     SPI_REGISTER_COUNT
-} ;
-uint8_t SPI_registers[SPI_REGISTER_COUNT] = {0};
-uint16_t SPI_data_register; // since this is the only 16 bit register...
+} SPI_REGISTER_INDEX;
+extern uint8_t SPI_registers[SPI_REGISTER_COUNT];
+extern uint16_t SPI_data_register; // since this is the only 16 bit register...
 
 /*
  * Bit index enums for various registers that have specific bit indexing
@@ -159,7 +151,7 @@ typedef enum {
 
 // Byte 0 is the command code
 // Byte 1-11 are parameters or empty
-uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
+extern uint8_t SEGA_PACKET_CMD_REGISTER[12];
 
 #define TEST_UNIT_SEGA_PACKET_CMD       0x00
 #define REQ_STAT_SEGA_PACKET_CMD        0x10
@@ -176,35 +168,35 @@ uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
 #define CD_READ2_SEGA_PACKET_CMD        0x31
 #define GET_SCD_SEGA_PACKET_CMD         0x40
 
-uint8_t SEGA_PACKET_CMD_TEST_UNIT[12] = {
-    TEST_UNIT_SEGA_PACKET_CMD,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00
-};
+// uint8_t SEGA_PACKET_CMD_TEST_UNIT[12] = {
+//     TEST_UNIT_SEGA_PACKET_CMD,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00
+// };
 
-uint8_t SEGA_PACKET_CMD_REQ_STAT[12] = {
-    REQ_STAT_SEGA_PACKET_CMD,
-    0x00,
-    0x00, // byte[2] - starting address, always even
-    0x00,
-    0x00, // byte[4] - allocation length
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00
-};
+// uint8_t SEGA_PACKET_CMD_REQ_STAT[12] = {
+//     REQ_STAT_SEGA_PACKET_CMD,
+//     0x00,
+//     0x00, // byte[2] - starting address, always even
+//     0x00,
+//     0x00, // byte[4] - allocation length
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00
+// };
 
 /*************************************/
 /*********** REQ STAT INFO ***********/
@@ -235,48 +227,48 @@ uint8_t SEGA_PACKET_CMD_REQ_STAT[12] = {
 // Based on status. Home position = 0x96
 
 // 10 Bytes total
-uint8_t SEGA_PACKET_REQ_STAT_INFO[10] = {
-    0x00, // STATUS in lower 4 bits (no command in )
-    0x00, // Upper 4 bits = Disc format, Lower 4 bits = Repeat Count
-    0x00, // Upper 4 bits = Address, lower 4 = Control, NOTE: "Control address byte of subcode Q (first byte)" (whatever this means...)
-    0x00, // TNO, Subcode Q track number (binary value, not BCD)
-    0x00, // X, Subcode Q index number (binary value, not BCD)
-    0x00, // FAD = Frame Address, (based on subcode Q for CD-DA and header information for CD-ROM)
-    0x00, // FAD
-    0x00, // FAD
-    0x00, // Max Read Error Retry Times, cleared to 0 when read
-    0x00,
-};
+// uint8_t SEGA_PACKET_REQ_STAT_INFO[10] = {
+//     0x00, // STATUS in lower 4 bits (no command in )
+//     0x00, // Upper 4 bits = Disc format, Lower 4 bits = Repeat Count
+//     0x00, // Upper 4 bits = Address, lower 4 = Control, NOTE: "Control address byte of subcode Q (first byte)" (whatever this means...)
+//     0x00, // TNO, Subcode Q track number (binary value, not BCD)
+//     0x00, // X, Subcode Q index number (binary value, not BCD)
+//     0x00, // FAD = Frame Address, (based on subcode Q for CD-DA and header information for CD-ROM)
+//     0x00, // FAD
+//     0x00, // FAD
+//     0x00, // Max Read Error Retry Times, cleared to 0 when read
+//     0x00,
+// };
 
 // Gets CD block mode information
-uint8_t SEGA_PACKET_CMD_REQ_MODE[12] = {
-    REQ_MODE_SEGA_PACKET_CMD,
-    0x00,
-    0x00, // byte[2] - starting address, always even
-    0x00,
-    0x00, // byte[4] - allocation length
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-};
+// uint8_t SEGA_PACKET_CMD_REQ_MODE[12] = {
+//     REQ_MODE_SEGA_PACKET_CMD,
+//     0x00,
+//     0x00, // byte[2] - starting address, always even
+//     0x00,
+//     0x00, // byte[4] - allocation length
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+// };
 
 // Sets CD block mode information
-uint8_t SEGA_PACKET_CMD_SET_MODE[12] = {
-    SET_MODE_SEGA_PACKET_CMD,
-    0x00,
-    0x00, // byte[2] - starting address, always even
-    0x00,
-    0x00, // byte[4] - allocation length
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-};
+// uint8_t SEGA_PACKET_CMD_SET_MODE[12] = {
+//     SET_MODE_SEGA_PACKET_CMD,
+//     0x00,
+//     0x00, // byte[2] - starting address, always even
+//     0x00,
+//     0x00, // byte[4] - allocation length
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+// };
 
 /*************************************************/
 /*********** REQ/SET MODE HARDWARE INFO **********/
@@ -291,8 +283,10 @@ uint8_t SEGA_PACKET_CMD_SET_MODE[12] = {
 #define REQ_MODE_HARDWARE_INFO_CDROM_SPEED_10X         0x6
 #define REQ_MODE_HARDWARE_INFO_CDROM_SPEED_12X         0x7
 
-uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32] = { 0
-/*
+extern uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32];
+/* 
+= { 0
+
  * Byte 0-1         0x00
  * Byte 2           CD-ROM Speed
  * Byte 3           0x00
@@ -307,54 +301,56 @@ uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32] = { 0
  * Byte 10-17       Drive Information (ASCII), Name of drive, READ ONLY
  * Byte 18-25       System Version (ASCII), CD block version, READ ONLY
  * Byte 26-31       System Date (ASCII), Updated date of CD block, READ ONLY
- */
+ 
 };
+*/
 
-uint8_t SEGA_PACKET_CMD_REQ_ERROR[] = {
-    REQ_ERROR_SEGA_PACKET_CMD,
-    0x00,
-    0x00,
-    0x00,
-    0x00, // byte[4] - allocation length
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-};
+// uint8_t SEGA_PACKET_CMD_REQ_ERROR[] = {
+//     REQ_ERROR_SEGA_PACKET_CMD,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00, // byte[4] - allocation length
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+// };
 
-uint8_t SEGA_PACKET_REQ_ERROR_INFO[10] = { 0
-/*
- * Byte 0, 0xF0 (upper 4 bits are 1s)
- * Byte 1, 0x0
- * Byte 2, bit 3-0, Sense Key
- * Byte 4-7, Command specific information, if not defined by a command, the FAD where the error occured is reported 
- * Byte 8, Additional Sense Code - TODO Appendix I
- * Byte 9, Additional Sense Code Qualifier, TODO Appendix I
- */
-};
+// uint8_t SEGA_PACKET_REQ_ERROR_INFO[10] = { 0
+// /*
+//  * Byte 0, 0xF0 (upper 4 bits are 1s)
+//  * Byte 1, 0x0
+//  * Byte 2, bit 3-0, Sense Key
+//  * Byte 4-7, Command specific information, if not defined by a command, the FAD where the error occured is reported 
+//  * Byte 8, Additional Sense Code - TODO Appendix I
+//  * Byte 9, Additional Sense Code Qualifier, TODO Appendix I
+//  */
+// };
 
-uint8_t SEGA_PACKET_CMD_GET_TOC[] = {
-    GET_TOC_SEGA_PACKET_CMD,
-    0x00, // byte[1, bit 0, Select. 0 = Single density TOC info, 1 = Double density TOC info
-    0x00,
-    0x00, // byte[3] - Allocation Length (MSB)
-    0x00, // byte[4] - Allocation Length (LSB)
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-};
+// uint8_t SEGA_PACKET_CMD_GET_TOC[] = {
+//     GET_TOC_SEGA_PACKET_CMD,
+//     0x00, // byte[1, bit 0, Select. 0 = Single density TOC info, 1 = Double density TOC info
+//     0x00,
+//     0x00, // byte[3] - Allocation Length (MSB)
+//     0x00, // byte[4] - Allocation Length (LSB)
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+//     0x00,
+// };
 
 #define SEGA_PACKET_ADR_CODE_NO_SUB_Q                   0x0
 #define SEGA_PACKET_ADR_CODE_SUB_Q_CURR_POS             0x1
 #define SEGA_PACKET_ADR_CODE_SUB_Q_MEDIA_CATALOG_NUM    0x2
 #define SEGA_PACKET_ADR_CODE_SUB_Q_ISRC_CODE            0x3
 
-uint8_t SEGA_PACKET_TOC_INFO[408] = { 0
+extern uint8_t SEGA_PACKET_TOC_INFO[408];
+// = { 0
 /*
  * 0-3, Track 1 information *1
  * 4-7, Track 2 information
@@ -363,7 +359,7 @@ uint8_t SEGA_PACKET_TOC_INFO[408] = { 0
  * 400-403, End track information *3
  * 404-407, Lead-out information *4
  */
-};
+// };
 
 /*
 Bit 0, 
@@ -414,3 +410,9 @@ Bit 3,
  * Byte 3, FAD for lead-out start (LSB)
  */
 // };
+
+
+bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex);
+void SPI_set_BSY(bool isBusy);
+void SPI_set_DRQ(bool isDataReady);
+void SPI_assert_INTRQ(bool valueHigh);

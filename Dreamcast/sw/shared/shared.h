@@ -17,6 +17,11 @@ extern volatile int current_mcu;
 // When waiting for the control line command to send data back
 extern volatile bool mcu1_is_waiting_for_control_line_return;
 extern volatile bool mcu1_control_line_data_ready;
+extern volatile uint16_t mcu1_received_control_line_data;
+// Maybe we don't need to ringbuffer these values...
+// extern volatile uint16_t mcu1_received_control_line_data_buffer[32];
+// extern volatile uint8_t mcu1_received_control_line_data_buffer_head;
+// extern volatile uint8_t mcu1_received_control_line_data_buffer_tail;
 
 // flag for MCU2 to fetch the control lines latest update
 extern volatile bool mcu2_fetch_control_lines;
@@ -35,7 +40,7 @@ extern volatile bool mcu2_fetch_control_lines;
 #define DREAMLINK_CMD_SET_CONTROL_LINE      (0x02)
 #define DREAMLINK_CMD_SEND_CONTROL_LINE     (0x03)
 
-void process_dreamlink_data();
+void process_dreamlink_buffer();
 void dreamlink_get_control_lines_cmd();
 void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq);
 void dreamlink_send_control_line_data_cmd(uint16_t controlLines);

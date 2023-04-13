@@ -52,18 +52,51 @@ int main(void) {
     printf("MCU2- Setting up interconnect\n");
     interconnect_init(MCU2_PIN_PIO_COMMS_CTRL1, MCU2_PIN_PIO_COMMS_CTRL2, MCU2_PIN_PIO_COMMS_D0, true);
     
+    uint16_t lastSampled = 0;
+    bool didProcessBuffer = false;
+    volatile uint32_t lineChangeCount = 0;
+    volatile uint32_t startTime = 0;
     while(1) {
-        process_dreamlink_data();
+        tight_loop_contents();
+
+        if (interconnect_rx_buffer_has_data()) {
+            process_dreamlink_buffer();
+            didProcessBuffer = true;
+        }
 
         if (mcu2_fetch_control_lines) {
             mcu2_fetch_control_lines = false;
-            
+
             // fetch control line data
             uint16_t values = (uint16_t)(gpio_get_all() & MCU2_CONTROL_LINE_PIN_MASK);
-            cached_control_line_data = values;
+            
+            // Only really care about address and function select, not dma or iordy/intrq lines since those 
+            // are supposed to be set BY us.
+            // Debounce the values in case we are sampling faster than is being sent
+            if (values & 0x7F != cached_control_line_data & 0x7F) {
+                // if (lineChangeCount == 0) {
+                //     startTime = time_us_32();
+                // }
+                cached_control_line_data = values;
 
-            // send control line data
-            dreamlink_send_control_line_data_cmd(values);
+                // send control line data
+                dreamlink_send_control_line_data_cmd(values);
+                // lineChangeCount++;
+            }
         }
+
+        // Hack to constantly process the control pins and send the data to mcu1...
+        if (didProcessBuffer) {
+            didProcessBuffer = false;
+        } else {
+            mcu2_fetch_control_lines = true;
+        }
+
+        // if (lineChangeCount >= 1000) {
+        //     uint32_t diff = time_us_32() - startTime;
+        //     printf("%u: %uus\n", lineChangeCount, diff);
+        //     startTime = 0;
+        //     lineChangeCount = 0;
+        // }
     }
 }

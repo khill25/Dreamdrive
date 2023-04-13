@@ -128,10 +128,18 @@ void interconnect_set_direction(bool isTx) {
     // TODO implement me
 }
 
+static inline uint16_t swap8(uint16_t value)
+{
+	// 0x1122 => 0x2211
+	return (value << 8) | (value >> 8);
+}
+
 void interconnect_tx(uint8_t* buf, int len) {
     uint16_t* buf16 = (uint16_t*)buf;
     for(int i = 0; i < len/2; i++) {
-        pio_sm_put_blocking(tx_interconnect_config.pio, tx_interconnect_config.sm, buf16[i]);
+        // Byte swap since bits are reversed
+        uint16_t swapped = swap8(buf16[i]);
+        pio_sm_put_blocking(tx_interconnect_config.pio, tx_interconnect_config.sm, swapped);
     }
 }
 

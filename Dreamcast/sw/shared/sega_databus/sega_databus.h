@@ -21,4 +21,22 @@
 // This register is for local use and not part of the sega packet interface 
 extern volatile uint16_t cached_control_line_register;
 
-// TODO stub out some methods to read and write data based on control lines
+// Individual values, might be faster than shifting bits but we can optimize later
+extern volatile bool cached_port_function_register_cs0;
+extern volatile bool cached_port_function_register_cs1;
+extern volatile bool cached_port_function_register_da2;
+extern volatile bool cached_port_function_register_da1;
+extern volatile bool cached_port_function_register_da0;
+extern volatile bool cached_port_function_register_dior;
+extern volatile bool cached_port_function_register_diow;
+extern volatile bool cached_port_function_register_iordy;
+extern volatile bool cached_port_function_register_intrq;
+extern volatile bool cached_port_function_register_dmarq;
+extern volatile bool cached_port_function_register_dmack;
+
+extern uint8_t databus_state;
+extern uint8_t* databus_selected_register;
+extern uint8_t databus_selected_register_index;
+extern bool databus_selected_register_is_valid;
+void sega_databus_extract_raw_control_line_packet(uint16_t rawData);
+void sega_databus_process_control_line_data();
