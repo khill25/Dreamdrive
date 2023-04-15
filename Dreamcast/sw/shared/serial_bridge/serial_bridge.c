@@ -33,6 +33,7 @@
 
 #include "serial_bridge.h"
 #include "serial_bridge.pio.h"
+#include "shared.h"
  
 #define NUM_INTERCONNECT_DAT_PINS 4 // Total pins
 #define NUM_INTERCONNECT_DAT_TX_PINS 2 // Pins used when tx'ing
@@ -63,12 +64,6 @@ pio_interconnect_inst_t rx_interconnect_config = {
     .offset = 0
 };
 
-#define RX_RING_BUFFER_SIZE 1024
-typedef struct RXRingBuffer_t {                                                                  
-    uint8_t buf[RX_RING_BUFFER_SIZE]; // 1024 bytes
-    uint32_t head;                                                   
-    uint32_t tail;                                                   
-} RXRingBuffer_t;
 RXRingBuffer_t rxRingBuffer = {};
 
 // uint16_t rx_interconnect_fetch_half_word() {

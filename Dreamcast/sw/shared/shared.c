@@ -11,7 +11,7 @@
 
 #include "mcu2_pins.h"
 
-#define DEBUG_PRINT_INTERLINK 1
+#define DEBUG_PRINT_INTERLINK 0
 
 volatile int current_mcu = 0;
 
@@ -23,6 +23,8 @@ volatile bool mcu1_is_waiting_for_control_line_return = false;
 volatile bool mcu1_control_line_data_ready = false;
 volatile uint16_t mcu1_received_control_line_data = 0;
 
+volatile RXRingBuffer_t mcu1_received_control_line_buffer = {};
+
 // MCU2 state variables
 volatile bool mcu2_fetch_control_lines;
 
@@ -32,7 +34,7 @@ volatile int cmd_buffer_index = 0;
 volatile bool is_reading_cmd_header = false;
 volatile uint16_t cmd_num_bytes_to_read = 0;
 
-volatile uint16_t data_buffer[512];
+volatile uint8_t data_buffer[512];
 volatile bool is_receiving_data = false;
 volatile int data_buffer_index = 0;
 volatile bool should_process_cmd_buffer = false;
@@ -43,8 +45,17 @@ void process_dreamlink_buffer_helper(char ch) {
         printf("%02x ", ch);
         #endif
 
+        // If the byte is a control line cmd and we aren't in any other state
+        // put us right into recieve state and return
+        if (ch == DREAMLINK_CMD_SEND_CONTROL_LINE && !is_receiving_data && !mayHaveStart) {
+            cmd_buffer[0] = ch;
+            is_receiving_data = true;
+            cmd_buffer_index = 0;
+            return;
+        }
+
         if (is_receiving_data) {
-            ((uint8_t*)(data_buffer))[data_buffer_index] = ch;
+            data_buffer[data_buffer_index] = ch;
         
             data_buffer_index++;
 
@@ -86,9 +97,17 @@ void process_dreamlink_buffer_helper(char ch) {
             } else if (command == DREAMLINK_CMD_SEND_CONTROL_LINE) {
                 // Should be received by MCU1 only... 
                 // MCU2 will just send the control lines instead of MCU1 needing to poll??
-                uint8_t* buf8 = (uint8_t*)data_buffer;
-                mcu1_received_control_line_data = buf8[0];
+                // uint8_t* buf8 = (uint8_t*)data_buffer;
+                // mcu1_received_control_line_data = buf8[0];
+                
+                // Add to ring buffer
+                mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head++] = data_buffer[0]; 
                 mcu1_control_line_data_ready = true;
+
+                // Reset the head if we are wrapping around
+                if (mcu1_received_control_line_buffer.head >= RX_RING_BUFFER_SIZE) {
+                    mcu1_received_control_line_buffer.head = 0;
+                }
             }
             else {
                 // not supported yet
@@ -140,12 +159,19 @@ void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq) {
 }
 
 void dreamlink_send_control_line_data_cmd(uint8_t controlLines) {
+    // uint8_t buf[] = { 
+    //     COMMAND_START_BYTE_0, 
+    //     COMMAND_START_BYTE_1, 
+    //     DREAMLINK_CMD_SEND_CONTROL_LINE, 
+    //     0x0, 
+    //     0x1, // 1 byte
+    //     controlLines
+    //     };
+    // interconnect_tx(buf, sizeof(buf));
+
+    // Sending control line data is very time sensitive so transmit as few bytes as possible.
     uint8_t buf[] = { 
-        COMMAND_START_BYTE_0, 
-        COMMAND_START_BYTE_1, 
         DREAMLINK_CMD_SEND_CONTROL_LINE, 
-        0x0, 
-        0x1, // 1 byte
         controlLines
         };
     interconnect_tx(buf, sizeof(buf));

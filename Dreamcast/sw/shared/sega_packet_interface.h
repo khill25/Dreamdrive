@@ -49,7 +49,7 @@ typedef enum SPI_REGISTER_INDEX {
     SPI_INTERRUPT_REASON_REGISTER_INDEX , // Read only
     SPI_SECTOR_COUNT_REGISTER_INDEX     , // Write only
     SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
-    SPI_REGISTER_COUNT
+    SPI_REGISTER_COUNT // 14 = (0xE)
 } SPI_REGISTER_INDEX;
 extern uint8_t SPI_registers[SPI_REGISTER_COUNT];
 extern uint16_t SPI_data_register; // since this is the only 16 bit register...

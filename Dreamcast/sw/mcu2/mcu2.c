@@ -81,10 +81,10 @@ int main(void) {
 
         tight_loop_contents();
 
-        if (interconnect_rx_buffer_has_data()) {
-            process_dreamlink_buffer();
-            didProcessBuffer = true;
-        }
+        // if (interconnect_rx_buffer_has_data()) {
+        //     process_dreamlink_buffer();
+        //     didProcessBuffer = true;
+        // }
 
         if (mcu2_fetch_control_lines) {
             mcu2_fetch_control_lines = false;

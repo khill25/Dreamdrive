@@ -35,7 +35,7 @@ typedef enum SEGA_DATABUS_STATE {
 uint8_t databus_state = SEGA_DATABUS_STATE_IDLE;
 
 // Used to transform data from MCU2 into the various control lines
-void sega_databus_extract_raw_control_line_packet(uint16_t rawData, bool rd, bool wr) {
+void sega_databus_extract_raw_control_line_packet(uint8_t rawData, bool rd, bool wr) {
     // MCU2 has 16 lines, Easier to sample them all at this point
     /* LSB ... MSB
      * a0, a1, a2, cs0, cs1, read, write, iordy, 

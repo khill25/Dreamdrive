@@ -23,14 +23,21 @@
  * Once MCU1 has recieved info from MCU2 (control line update)
  * Process it and act if needed
  */
-static void process_mcu2_data_and_exec_SPI_cmd_if_needed() {
+static void process_mcu2_data_and_exec_SPI_cmd_if_needed(bool rd, bool wr) {
     // Grab the state of the pins
-    uint16_t current_databus_value = gpio_get_all(); /// TODO mask this data for the actual data bus pins
-    bool rd = current_databus_value & 0x10000000; // pin 28
-    bool wr = current_databus_value & 0x20000000; // pin 29
+    uint32_t current_databus_value = gpio_get_all(); /// TODO mask this data for the actual data bus pins
+    // bool rd = current_databus_value & 0x10000000; // pin 28
+    // bool wr = current_databus_value & 0x20000000; // pin 29
 
-    sega_databus_extract_raw_control_line_packet(mcu1_received_control_line_data, rd, wr);
-    sega_databus_process_control_line_data();
+    uint8_t controlValues = mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head-1];
+
+    sega_databus_extract_raw_control_line_packet(controlValues, rd, wr);
+    
+    // at least 22 cycles coming to this line
+    sega_databus_process_control_line_data(); // worst case another at least 24 cycles here
+
+    // 
+
     // At this point we have the register and register "name" (index)
 
     printf("data:%04x, index:%02x, rd:%u, wr:%u\n", databus_selected_register, databus_selected_register_index, rd, wr);
@@ -93,14 +100,43 @@ int main(void) {
     gpio_init(MCU1_PIN_WRITE);
     gpio_set_dir(MCU1_PIN_WRITE, false);
     
+    bool last_rd = 0;
+    bool last_wr = 0;
+    bool rd = 0;
+    bool wr = 0;
     int numReadValues = 0;
     while(1) {
-        process_dreamlink_buffer();
+
+        uint32_t pins = gpio_get_all();
+        rd = pins & 0x10000000; // pin 28
+        wr = pins & 0x20000000; // pin 29
+
+        if (rd == 0 && last_rd == 1) {
+            process_dreamlink_buffer();
+        } else if (wr == 0 && last_wr == 1) {
+            process_dreamlink_buffer();
+        }
+
+        last_rd = rd;
+        last_wr = wr;
+
+        // // Wait for the rd or wr lines to go low
+        // // THEN process buffer
+        // // THEN process cmd
+        // do {
+        //     rd = gpio_get(MCU1_PIN_READ);
+        //     wr = gpio_get(MCU1_PIN_WRITE);
+        //     last_rd = rd;
+        //     last_wr = wr;
+        // } while (rd == 1 && wr == 1);
+
+        // process_dreamlink_buffer();
 
         if (mcu1_control_line_data_ready) {
             mcu1_control_line_data_ready = false;
             
-            process_mcu2_data_and_exec_SPI_cmd_if_needed();
+            // Pass in the last values for the pins
+            process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
         }
     }
 

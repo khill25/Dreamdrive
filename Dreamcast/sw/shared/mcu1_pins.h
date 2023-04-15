@@ -42,3 +42,8 @@
 // #define MCU1_PIN_PIO_COMMS_D3       (29)
 
 // 23, 25, 30 unavailable on the pico/weact boards
+
+// Investigate using TS3A27518E 6 channel 1:2 mux/demux -- needs 2 pins for select
+//
+// TS3L501E (8 bits but also has led pins that can be used for 3 more bits since it's for a lan switch)
+// needs 1 pin for select

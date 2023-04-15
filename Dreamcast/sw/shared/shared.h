@@ -11,6 +11,14 @@
 
 extern volatile int current_mcu;
 
+#define RX_RING_BUFFER_SIZE 1024
+// 8-bit ring buffer
+typedef struct RXRingBuffer_t {                                                                  
+    uint8_t buf[RX_RING_BUFFER_SIZE]; // 1024 bytes
+    uint32_t head;                                                   
+    uint32_t tail;                                                   
+} RXRingBuffer_t;
+
 // TODO there will likely be other variables and it might make sense
 // to use a single variable and bit shift? 
 
@@ -18,6 +26,7 @@ extern volatile int current_mcu;
 extern volatile bool mcu1_is_waiting_for_control_line_return;
 extern volatile bool mcu1_control_line_data_ready;
 extern volatile uint16_t mcu1_received_control_line_data;
+extern volatile RXRingBuffer_t mcu1_received_control_line_buffer;
 // Maybe we don't need to ringbuffer these values...
 // extern volatile uint16_t mcu1_received_control_line_data_buffer[32];
 // extern volatile uint8_t mcu1_received_control_line_data_buffer_head;

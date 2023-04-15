@@ -38,5 +38,5 @@ extern uint8_t databus_state;
 extern uint8_t* databus_selected_register;
 extern uint8_t databus_selected_register_index;
 extern bool databus_selected_register_is_valid;
-void sega_databus_extract_raw_control_line_packet(uint16_t rawData, bool rd, bool wr);
+void sega_databus_extract_raw_control_line_packet(uint8_t rawData, bool rd, bool wr);
 void sega_databus_process_control_line_data();
