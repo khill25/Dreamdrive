@@ -33,13 +33,28 @@ void test_sample_pins() {
 // Setup the gpio pins connected to the ide control lines, we want input for all of them?
 // TODO some pins might be input/output
 void setup_gpio() {
-    for(int i = 0; i < 16; i++) {
-        gpio_init(i);
-        gpio_set_dir(i, false);
-    }
+    // for(int i = 0; i < 16; i++) {
+    //     gpio_init(i);
+    //     gpio_set_dir(i, false);
+    // }
+
+    gpio_init(MCU2_PIN_A0);
+    gpio_set_dir(MCU2_PIN_A0, false);
+
+    gpio_init(MCU2_PIN_A1);
+    gpio_set_dir(MCU2_PIN_A1, false);
+
+    gpio_init(MCU2_PIN_A2);
+    gpio_set_dir(MCU2_PIN_A2, false);
+
+    gpio_init(MCU2_PIN_IDE_CS0);
+    gpio_set_dir(MCU2_PIN_IDE_CS0, false);
+
+    gpio_init(MCU2_PIN_IDE_CS1);
+    gpio_set_dir(MCU2_PIN_IDE_CS1, false);
 }
 
-uint16_t cached_control_line_data = 0;
+uint8_t cached_control_line_data = 0;
 
 int main(void) {
     stdio_init_all();
@@ -52,11 +67,18 @@ int main(void) {
     printf("MCU2- Setting up interconnect\n");
     interconnect_init(MCU2_PIN_PIO_COMMS_CTRL1, MCU2_PIN_PIO_COMMS_CTRL2, MCU2_PIN_PIO_COMMS_D0, true);
     
-    uint16_t lastSampled = 0;
+    uint8_t lastSampled = 0;
     bool didProcessBuffer = false;
     volatile uint32_t lineChangeCount = 0;
     volatile uint32_t startTime = 0;
+    // volatile uint8_t buf[] = {0};
+    // volatile uint8_t v = 0;
     while(1) {
+
+        // interconnect_tx(buf, 1);
+        // buf[0] = ++v;
+        // sleep_ms(1000);
+
         tight_loop_contents();
 
         if (interconnect_rx_buffer_has_data()) {
@@ -68,12 +90,17 @@ int main(void) {
             mcu2_fetch_control_lines = false;
 
             // fetch control line data
-            uint16_t values = (uint16_t)(gpio_get_all() & MCU2_CONTROL_LINE_PIN_MASK);
+            uint8_t values = (uint8_t)(gpio_get_all() & MCU2_REGISTER_SELECT_PIN_MASK);
+
+            // If both cs1, cs0 are high, this is not a valid address
+            // If cs1 and cs0 are both low, not valid... data bus high imped?
+            if ((values & 0x18) == 0x18 || (values & 0x18) == 0x0) {
+                continue;
+            }
             
-            // Only really care about address and function select, not dma or iordy/intrq lines since those 
-            // are supposed to be set BY us.
             // Debounce the values in case we are sampling faster than is being sent
-            if (values & 0x7F != cached_control_line_data & 0x7F) {
+            // Also dont send if both cs lines are high
+            if (values != cached_control_line_data) {
                 // if (lineChangeCount == 0) {
                 //     startTime = time_us_32();
                 // }

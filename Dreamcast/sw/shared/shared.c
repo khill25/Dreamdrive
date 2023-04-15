@@ -87,7 +87,7 @@ void process_dreamlink_buffer_helper(char ch) {
                 // Should be received by MCU1 only... 
                 // MCU2 will just send the control lines instead of MCU1 needing to poll??
                 uint8_t* buf8 = (uint8_t*)data_buffer;
-                mcu1_received_control_line_data = (buf8[1] << 8) | buf8[2]; //  because we need to dump the 0 padding
+                mcu1_received_control_line_data = buf8[0];
                 mcu1_control_line_data_ready = true;
             }
             else {
@@ -108,10 +108,8 @@ void process_dreamlink_buffer() {
     while (interconnect_rx_buffer_has_data()) {
         // TODO: might want to use 8bit data for dreamlink/interconnect instead of 16 bits
         // Need to see more use cases before changing...
-        uint16_t halfWord = interconnect_rx_get();
-        
-        process_dreamlink_buffer_helper((uint8_t)(halfWord >> 8));
-        process_dreamlink_buffer_helper((uint8_t)halfWord);
+        uint8_t b = interconnect_rx_get();
+        process_dreamlink_buffer_helper(b);
     }
 }
 
@@ -141,16 +139,14 @@ void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq) {
     interconnect_tx(buf, sizeof(buf));
 }
 
-void dreamlink_send_control_line_data_cmd(uint16_t controlLines) {
+void dreamlink_send_control_line_data_cmd(uint8_t controlLines) {
     uint8_t buf[] = { 
         COMMAND_START_BYTE_0, 
         COMMAND_START_BYTE_1, 
         DREAMLINK_CMD_SEND_CONTROL_LINE, 
         0x0, 
-        0x3, // 2 bytes + 1 padding for 16 bit alignment
-        0x0, // 0 padding
-        (uint8_t)(controlLines << 8),
-        (uint8_t)controlLines
+        0x1, // 1 byte
+        controlLines
         };
     interconnect_tx(buf, sizeof(buf));
 }

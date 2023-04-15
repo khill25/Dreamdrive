@@ -35,7 +35,7 @@ typedef enum SEGA_DATABUS_STATE {
 uint8_t databus_state = SEGA_DATABUS_STATE_IDLE;
 
 // Used to transform data from MCU2 into the various control lines
-void sega_databus_extract_raw_control_line_packet(uint16_t rawData) {
+void sega_databus_extract_raw_control_line_packet(uint16_t rawData, bool rd, bool wr) {
     // MCU2 has 16 lines, Easier to sample them all at this point
     /* LSB ... MSB
      * a0, a1, a2, cs0, cs1, read, write, iordy, 
@@ -50,12 +50,14 @@ void sega_databus_extract_raw_control_line_packet(uint16_t rawData) {
      cached_port_function_register_da2  =  (rawData >> MCU2_PIN_A2) & 0x1;
      cached_port_function_register_cs0  =  (rawData >> MCU2_PIN_IDE_CS0) & 0x1;
      cached_port_function_register_cs1  =  (rawData >> MCU2_PIN_IDE_CS1) & 0x1;
-     cached_port_function_register_dior =  (rawData >> MCU2_PIN_READ) & 0x1;
-     cached_port_function_register_diow =  (rawData >> MCU2_PIN_WRITE) & 0x1;
-     cached_port_function_register_iordy = (rawData >> MCU2_PIN_IORDY) & 0x1;
-     cached_port_function_register_intrq = (rawData >> MCU2_PIN_INTRQ) & 0x1;
-     cached_port_function_register_dmarq = (rawData >> MCU2_PIN_DMARQ) & 0x1;
-     cached_port_function_register_dmack = (rawData >> MCU2_PIN_DMACK) & 0x1;
+     cached_port_function_register_dior = rd;
+     cached_port_function_register_diow = wr;
+    //  cached_port_function_register_dior =  (rawData >> MCU2_PIN_READ) & 0x1;
+    //  cached_port_function_register_diow =  (rawData >> MCU2_PIN_WRITE) & 0x1;
+    //  cached_port_function_register_iordy = (rawData >> MCU2_PIN_IORDY) & 0x1;
+    //  cached_port_function_register_intrq = (rawData >> MCU2_PIN_INTRQ) & 0x1;
+    //  cached_port_function_register_dmarq = (rawData >> MCU2_PIN_DMARQ) & 0x1;
+    //  cached_port_function_register_dmack = (rawData >> MCU2_PIN_DMACK) & 0x1;
 }
 
 void sega_databus_process_control_line_data() {

@@ -23,6 +23,9 @@
 #define MCU1_PIN_D14                (14)
 #define MCU1_PIN_D15                (15)
 
+#define MCU1_PIN_READ               (28)
+#define MCU1_PIN_WRITE              (29)
+
 #define MCU1_PIN_SD_CLK             (16)
 #define MCU1_PIN_SD_CMD             (17)
 #define MCU1_PIN_SD_D0              (18)
@@ -34,7 +37,8 @@
 #define MCU1_PIN_PIO_COMMS_CTRL2    (24)
 #define MCU1_PIN_PIO_COMMS_D0       (26)
 #define MCU1_PIN_PIO_COMMS_D1       (27)
-#define MCU1_PIN_PIO_COMMS_D2       (28)
-#define MCU1_PIN_PIO_COMMS_D3       (29)
+
+// #define MCU1_PIN_PIO_COMMS_D2       (28)
+// #define MCU1_PIN_PIO_COMMS_D3       (29)
 
 // 23, 25, 30 unavailable on the pico/weact boards

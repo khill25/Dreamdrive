@@ -22,4 +22,4 @@ void interconnect_tx16(uint16_t value);
 
 bool interconnect_rx_buffer_has_data();
 bool interconnect_rx_has_data();
-uint16_t interconnect_rx_get(); // Read 16 bits of the rx buffer
+uint8_t interconnect_rx_get(); // Read 8 bits of the rx buffer

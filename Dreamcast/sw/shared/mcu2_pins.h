@@ -12,6 +12,7 @@
 // THEN the clock line for the custom sound chip (AICA)
 
 #define MCU2_CONTROL_LINE_PIN_MASK (0xFFFF)
+#define MCU2_REGISTER_SELECT_PIN_MASK (0x1F)
 
 // Control lines
 #define MCU2_PIN_A0                 (0)
@@ -19,8 +20,8 @@
 #define MCU2_PIN_A2                 (2)
 #define MCU2_PIN_IDE_CS0            (3)
 #define MCU2_PIN_IDE_CS1            (4)
-#define MCU2_PIN_READ               (5)
-#define MCU2_PIN_WRITE              (6)
+// #define MCU2_PIN_READ               (5) // moved to MCU1 pin 28
+// #define MCU2_PIN_WRITE              (6) // moved to MCU1 pin 29
 #define MCU2_PIN_IORDY              (7)
 #define MCU2_PIN_INTRQ              (8)
 #define MCU2_PIN_DMARQ              (12)

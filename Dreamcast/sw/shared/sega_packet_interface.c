@@ -51,36 +51,36 @@ void SPI_issue_device_reset(uint8_t reset_type) {
  * 010xx 1x - Data bus high imped
  * 0110x 1x - Data bus high imped
  * 
- * 01110 10 - (0xE) Alternate status register
- * 01110 01 - (0xE) Device Control Register
+ * 10110 10 - (0x16) Alternate status register (read)
+ * 10110 01 - (0x16) Device Control Register (write)
  * 
- * 10000 10 - (0x10) Data
- * 10000 01 - (0x10) Data
+ * 01000 10 - (0x08) Data (read)
+ * 01000 01 - (0x08) Data (write)
  * 
- * 10001 10 - (0x11) Error Register
- * 10001 01 - (0x11) Features Register
+ * 01001 10 - (0x09) Error Register (read)
+ * 01001 01 - (0x09) Features Register (write)
  * 
- * 10010 1x - (0x12) Interrupt Reason Register
+ * 01010 1x - (0xA) Interrupt Reason Register (read)
  * 
- * 10011 1x - (0x13) Sector Number
+ * 01011 1x - (0xB) Sector Number (read)
  * 
- * 10100 10 - (0x14) Byte Count Register bits 0-7
- * 10100 01 - (0x14) Byte Count Register bits 0-7
+ * 01100 10 - (0xC) Byte Count Register bits 0-7 (read)
+ * 01100 01 - (0xC) Byte Count Register bits 0-7 (write)
  * 
- * 10101 10 - (0x15) Byte Count Register bits 8-15
- * 10101 01 - (0x15) Byte Count Register bits 8-15
+ * 01101 10 - (0xD) Byte Count Register bits 8-15 (read)
+ * 01101 01 - (0xD) Byte Count Register bits 8-15 (write)
  * 
- * 10110 10 - (0x16) Drive Select Register
- * 10110 01 - (0x16) Drive Select Register
+ * 01110 10 - (0xE) Drive Select Register (read)
+ * 01110 01 - (0xE) Drive Select Register (write)
  * 
- * 10111 10 - (0x17) Status Register
- * 10111 01 - (0x17) Command Register
+ * 01111 10 - (0xF) Status Register (read)
+ * 01111 01 - (0xF) Command Register (write)
  * 
  * 11xxx xx - Invalid address
  * 
  */
 bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex) {
-    uint8_t coded_register_index = cs0 << 4 | cs1 << 3 | da2 << 2 | da1 << 1 | da0;
+    uint8_t coded_register_index = cs1 << 4 | cs0 << 3 | da2 << 2 | da1 << 1 | da0;
     
     // High imped
     if (cs0 == 0 && cs1 == 0) {        
@@ -221,7 +221,7 @@ Command flow
     SPI_set_BSY(true);
 
     // Access command register
-    uint8_t* commandRegister = SPI_registers[SPI_COMMAND_REGISTER_INDEX];
+    uint8_t* commandRegister = &SPI_registers[SPI_COMMAND_REGISTER_INDEX];
     // command should be ATA_CMD_IDENTIFY_DEVICE
 
     // Fetch data

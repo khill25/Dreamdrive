@@ -43,4 +43,4 @@ extern volatile bool mcu2_fetch_control_lines;
 void process_dreamlink_buffer();
 void dreamlink_get_control_lines_cmd();
 void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq);
-void dreamlink_send_control_line_data_cmd(uint16_t controlLines);
+void dreamlink_send_control_line_data_cmd(uint8_t controlLines);
