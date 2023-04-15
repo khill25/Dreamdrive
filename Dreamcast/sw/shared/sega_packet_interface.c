@@ -133,7 +133,8 @@ bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool 
     }
 
     if(ret_register) {
-        ret_register = &SPI_registers[register_index];
+        // ret_register = &SPI_registers[register_index];
+        *ret_register = coded_register_index;
     }
 
     return true;

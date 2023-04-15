@@ -59,7 +59,7 @@ These are listed in priority order. With **Power-on Reset** being higher than **
 #### Function Select Table
 This table represents which registers are read or written based on the CS, Address, and Read/Write lines. Data is valid on falling edge of `READ`/`WRITE`. There is 100-300ns of time to sample the pins before the data becomes valid on the next rising edge.
 
-|CS1|CS0| A2 | A1 | A0 | READ | WRITE |
+|CS0|CS1| A2 | A1 | A0 | READ | WRITE |
 ---|---|---|---|---|---|---|
 1|0|1|1|0|`Alternate Status Register`|`Device Control Register`|
 0|1|0|0|0|`Data Register`| `Data Register`|

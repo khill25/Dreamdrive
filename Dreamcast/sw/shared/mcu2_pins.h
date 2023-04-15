@@ -13,6 +13,7 @@
 
 #define MCU2_CONTROL_LINE_PIN_MASK (0xFFFF)
 #define MCU2_REGISTER_SELECT_PIN_MASK (0x1F)
+#define MCU2_REGISTER_AND_RD_WR_SELECT_PIN_MASK (0x7F)
 
 // Control lines
 #define MCU2_PIN_A0                 (0)
