@@ -183,14 +183,29 @@ void init_test_irq_detect_program() {
     uint offset = pio_add_program(pio, &test_irq_set_gpio_program);
     pio_sm_config c = test_irq_set_gpio_program_get_default_config(offset);
 
-    // trigger gpio
+    // Control pins
+    pio_gpio_init(pio, 0);
+    pio_gpio_init(pio, 1);
+    pio_gpio_init(pio, 2);
+    pio_gpio_init(pio, 3);
+    pio_gpio_init(pio, 4);
+
+    // Read and write... 
+    pio_gpio_init(pio, 5);
+    pio_gpio_init(pio, 6);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, 0, 7, false);
+    sm_config_set_in_pins(&c, 0);
+
+    // trigger gpio... eventually this will likely be the mux pin to toggle
+    // between data bus and control lines
     pio_gpio_init(pio, 18);
     sm_config_set_set_pins(&c, 18, 1); 
 
     pio_sm_init(pio, sm, offset, &c);
     pio_sm_set_enabled(pio, sm, true);
 
-    pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS1);
+    // pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS1);
 }
 
 void test_control_lines_response_time_with_pio() {

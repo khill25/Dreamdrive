@@ -41,12 +41,52 @@ set pindirs, 1
 .program test_irq_set_gpio
 set pindirs, 1
 .wrap_target
+wait_for_cs:
+    ;; TODO Change pin direction to input
+
     wait 1 irq 4
 
 ;; 20ns of latency from a cs_detect program raising the irq to setting gpio 18 high
 ;; This means it's 2 cycles of latency added (which sounds right, 1 to set irq, 1 to read it)
-    set pins, 1 [3]
-    set pins, 0
+    ; set pins, 1 [3]
+    ; set pins, 0
+
+    ;; we about 40ns (first and worst case) and (164ns for cases after the very 1st cs change) 
+    ;; between cs low and rd/wr low.
+
+    ;; 40ns  = 10 cycles
+    ;; 164ns = 43 cycles
+
+    ;; todo
+    ;; sample control pins (CS0, CS1, A0, A1, A2)
+    ;; flip the mux to data pins
+    ;; determine which register that is
+    ;; wait for read/write to go low
+    ;; if write: read data from bus
+    ;; if read: write data to bus
+
+    in pins, 5
+    push
+
+    set pins, 1 ;; this will be used for the mux but gpio signal is okay for now
+
+    ;; Figure out how to wait for read or write and jmp to the right label
+    ;;
+    ;;
+
+;; WRITE low, read the pins and write to a register.
+;; Pins should already be configured to input
+read_from_bus:
+    in pins, 16
+    push
+    jmp wait_for_cs
+
+;; READ low, means we put data on lines from a register
+write_to_bus:
+    ;; Change pin direction to output
+    pull
+    out pins, 16
+
 .wrap
 
 ; ;; WIP
