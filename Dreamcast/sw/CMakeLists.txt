@@ -17,6 +17,14 @@ endif()
 # Copy program to ram during boot
 # set(PICO_COPY_TO_RAM 1)
 
+add_compile_options(
+        # -Wall
+        # -save-temps
+        # -Wno-unused-function # we have some for the docs that aren't called
+        # -Wno-maybe-uninitialized
+        -O3
+)
+
 # Initialize the SDK
 pico_sdk_init()
 
@@ -33,10 +41,3 @@ add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 # Add applications
 add_subdirectory(mcu1)
 add_subdirectory(mcu2)
-
-add_compile_options(
-        -Wall
-        -save-temps
-        -Wno-unused-function # we have some for the docs that aren't called
-        -Wno-maybe-uninitialized
-)

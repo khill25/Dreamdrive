@@ -413,6 +413,10 @@ Bit 3,
 
 
 bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex);
+// Potentially faster version of the above since we need to speed things up a lot. 
+// The abstraction is nice but the rp2040 and signally don't allow enough time
+void SPI_select_register_coded(uint8_t codedValue, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_register_index);
+
 void SPI_set_BSY(bool isBusy);
 void SPI_set_DRQ(bool isDataReady);
 void SPI_assert_INTRQ(bool valueHigh);

@@ -11,8 +11,11 @@
 #include "shared.h"
 #include "serial_bridge/serial_bridge.h"
 #include "hardware/pio.h"
+#include "hardware/vreg.h"
 
 #include "sega_packet_interface.h"
+
+#include "sega_cs_detect.pio.h"
 
 #define CONTROL_PIN_MASK 0x0000FFFF
 volatile uint32_t last_ctrl_pin_sample = 0x0;
@@ -30,6 +33,216 @@ void test_sample_pins() {
     }
 
     last_ctrl_pin_sample = pins;
+}
+
+volatile uint32_t ctrl_line_values = 0;
+volatile uint32_t last_ctrl_line_values = 1;
+void test_control_line_response_time() {
+    bool has_reset = false;
+    uint32_t values = 0;
+    volatile bool rd = 0;
+    volatile bool wr = 0;
+    volatile bool da0 = 0;
+    volatile bool da1 = 0;
+    volatile bool da2 = 0;
+    volatile bool cs0 = 0;
+    volatile bool cs1 = 0;
+    volatile uint8_t selected_register_index = 14;
+    volatile uint8_t selected_register = 0;
+    while(1) { 
+        tight_loop_contents();
+        // fetch control line data
+
+        // uint32_t values = gpio_get_all();
+        // ctrl_line_values = sio_hw->gpio_in & MCU2_REGISTER_SELECT_PIN_MASK;
+        // Skip if both cs lines are high or the state hasn't changed
+        // if ((ctrl_line_values & 0x18) == 0x18 || last_ctrl_line_values == ctrl_line_values) {
+        //     last_ctrl_line_values = ctrl_line_values; // reset the last value
+        //     continue;
+        // }
+
+        // Continue if both cs lines are high
+        if (gpio_get(4) && gpio_get(3)) {
+            has_reset = true;
+            continue;
+        }
+
+        // Continue if the CS lines haven't reset
+        if (!has_reset) {
+            continue;
+        }
+
+        has_reset = false;
+
+        // We have determined that the control line has changed, signal
+        gpio_put(18, true);
+        
+        // Also connected to mcu1 but still connected to prototype board's mcu2
+        values = gpio_get_all();
+        rd = values & 0x20; // pin 5
+        wr = values & 0x40; // pin 6
+
+        selected_register_index = 14;
+        selected_register = 0;
+
+        if (rd == 0) {
+            da0 = (values >> MCU2_PIN_A0) & 0x1;
+            da1 = (values >> MCU2_PIN_A1) & 0x1;
+            da2 = (values >> MCU2_PIN_A2) & 0x1;
+            cs0 = (values >> MCU2_PIN_IDE_CS0) & 0x1;
+            cs1 = (values >> MCU2_PIN_IDE_CS1) & 0x1;
+            // Decode with flipped cs values
+            SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
+        } else if (wr == 0) {
+            da0 = (values >> MCU2_PIN_A0) & 0x1;
+            da1 = (values >> MCU2_PIN_A1) & 0x1;
+            da2 = (values >> MCU2_PIN_A2) & 0x1;
+            cs0 = (values >> MCU2_PIN_IDE_CS0) & 0x1;
+            cs1 = (values >> MCU2_PIN_IDE_CS1) & 0x1;
+
+            // Decode with flipped cs values
+            SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
+        }
+
+        gpio_put(18, false);            
+        // last_ctrl_line_values = ctrl_line_values;
+
+    } // end while
+} // end func
+
+void init_sega_cs_detect(uint pin, uint sm) {
+    PIO pio = pio1;
+    uint offset = pio_add_program(pio, &sega_cs_detect_program);
+    pio_sm_config c = sega_cs_detect_program_get_default_config(offset);
+
+    pio_gpio_init(pio, pin);
+    pio_gpio_init(pio, 18);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, false);
+    sm_config_set_in_pins(&c, pin);
+
+    sm_config_set_set_pins(&c, 18, 1); // trigger gpio
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+
+    pio->input_sync_bypass |= (1u << pin);
+}
+
+void init_sega_cs0_detect_program() {
+    // CS0 program
+
+    PIO pio = pio1;
+    uint sm = 0;
+    uint offset = pio_add_program(pio, &sega_cs0_detect_program);
+    pio_sm_config c = sega_cs0_detect_program_get_default_config(offset);
+
+    pio_gpio_init(pio, MCU2_PIN_IDE_CS0);
+    
+    // for trigger gpio, used for benchmarking
+    // pio_gpio_init(pio, 18);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, MCU2_PIN_IDE_CS0, 1, false);
+    sm_config_set_in_pins(&c, MCU2_PIN_IDE_CS0);
+
+    // trigger gpio
+    // sm_config_set_set_pins(&c, 18, 1); 
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+
+    pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS0);
+}
+
+void init_sega_cs1_detect_program() {
+    // CS1 program
+
+    PIO pio = pio1;
+    uint sm = 1;
+    uint offset = pio_add_program(pio, &sega_cs1_detect_program);
+    pio_sm_config c = sega_cs1_detect_program_get_default_config(offset);
+
+    pio_gpio_init(pio, MCU2_PIN_IDE_CS1);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, MCU2_PIN_IDE_CS1, 1, false);
+    sm_config_set_in_pins(&c, MCU2_PIN_IDE_CS1);
+
+    // trigger gpio
+    // sm_config_set_set_pins(&c, 18, 1); 
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+
+    pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS1);
+}
+
+void init_test_irq_detect_program() {
+
+    PIO pio = pio1;
+    uint sm = 2;
+    uint offset = pio_add_program(pio, &test_irq_set_gpio_program);
+    pio_sm_config c = test_irq_set_gpio_program_get_default_config(offset);
+
+    // trigger gpio
+    pio_gpio_init(pio, 18);
+    sm_config_set_set_pins(&c, 18, 1); 
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+
+    pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS1);
+}
+
+void test_control_lines_response_time_with_pio() {
+
+    PIO pio = pio1;
+
+    //setup pio, 1 per CS
+    // init_sega_cs_detect(3, 0);
+    // init_sega_cs_detect(4, 1);
+
+    init_sega_cs0_detect_program();
+    init_sega_cs1_detect_program();
+    init_test_irq_detect_program();
+
+    uint8_t registersAccessed[12] = {0};
+
+    volatile uint32_t values = 0;
+    volatile uint16_t codedValues = 0;
+    volatile uint8_t selected_register;
+    volatile uint8_t selected_register_index;
+    // uint8_t i = 0;
+
+    while(1) {
+
+        while (!(pio->irq & (1<<0)));
+        pio_interrupt_clear(pio, 0);
+
+        gpio_put(18, true);
+
+        values = gpio_get_all();
+
+        codedValues = values & 0x7F;
+
+        SPI_select_register_coded(
+            codedValues & 0x1F, // cs0, cs1, a0, a1, a2
+            codedValues & 0x20, // read
+            codedValues & 0x40, // write
+            &selected_register, // pointer to found register
+            &selected_register_index // pointer to found register index
+            );
+        
+        // registersAccessed[i++] = selected_register_index;
+
+        gpio_put(18, false);
+
+        // if (i == 7) {
+        //     for(i = 0; i < 7; i++) {
+        //         printf("%u, ", registersAccessed[i]);
+        //     }
+        //     printf("\n");
+        // }
+    }
 }
 
 // Setup the gpio pins connected to the ide control lines, we want input for all of them?
@@ -57,10 +270,10 @@ void setup_gpio() {
 
     // read and write pins
     gpio_init(5);
-    gpio_set_dir(MCU2_PIN_IDE_CS1, false);
+    gpio_set_dir(5, false);
 
     gpio_init(6);
-    gpio_set_dir(MCU2_PIN_IDE_CS1, false);
+    gpio_set_dir(6, false);
 }
 
 uint8_t cached_control_line_data = 0;
@@ -77,8 +290,17 @@ int main(void) {
     interconnect_init(MCU2_PIN_PIO_COMMS_CTRL1, MCU2_PIN_PIO_COMMS_CTRL2, MCU2_PIN_PIO_COMMS_D0, true);
     
     const int freq_khz = 266000;
+    // const int freq_khz = 336000;
+    // vreg_set_voltage(VREG_VOLTAGE_1_25);
     bool clockWasSet = set_sys_clock_khz(freq_khz, false);
     printf("Clock of %uMhz was set: %u\n", freq_khz / 1000, clockWasSet);
+
+    gpio_init(18);
+    gpio_set_dir(18, true);
+    gpio_set_pulls(18, false, true);
+
+    gpio_put(18, true);
+    gpio_put(18, false);
 
     uint8_t lastSampled = 0;
     bool didProcessBuffer = false;
@@ -86,115 +308,10 @@ int main(void) {
     volatile uint32_t startTime = 0;
     // volatile uint8_t buf[] = {0};
     // volatile uint8_t v = 0;
-    bool last_rd = 0;
-    bool last_wr = 0;
-    bool rd = 0;
-    bool wr = 0;
+    
     volatile uint32_t c = 0;
-    while(1) {
 
-        // interconnect_tx(buf, 1);
-        // buf[0] = ++v;
-        // sleep_ms(1000);
-
-        tight_loop_contents();
-
-        // if (interconnect_rx_buffer_has_data()) {
-        //     process_dreamlink_buffer();
-        //     didProcessBuffer = true;
-        // }
-
-        // if (mcu2_fetch_control_lines) {
-        //     mcu2_fetch_control_lines = false;
-
-            // fetch control line data
-            uint8_t values = (uint8_t)(gpio_get_all() & MCU2_REGISTER_AND_RD_WR_SELECT_PIN_MASK);
-
-            // Also connected to mcu1 but still connected to prototype board's mcu2
-            rd = values & 0x20; // pin 5
-            wr = values & 0x40; // pin 6
-
-            // Skip if both cs lines are high
-            // OR both read and write are low
-            if ((values & 0x18) != 0x18 && (values & 0x18) != 0x0) {
-            // READ
-            //     if (rd == 0 && last_rd == 1) {
-
-            //         volatile bool da0  =  (values >> MCU2_PIN_A0) & 0x1;
-            //         volatile bool da1  =  (values >> MCU2_PIN_A1) & 0x1;
-            //         volatile bool da2  =  (values >> MCU2_PIN_A2) & 0x1;
-            //         volatile bool cs0  =  (values >> MCU2_PIN_IDE_CS0) & 0x1;
-            //         volatile bool cs1  =  (values >> MCU2_PIN_IDE_CS1) & 0x1;
-            //         volatile uint8_t selected_register_index = 14;
-            //         volatile uint8_t selected_register = 0;
-            //         // Decode with flipped cs values
-            //         SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
-            //         printf("r-0x%02x(%u) ", selected_register, selected_register_index);
-
-            //         // printf("r-%02x ", values & MCU2_REGISTER_SELECT_PIN_MASK);
-            //         // SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
-            //         // printf("!r-%02x(%02x) ", selected_register, selected_register_index);
-
-            // // WRITE
-            //     } else 
-                if (wr == 0 && last_wr == 1) {
-                    volatile bool da0  =  (values >> MCU2_PIN_A0) & 0x1;
-                    volatile bool da1  =  (values >> MCU2_PIN_A1) & 0x1;
-                    volatile bool da2  =  (values >> MCU2_PIN_A2) & 0x1;
-                    volatile bool cs0  =  (values >> MCU2_PIN_IDE_CS0) & 0x1;
-                    volatile bool cs1  =  (values >> MCU2_PIN_IDE_CS1) & 0x1;
-                    volatile uint8_t selected_register_index = 14;
-                    volatile uint8_t selected_register = 0;
-                    // Decode with flipped cs values
-                    SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
-                    printf("w-0x%02x(%u) ", selected_register, selected_register_index);
-
-                    // printf("w-%02x ", values & MCU2_REGISTER_SELECT_PIN_MASK);
-                    // SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
-                    // printf("!w-%02x(%02x) ", selected_register, selected_register_index);
-                }
-
-                c++;
-                if (c > 128) {
-                    printf("\n");
-                    c = 0;
-                }
-
-                last_rd = rd;
-                last_wr = wr;
-            }
-            // // If both cs1, cs0 are high, this is not a valid address
-            // // If cs1 and cs0 are both low, not valid... data bus high imped?
-            // if ((values & 0x18) == 0x18 || (values & 0x18) == 0x0) {
-            //     continue;
-            // }
-            
-            // // Debounce the values in case we are sampling faster than is being sent
-            // // Also dont send if both cs lines are high
-            // if (values != cached_control_line_data) {
-            //     // if (lineChangeCount == 0) {
-            //     //     startTime = time_us_32();
-            //     // }
-            //     cached_control_line_data = values;
-
-            //     // send control line data
-            //     dreamlink_send_control_line_data_cmd(values);
-            //     // lineChangeCount++;
-            // }
-        // }
-
-        // // Hack to constantly process the control pins and send the data to mcu1...
-        // if (didProcessBuffer) {
-        //     didProcessBuffer = false;
-        // } else {
-        //     mcu2_fetch_control_lines = true;
-        // }
-
-        // if (lineChangeCount >= 1000) {
-        //     uint32_t diff = time_us_32() - startTime;
-        //     printf("%u: %uus\n", lineChangeCount, diff);
-        //     startTime = 0;
-        //     lineChangeCount = 0;
-        // }
-    }
+    // Loop forever and test
+    // test_control_line_response_time();
+    test_control_lines_response_time_with_pio();
 }

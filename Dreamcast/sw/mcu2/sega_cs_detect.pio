@@ -1,0 +1,64 @@
+.program sega_cs_detect
+set pindirs, 1
+.wrap_target
+    wait 0 gpio 4
+    ;; there seems to be 4 cycles of latency between the pin going low and the gpio going high
+    ;; This is even with the input synchronizers disabled
+    ;; Additionally using `wait pin` instead of `wait gpio` adds another cycle of latency
+    set pins, 1 [3]
+    set pins, 0
+    
+    wait 1 gpio 4
+.wrap
+
+
+; .define sega_cs0 3
+.program sega_cs0_detect
+; set pindirs, 1
+.wrap_target
+    wait 0 gpio 3
+
+    ; set pins, 1 [3]
+    ; set pins, 0
+    irq 4
+    
+    wait 1 gpio 3
+.wrap
+
+; .define sega_cs1 4
+.program sega_cs1_detect
+; set pindirs, 1
+.wrap_target
+    wait 0 gpio 4
+    
+    ; set pins, 1 [3]
+    ; set pins, 0
+    irq 4
+    
+    wait 1 gpio 4
+.wrap
+
+.program test_irq_set_gpio
+set pindirs, 1
+.wrap_target
+    wait 1 irq 4
+
+;; 20ns of latency from a cs_detect program raising the irq to setting gpio 18 high
+;; This means it's 2 cycles of latency added (which sounds right, 1 to set irq, 1 to read it)
+    set pins, 1 [3]
+    set pins, 0
+.wrap
+
+; ;; WIP
+; .program sega_data_bus
+; ; pindirs need to be set to some known state: input?
+
+; write_data:
+;     mov osr, ~null
+;     out pindirs, 16
+;     out pins, 16 ; write 16 bits to the pins
+
+; read_data:
+;     mov osr, ~null
+;     out pindirs, 16
+;     in pins, 16 ; read 16 bits from the pins
