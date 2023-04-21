@@ -20,6 +20,32 @@
 #include "sega_packet_interface.h"
 
 /*
+ * Using 8line mux 2:1 (Common A, ControlLine B, Data C)
+ * (A) gpio0-?
+ * (B) A0, A1, A2, CS0, CS1 ()
+ * (C) D0-D?
+ * 
+ * 6 gpio SD Card
+ * 16 Databus/muxed
+ * 1 Mux select
+ * ===== 23 pins
+ * 5: rd, wr, intrq, dmack, dmarq
+ * ===== 28 pins
+ * X(whatever is left) for comms to mcu2
+ * 
+ * These need to be available and not muxed?
+ * rd
+ * wr
+ * intrq
+ * dmack (host drives signal when signalling for more dma data)
+ * dmarq (device drives signal when dma available)
+ * 
+ * What sets of pins are used at the same time?
+ * (20) d0-d15, marq, mack, intrq(?), rd, wr
+ * (5)  a0-a2, cs0, cs2
+ */
+
+/*
  * Once MCU1 has recieved info from MCU2 (control line update)
  * Process it and act if needed
  */
@@ -95,30 +121,42 @@ int main(void) {
         gpio_set_dir(i, false); // set to input
     }
 
-    gpio_init(MCU1_PIN_READ);
-    gpio_set_dir(MCU1_PIN_READ, false);
-    gpio_init(MCU1_PIN_WRITE);
-    gpio_set_dir(MCU1_PIN_WRITE, false);
+    gpio_init(MCU1_PIN_MUX_SELECT);
+    gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+
+    // MUX to control lines
+    gpio_put(MCU1_PIN_MUX_SELECT, true);
     
     bool last_rd = 0;
     bool last_wr = 0;
     bool rd = 0;
     bool wr = 0;
     int numReadValues = 0;
+    bool csIsReady = false;
     while(1) {
 
         uint32_t pins = gpio_get_all();
-        rd = pins & 0x10000000; // pin 28
-        wr = pins & 0x20000000; // pin 29
 
-        if (rd == 0 && last_rd == 1) {
-            process_dreamlink_buffer();
-        } else if (wr == 0 && last_wr == 1) {
-            process_dreamlink_buffer();
+        // If CS1 line is low
+        if ((pins & 0x1) == false) {
+            gpio_put(MCU1_PIN_MUX_SELECT, false); // switch to data lines
+        } else {
+            gpio_put(MCU1_PIN_MUX_SELECT, true); // control lines
         }
 
-        last_rd = rd;
-        last_wr = wr;
+        // rd = pins & 0x10000000; // pin 28
+        // wr = pins & 0x20000000; // pin 29
+
+        // if (rd == 0 && last_rd == 1) {
+        //     process_dreamlink_buffer();
+        // } else if (wr == 0 && last_wr == 1) {
+        //     process_dreamlink_buffer();
+        // }
+
+        // last_rd = rd;
+        // last_wr = wr;
+
+
 
         // // Wait for the rd or wr lines to go low
         // // THEN process buffer
@@ -132,12 +170,12 @@ int main(void) {
 
         // process_dreamlink_buffer();
 
-        if (mcu1_control_line_data_ready) {
-            mcu1_control_line_data_ready = false;
+        // if (mcu1_control_line_data_ready) {
+        //     mcu1_control_line_data_ready = false;
             
-            // Pass in the last values for the pins
-            process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
-        }
+        //     // Pass in the last values for the pins
+        //     process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
+        // }
     }
 
     return 0;
