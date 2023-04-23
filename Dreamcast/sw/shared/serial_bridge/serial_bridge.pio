@@ -4,6 +4,12 @@
  * Copyright (c) 2023 Kaili Hill
  */
 
+ /*
+  * This PIO is only good if there are 2 ack lines (one per mcu) and at least 1 data line
+  * Rev2 board had to drop to 2 pins for comms so will likely need to fall back to some kind of
+  * UART like implementation.
+  */
+
 ;; tx_ack == intermcu_rx_program.sideSet
 ;; rx_ack == intermcu_tx_program.sideSet
 ;; rx_ack == pin 22 // ctrl1
