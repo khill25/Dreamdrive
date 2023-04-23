@@ -34,8 +34,8 @@
         "other_text_upright": false,
         "pads": {
           "drill": 0.0,
-          "height": 1.0,
-          "width": 3.15
+          "height": 1.6,
+          "width": 2.18
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -55,7 +55,16 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        "silk_over_copper|112494000|68605000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|8bfa62b9-96e2-4c42-adeb-d7400153c857",
+        "silk_over_copper|112508000|92354000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|dcc3de7f-1b9c-432d-8e30-273931e48766",
+        "silk_over_copper|112522000|59665000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|713dd597-dff4-4b8a-9fe6-7600ee551ca8",
+        "silk_over_copper|112522000|68605000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|dc9aebc1-7324-4840-bfe3-7c2287dd7fcc",
+        "silk_over_copper|112522000|83414000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|c0b84b93-d369-48e0-b8be-012d97f9946c",
+        "silk_over_copper|112522000|92354000|0b1b39f3-a60b-433f-8703-fc2fa6f6c31d|f7f36765-3401-4090-8425-fa77717427e6",
+        "track_dangling|119334000|83620500|7e36ed15-6a2c-4c74-8820-05c40d930621|00000000-0000-0000-0000-000000000000",
+        "track_dangling|119334000|92147500|20149220-7262-478b-9e5f-0ace4462c2fe|00000000-0000-0000-0000-000000000000"
+      ],
       "meta": {
         "version": 2
       },
@@ -396,7 +405,7 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "specctra_dsn": "",
+      "specctra_dsn": "Dreamdrivecast.dsn",
       "step": "",
       "vrml": ""
     },
