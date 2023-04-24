@@ -2,7 +2,6 @@ add_executable(dreamdrivecast_mcu2
     mcu2.c
 )
 
-
 target_include_directories(dreamdrivecast_mcu2 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
@@ -15,10 +14,6 @@ target_link_libraries(dreamdrivecast_mcu2
     hardware_pio
 
     dreamdrivecast_shared
-)
-
-pico_generate_pio_header(dreamdrivecast_mcu2
-    ${CMAKE_CURRENT_LIST_DIR}/sega_cs_detect.pio
 )
 
 set(PICO_COPY_TO_RAM 1)

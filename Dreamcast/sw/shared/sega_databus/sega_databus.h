@@ -18,7 +18,7 @@
 #define CACHED_CONTROL_LINE_REGISTER_INTRQ (0x8);
 #define CACHED_CONTROL_LINE_REGISTER_DMARQ (0x9);
 #define CACHED_CONTROL_LINE_REGISTER_DMACK (0xA);
-// This register is for local use and not part of the sega packet interface 
+// This register is for local use and not part of the sega packet interface
 extern volatile uint16_t cached_control_line_register;
 
 // Individual values, might be faster than shifting bits but we can optimize later
@@ -40,3 +40,6 @@ extern uint8_t databus_selected_register_index;
 extern bool databus_selected_register_is_valid;
 void sega_databus_extract_raw_control_line_packet(uint8_t rawData, bool rd, bool wr);
 void sega_databus_process_control_line_data();
+
+void setup_sega_pio_programs();
+void swap_cs_detect_for_rw_detect();

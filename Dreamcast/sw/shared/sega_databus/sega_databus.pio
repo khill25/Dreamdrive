@@ -31,17 +31,17 @@ set pindirs, 1
 ; .define RD 16
 .program sega_read_detect
 .wrap_target
-	wait 0 gpio 3
+	wait 0 gpio 16
 	irq 5
-	wait 1 gpio 3
+	wait 1 gpio 16
 .wrap
 
 ; .define WR 17
 .program sega_write_detect
 .wrap_target
-	wait 0 gpio 4
+	wait 0 gpio 17
 	irq 5
-	wait 1 gpio 4
+	wait 1 gpio 17
 .wrap
 
 .program test_irq_set_gpio

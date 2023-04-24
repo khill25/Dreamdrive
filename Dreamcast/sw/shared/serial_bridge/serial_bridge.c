@@ -9,21 +9,21 @@
  * Interconnect notes:
  * MCU1 contains all the data lines to the dreamcast
  * MCU2 contains all the control lines
- * 
+ *
  * I *THINK* that we need MCU1 to be setup to listen to MCU2 as that is where
  * the actions to perform read/write on the data lines comes from.
- * 
+ *
  * I'm not sure what kind of data MCU2 may need to send, but if it turns out that cd_sdat
- * needs to stream audio info or something, we may want to change that pin to MCU1 
- * and maybe bodge wire and remove the "key" switch from the weact board, as that is the 
+ * needs to stream audio info or something, we may want to change that pin to MCU1
+ * and maybe bodge wire and remove the "key" switch from the weact board, as that is the
  * only other place we can get another gpio without going naked rp2040s.
- * 
- * So with that: 
+ *
+ * So with that:
  * MCU1 will be setup with the RX program
  * MCU2 will be setup with the TX Program
  * There should be a way to flip the comm channels as currently there is no
  * need for duplex... (unless we run into the issue in the above paragraph)
- * 
+ *
  */
 
 #include <stdlib.h>
@@ -34,7 +34,7 @@
 #include "serial_bridge.h"
 #include "serial_bridge.pio.h"
 #include "shared.h"
- 
+
 #define NUM_INTERCONNECT_DAT_PINS 4 // Total pins
 #define NUM_INTERCONNECT_DAT_TX_PINS 2 // Pins used when tx'ing
 #define NUM_INTERCONNECT_DAT_RX_PINS 2 // pins used when rx'ing
@@ -89,7 +89,7 @@ void rx_interconnect_interrupt() {
         //while (pio_sm_is_rx_fifo_empty(rx_interconnect_config.pio, rx_interconnect_config.sm)) { tight_loop_contents(); }
 
         // uint32_t word_shift = (rx_interconnect_config.pio->rxf[rx_interconnect_config.sm] >> 16);
-        
+
         // // Fetch the data and put it in the ring buffer
         // uint16_t halfWord = (uint16_t)word_shift;
 
@@ -115,10 +115,10 @@ void interconnect_init(int ctrl1, int ctrl2, int dat0, bool start_as_tx) {
         pio_gpio_init(rx_interconnect_config.pio, ctrl1);
         pio_gpio_init(rx_interconnect_config.pio, ctrl2);
         interconnect_rx_program_init(rx_interconnect_config.pio, rx_interconnect_config.sm, offset, dat0, rx_interconnect_config.ctrl, 1);
-        
+
         uint irqNum = rx_interconnect_config.pio == pio0 ? PIO0_IRQ_0 : PIO1_IRQ_0;
         irq_set_exclusive_handler(irqNum, rx_interconnect_interrupt);
-        
+
 	    pio_set_irq0_source_enabled(rx_interconnect_config.pio, pis_sm1_rx_fifo_not_empty, true);
         irq_set_enabled(irqNum, true);
 
@@ -168,7 +168,7 @@ uint8_t interconnect_rx_get() {
         rxRingBuffer.tail = 0;
     }
     return ret;
-} 
+}
 
 static inline void interconnect_tx_program_init(PIO pio, uint sm, uint offset, uint pin_tx_start, uint pin_ctrl, uint divider) {
 
@@ -187,7 +187,7 @@ static inline void interconnect_tx_program_init(PIO pio, uint sm, uint offset, u
 
     // Setup autopull, grab 8 bits at a time
     sm_config_set_out_shift(&c, true, true, 8);
-    sm_config_set_in_pins(&c, 22); 
+    sm_config_set_in_pins(&c, 22);
     sm_config_set_out_pins(&c, 26, NUM_INTERCONNECT_DAT_TX_PINS);
 
     // ctrl pin (24) is used to signal we have put data on the lines
@@ -199,7 +199,7 @@ static inline void interconnect_tx_program_init(PIO pio, uint sm, uint offset, u
 }
 
 static inline void interconnect_rx_program_init(PIO pio, uint sm, uint offset, uint pin_rx_start, uint pin_ctrl, uint divider) {
-    
+
     printf("rx_pin: %u, ctrl: %u\n", pin_rx_start, pin_ctrl);
 
     for (int i = pin_rx_start; i < pin_rx_start+NUM_INTERCONNECT_DAT_RX_PINS; i++) {
@@ -221,10 +221,10 @@ static inline void interconnect_rx_program_init(PIO pio, uint sm, uint offset, u
     pio_sm_config c = inter_mcu_rx_program_get_default_config(offset);
 
     sm_config_set_in_shift(&c, true, true, 8);
-    
+
     // sm_config_set_in_pins(&c, 24);
     sm_config_set_in_pins(&c, pin_rx_start);
-    
+
     // ctrl pin is used to signal we have sampled the data
     // Set side set pin
     sm_config_set_sideset_pins(&c, pin_ctrl);

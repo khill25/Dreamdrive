@@ -24,7 +24,7 @@
  * (A) gpio0-?
  * (B) A0, A1, A2, CS0, CS1 ()
  * (C) D0-D?
- * 
+ *
  * 6 gpio SD Card
  * 16 Databus/muxed
  * 1 Mux select
@@ -32,14 +32,14 @@
  * 5: rd, wr, intrq, dmack, dmarq
  * ===== 28 pins
  * X(whatever is left) for comms to mcu2
- * 
+ *
  * These need to be available and not muxed?
  * rd
  * wr
  * intrq
  * dmack (host drives signal when signalling for more dma data)
  * dmarq (device drives signal when dma available)
- * 
+ *
  * What sets of pins are used at the same time?
  * (20) d0-d15, marq, mack, intrq(?), rd, wr
  * (5)  a0-a2, cs0, cs2
@@ -58,11 +58,11 @@ static void process_mcu2_data_and_exec_SPI_cmd_if_needed(bool rd, bool wr) {
     uint8_t controlValues = mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head-1];
 
     sega_databus_extract_raw_control_line_packet(controlValues, rd, wr);
-    
+
     // at least 22 cycles coming to this line
     sega_databus_process_control_line_data(); // worst case another at least 24 cycles here
 
-    // 
+    //
 
     // At this point we have the register and register "name" (index)
 
@@ -73,8 +73,8 @@ static void process_mcu2_data_and_exec_SPI_cmd_if_needed(bool rd, bool wr) {
     }
 
     // Need to put sampled data into relevant registers
-    
-    // Once the register is the COMMAND_REGISTER, we can start processing as we will have all the data 
+
+    // Once the register is the COMMAND_REGISTER, we can start processing as we will have all the data
     // set in the appropriate registers
     if(databus_selected_register_index == SPI_COMMAND_REGISTER_INDEX) {
 
@@ -82,7 +82,7 @@ static void process_mcu2_data_and_exec_SPI_cmd_if_needed(bool rd, bool wr) {
 
     // In most cases BSY register must be set within 400ns of the host sending this data
     // and we have likely spent most of that shuffling the data from mcu2 and then decoding it.
-            
+
 }
 /*
 May need to do something faster than waiting for mcu2 to send a packet every time it samples pins
@@ -96,7 +96,7 @@ MCU2 captures all the signal lines state changes
         * but then sends all the data it received (so all the control line samples)
         * and MCU1 can line up the control lines with it's sampled (parallel) buffer
 
-BSY must be set within 400ns of the command register being written    
+BSY must be set within 400ns of the command register being written
  */
 
 void sdcard_read_test() {
@@ -115,6 +115,8 @@ int main(void) {
 
     interconnect_init(MCU1_PIN_PIO_COMMS_CTRL1, MCU1_PIN_PIO_COMMS_CTRL2, MCU1_PIN_PIO_COMMS_D0, false);
 
+    setup_sega_pio_programs();
+
     // init the data pins
     for (int i = 0; i < 16; i++) {
         gpio_init(i);
@@ -126,7 +128,7 @@ int main(void) {
 
     // MUX to control lines
     gpio_put(MCU1_PIN_MUX_SELECT, true);
-    
+
     bool last_rd = 0;
     bool last_wr = 0;
     bool rd = 0;
@@ -172,7 +174,7 @@ int main(void) {
 
         // if (mcu1_control_line_data_ready) {
         //     mcu1_control_line_data_ready = false;
-            
+
         //     // Pass in the last values for the pins
         //     process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
         // }
