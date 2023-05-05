@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/opt/toolchains/dc/kos/include/**",
+                "/opt/toolchains/dc/kos-ports/**",
+                "/opt/toolchains/dc/arm-eabi/include/**",
+                "/opt/toolchains/dc/sh-elf/**",
+                "/opt/toolchains/dc/sh-elf/sh-elf/include/**",
+				"/opt/toolchains/dc/kos/kernel/arch/dreamcast/include/**",
+				"/opt/toolchains/dc/kos/addons/include/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c17",
+            "cppStandard": "gnu++17",
+            "intelliSenseMode": "clang-x64",
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}
