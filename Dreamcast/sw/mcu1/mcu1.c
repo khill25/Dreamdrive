@@ -9,7 +9,7 @@
 #include "pico/stdlib.h"
 #include "mcu1_pins.h"
 #include "shared.h"
-#include "serial_bridge/serial_bridge.h"
+#include "pio_uart/pio_uart.h"
 #include "hardware/pio.h"
 #include "sega_databus/sega_databus.h"
 
@@ -18,6 +18,8 @@
 #include "f_util.h"
 
 #include "sega_packet_interface.h"
+
+bool isMuxDataLines = true;
 
 /*
  * Using 8line mux 2:1 (Common A, ControlLine B, Data C)
@@ -110,15 +112,17 @@ int main(void) {
     sleep_ms(1000);
     printf("MCU1- Init interconnect\n");
 
-    gpio_init(26);
-    gpio_set_dir(26, false);
+    // Setup the Mux select line
+    gpio_init(MCU1_PIN_MUX_SELECT);
+    gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+    gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to data lines
 
-    interconnect_init(MCU1_PIN_PIO_COMMS_CTRL1, MCU1_PIN_PIO_COMMS_CTRL2, MCU1_PIN_PIO_COMMS_D0, false);
+    pio_uart_init(MCU1_PIN_PIO_COMMS_D0, MCU1_PIN_PIO_COMMS_D1);
 
     setup_sega_pio_programs();
 
-    // init the data pins
-    for (int i = 0; i < 16; i++) {
+    // init the pins, 0-15 = data, 16 = read, 17 = write, 18 = interrupt, 19 = DMACK, 20 = DMARQ
+    for (int i = 0; i <= 20; i++) {
         gpio_init(i);
         gpio_set_dir(i, false); // set to input
     }
@@ -146,38 +150,39 @@ int main(void) {
             gpio_put(MCU1_PIN_MUX_SELECT, true); // control lines
         }
 
-        // rd = pins & 0x10000000; // pin 28
-        // wr = pins & 0x20000000; // pin 29
+        // printf(".");
+        // sleep_ms(1000);
 
-        // if (rd == 0 && last_rd == 1) {
-        //     process_dreamlink_buffer();
-        // } else if (wr == 0 && last_wr == 1) {
-        //     process_dreamlink_buffer();
-        // }
+        rd = pins & 0x10000000; // pin 28
+        wr = pins & 0x20000000; // pin 29
 
-        // last_rd = rd;
-        // last_wr = wr;
+        if (rd == 0 && last_rd == 1) {
+            process_dreamlink_buffer();
+        } else if (wr == 0 && last_wr == 1) {
+            process_dreamlink_buffer();
+        }
 
+        last_rd = rd;
+        last_wr = wr;
 
+        // Wait for the rd or wr lines to go low
+        // THEN process buffer
+        // THEN process cmd
+        do {
+            rd = gpio_get(MCU1_PIN_READ);
+            wr = gpio_get(MCU1_PIN_WRITE);
+            last_rd = rd;
+            last_wr = wr;
+        } while (rd == 1 && wr == 1);
 
-        // // Wait for the rd or wr lines to go low
-        // // THEN process buffer
-        // // THEN process cmd
-        // do {
-        //     rd = gpio_get(MCU1_PIN_READ);
-        //     wr = gpio_get(MCU1_PIN_WRITE);
-        //     last_rd = rd;
-        //     last_wr = wr;
-        // } while (rd == 1 && wr == 1);
+        process_dreamlink_buffer();
 
-        // process_dreamlink_buffer();
+        if (mcu1_control_line_data_ready) {
+            mcu1_control_line_data_ready = false;
 
-        // if (mcu1_control_line_data_ready) {
-        //     mcu1_control_line_data_ready = false;
-
-        //     // Pass in the last values for the pins
-        //     process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
-        // }
+            // Pass in the last values for the pins
+            process_mcu2_data_and_exec_SPI_cmd_if_needed(rd, wr);
+        }
     }
 
     return 0;

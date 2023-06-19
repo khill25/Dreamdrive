@@ -9,7 +9,7 @@
 
 #include "sega_databus.h"
 #include "sega_packet_interface.h"
-#include "mcu2_pins.h"
+#include "mcu1_pins.h"
 
 #include "sega_databus.pio.h"
 
@@ -49,11 +49,11 @@ void sega_databus_extract_raw_control_line_packet(uint8_t rawData, bool rd, bool
     // This might take too long cycle count wise... This data will take time before it gets here
     // plus this will take another ~33 cycles worth of processing.
 
-     cached_port_function_register_da0  =  (rawData >> MCU2_PIN_A0) & 0x1;
-     cached_port_function_register_da1  =  (rawData >> MCU2_PIN_A1) & 0x1;
-     cached_port_function_register_da2  =  (rawData >> MCU2_PIN_A2) & 0x1;
-     cached_port_function_register_cs0  =  (rawData >> MCU2_PIN_IDE_CS0) & 0x1;
-     cached_port_function_register_cs1  =  (rawData >> MCU2_PIN_IDE_CS1) & 0x1;
+     cached_port_function_register_da0  =  (rawData >> MCU1_PIN_A0) & 0x1;
+     cached_port_function_register_da1  =  (rawData >> MCU1_PIN_A1) & 0x1;
+     cached_port_function_register_da2  =  (rawData >> MCU1_PIN_A2) & 0x1;
+     cached_port_function_register_cs0  =  (rawData >> MCU1_PIN_CS0) & 0x1;
+     cached_port_function_register_cs1  =  (rawData >> MCU1_PIN_CS1) & 0x1;
      cached_port_function_register_dior = rd;
      cached_port_function_register_diow = wr;
     //  cached_port_function_register_dior =  (rawData >> MCU2_PIN_READ) & 0x1;
@@ -232,19 +232,19 @@ void test_control_line_response_time() {
 		selected_register = 0;
 
 		if (rd == 0) {
-			da0 = (values >> MCU2_PIN_A0) & 0x1;
-			da1 = (values >> MCU2_PIN_A1) & 0x1;
-			da2 = (values >> MCU2_PIN_A2) & 0x1;
-			cs0 = (values >> MCU2_PIN_IDE_CS0) & 0x1;
-			cs1 = (values >> MCU2_PIN_IDE_CS1) & 0x1;
+			da0 = (values >> MCU1_PIN_A0) & 0x1;
+			da1 = (values >> MCU1_PIN_A1) & 0x1;
+			da2 = (values >> MCU1_PIN_A2) & 0x1;
+			cs0 = (values >> MCU1_PIN_CS0) & 0x1;
+			cs1 = (values >> MCU1_PIN_CS1) & 0x1;
 			// Decode with flipped cs values
 			SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
 		} else if (wr == 0) {
-			da0 = (values >> MCU2_PIN_A0) & 0x1;
-			da1 = (values >> MCU2_PIN_A1) & 0x1;
-			da2 = (values >> MCU2_PIN_A2) & 0x1;
-			cs0 = (values >> MCU2_PIN_IDE_CS0) & 0x1;
-			cs1 = (values >> MCU2_PIN_IDE_CS1) & 0x1;
+			da0 = (values >> MCU1_PIN_A0) & 0x1;
+			da1 = (values >> MCU1_PIN_A1) & 0x1;
+			da2 = (values >> MCU1_PIN_A2) & 0x1;
+			cs0 = (values >> MCU1_PIN_CS0) & 0x1;
+			cs1 = (values >> MCU1_PIN_CS1) & 0x1;
 
 			// Decode with flipped cs values
 			SPI_select_register(cs1, cs0, da2, da1, da0, rd, wr, &selected_register, &selected_register_index);
@@ -283,13 +283,13 @@ void init_sega_cs0_detect_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_gpio_init(pio, MCU2_PIN_IDE_CS0);
+	pio_gpio_init(pio, MCU1_PIN_CS0);
 
 	// for trigger gpio, used for benchmarking
 	// pio_gpio_init(pio, 18);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, MCU2_PIN_IDE_CS0, 1, false);
-	sm_config_set_in_pins(&c, MCU2_PIN_IDE_CS0);
+	pio_sm_set_consecutive_pindirs(pio, sm, MCU1_PIN_CS0, 1, false);
+	sm_config_set_in_pins(&c, MCU1_PIN_CS0);
 
 	// trigger gpio
 	// sm_config_set_set_pins(&c, 18, 1);
@@ -299,7 +299,7 @@ void init_sega_cs0_detect_program(sega_pio_program_t* sega_pio_program) {
 	// pio_sm_set_enabled(pio, sm, true);
 
 	// DISABLE INPUT SYNC BYPASS for PIN CS0
-	pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS0);
+	pio->input_sync_bypass |= (1u << MCU1_PIN_CS0);
 }
 
 void init_sega_cs1_detect_program(sega_pio_program_t* sega_pio_program) {
@@ -310,10 +310,10 @@ void init_sega_cs1_detect_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_gpio_init(pio, MCU2_PIN_IDE_CS1);
+	pio_gpio_init(pio, MCU1_PIN_CS1);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, MCU2_PIN_IDE_CS1, 1, false);
-	sm_config_set_in_pins(&c, MCU2_PIN_IDE_CS1);
+	pio_sm_set_consecutive_pindirs(pio, sm, MCU1_PIN_CS1, 1, false);
+	sm_config_set_in_pins(&c, MCU1_PIN_CS1);
 
 	// trigger gpio
 	// sm_config_set_set_pins(&c, 18, 1);
@@ -323,7 +323,7 @@ void init_sega_cs1_detect_program(sega_pio_program_t* sega_pio_program) {
 	// pio_sm_set_enabled(pio, sm, true);
 
 	// DISABLE INPUT SYNC BYPASS for PIN CS1
-	pio->input_sync_bypass |= (1u << MCU2_PIN_IDE_CS1);
+	pio->input_sync_bypass |= (1u << MCU1_PIN_CS1);
 }
 
 void init_sega_read_detect_program(sega_pio_program_t* sega_pio_program) {
@@ -342,21 +342,25 @@ void init_sega_write_detect_program(sega_pio_program_t* sega_pio_program) {
 
 void init_test_irq_detect_program(sega_pio_program_t* sega_pio_program) {
 
+// TODO THIS FUNCTION WAS LEFT OVER WHEN PINS WERE CONNECTED TO MCU2
+// I changed pin numbers to reflect the current pis on mcu1
+// but unsure of any more changes that need to happen to use this method
+
 	PIO pio = (*sega_pio_program).pio;
 	uint sm = (*sega_pio_program).sm;
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
 	// Control pins
-	pio_gpio_init(pio, 0);
-	pio_gpio_init(pio, 1);
-	pio_gpio_init(pio, 2);
-	pio_gpio_init(pio, 3);
-	pio_gpio_init(pio, 4);
+	// pio_gpio_init(pio, 0);
+	// pio_gpio_init(pio, 1);
+	// pio_gpio_init(pio, 2);
+	// pio_gpio_init(pio, 3);
+	// pio_gpio_init(pio, 4);
 
 	// Read and write...
-	pio_gpio_init(pio, 5);
-	pio_gpio_init(pio, 6);
+	// pio_gpio_init(pio, 16);
+	// pio_gpio_init(pio, 17);
 
 	pio_sm_set_consecutive_pindirs(pio, sm, 0, 7, false);
 	sm_config_set_in_pins(&c, 0);

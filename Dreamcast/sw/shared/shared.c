@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "shared.h"
-#include "serial_bridge.h"
+#include "pio_uart/pio_uart.h"
 
 #include "mcu2_pins.h"
 
@@ -19,7 +19,7 @@ volatile int current_mcu = 0;
 // volatile uint16_t mcu1_received_control_line_data_buffer[32] = {0};
 // volatile uint8_t mcu1_received_control_line_data_buffer_head = 0;
 // volatile uint8_t mcu1_received_control_line_data_buffer_tail = 0;
-volatile bool mcu1_is_waiting_for_control_line_return = false; 
+volatile bool mcu1_is_waiting_for_control_line_return = false;
 volatile bool mcu1_control_line_data_ready = false;
 volatile uint16_t mcu1_received_control_line_data = 0;
 
@@ -56,7 +56,7 @@ void process_dreamlink_buffer_helper(char ch) {
 
         if (is_receiving_data) {
             data_buffer[data_buffer_index] = ch;
-        
+
             data_buffer_index++;
 
             // We have recieved all the data we expect, we can signal to start processing it
@@ -95,13 +95,13 @@ void process_dreamlink_buffer_helper(char ch) {
                 // Do it here, should be quick enough
 
             } else if (command == DREAMLINK_CMD_SEND_CONTROL_LINE) {
-                // Should be received by MCU1 only... 
+                // Should be received by MCU1 only...
                 // MCU2 will just send the control lines instead of MCU1 needing to poll??
                 // uint8_t* buf8 = (uint8_t*)data_buffer;
                 // mcu1_received_control_line_data = buf8[0];
-                
+
                 // Add to ring buffer
-                mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head++] = data_buffer[0]; 
+                mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head++] = data_buffer[0];
                 mcu1_control_line_data_ready = true;
 
                 // Reset the head if we are wrapping around
@@ -124,55 +124,57 @@ void process_dreamlink_buffer_helper(char ch) {
         }
 }
 void process_dreamlink_buffer() {
-    while (interconnect_rx_buffer_has_data()) {
+    // TODO this method needs to be totally updated to use the pio_uart code
+    // while (uart_rx_program_is_readable()) {
         // TODO: might want to use 8bit data for dreamlink/interconnect instead of 16 bits
         // Need to see more use cases before changing...
-        uint8_t b = interconnect_rx_get();
-        process_dreamlink_buffer_helper(b);
-    }
+
+        // uint8_t b = interconnect_rx_get();
+        // process_dreamlink_buffer_helper(b);
+    // }
 }
 
 // Sends an async request to fetch the last control pin values
-void dreamlink_get_control_lines_cmd() {
-    mcu1_is_waiting_for_control_line_return = true;
-    uint8_t buf[] = { 
-        COMMAND_START_BYTE_0, 
-        COMMAND_START_BYTE_1, 
-        DREAMLINK_CMD_GET_CONTROL_LINE, 
-        0x0, 
-        0x0,
-        };
-    interconnect_tx(buf, sizeof(buf));
-}
+// void dreamlink_get_control_lines_cmd() {
+//     mcu1_is_waiting_for_control_line_return = true;
+//     uint8_t buf[] = {
+//         COMMAND_START_BYTE_0,
+//         COMMAND_START_BYTE_1,
+//         DREAMLINK_CMD_GET_CONTROL_LINE,
+//         0x0,
+//         0x0,
+//         };
+//     interconnect_tx(buf, sizeof(buf));
+// }
 
-void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq) {
-    uint8_t value = intrq << 1 | dmarq;
-    uint8_t buf[] = { 
-        COMMAND_START_BYTE_0, 
-        COMMAND_START_BYTE_1,
-        DREAMLINK_CMD_SET_CONTROL_LINE, 
-        0x0, 
-        0x1, // 1 byte
-        value 
-        };
-    interconnect_tx(buf, sizeof(buf));
-}
+// void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq) {
+//     uint8_t value = intrq << 1 | dmarq;
+//     uint8_t buf[] = {
+//         COMMAND_START_BYTE_0,
+//         COMMAND_START_BYTE_1,
+//         DREAMLINK_CMD_SET_CONTROL_LINE,
+//         0x0,
+//         0x1, // 1 byte
+//         value
+//         };
+//     interconnect_tx(buf, sizeof(buf));
+// }
 
-void dreamlink_send_control_line_data_cmd(uint8_t controlLines) {
-    // uint8_t buf[] = { 
-    //     COMMAND_START_BYTE_0, 
-    //     COMMAND_START_BYTE_1, 
-    //     DREAMLINK_CMD_SEND_CONTROL_LINE, 
-    //     0x0, 
-    //     0x1, // 1 byte
-    //     controlLines
-    //     };
-    // interconnect_tx(buf, sizeof(buf));
+// void dreamlink_send_control_line_data_cmd(uint8_t controlLines) {
+//     // uint8_t buf[] = {
+//     //     COMMAND_START_BYTE_0,
+//     //     COMMAND_START_BYTE_1,
+//     //     DREAMLINK_CMD_SEND_CONTROL_LINE,
+//     //     0x0,
+//     //     0x1, // 1 byte
+//     //     controlLines
+//     //     };
+//     // interconnect_tx(buf, sizeof(buf));
 
-    // Sending control line data is very time sensitive so transmit as few bytes as possible.
-    uint8_t buf[] = { 
-        DREAMLINK_CMD_SEND_CONTROL_LINE, 
-        controlLines
-        };
-    interconnect_tx(buf, sizeof(buf));
-}
+//     // Sending control line data is very time sensitive so transmit as few bytes as possible.
+//     uint8_t buf[] = {
+//         DREAMLINK_CMD_SEND_CONTROL_LINE,
+//         controlLines
+//         };
+//     interconnect_tx(buf, sizeof(buf));
+// }

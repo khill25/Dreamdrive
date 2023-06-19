@@ -13,14 +13,14 @@ extern volatile int current_mcu;
 
 #define RX_RING_BUFFER_SIZE 1024
 // 8-bit ring buffer
-typedef struct RXRingBuffer_t {                                                                  
+typedef struct RXRingBuffer_t {
     uint8_t buf[RX_RING_BUFFER_SIZE]; // 1024 bytes
-    uint32_t head;                                                   
-    uint32_t tail;                                                   
+    uint32_t head;
+    uint32_t tail;
 } RXRingBuffer_t;
 
 // TODO there will likely be other variables and it might make sense
-// to use a single variable and bit shift? 
+// to use a single variable and bit shift?
 
 // When waiting for the control line command to send data back
 extern volatile bool mcu1_is_waiting_for_control_line_return;
@@ -50,6 +50,7 @@ extern volatile bool mcu2_fetch_control_lines;
 #define DREAMLINK_CMD_SEND_CONTROL_LINE     (0x03)
 
 void process_dreamlink_buffer();
-void dreamlink_get_control_lines_cmd();
-void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq);
-void dreamlink_send_control_line_data_cmd(uint8_t controlLines);
+// TODO these likey wont be needed anymore. But we will need a way to process information or send data(audio?) to MCU2
+// void dreamlink_get_control_lines_cmd();
+// void dreamlink_set_control_lines_cmd(bool intrq, bool dmarq);
+// void dreamlink_send_control_line_data_cmd(uint8_t controlLines);

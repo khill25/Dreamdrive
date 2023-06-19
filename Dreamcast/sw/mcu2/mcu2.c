@@ -9,7 +9,7 @@
 #include "pico/stdlib.h"
 #include "mcu2_pins.h"
 #include "shared.h"
-#include "serial_bridge/serial_bridge.h"
+#include "pio_uart/pio_uart.h"
 #include "hardware/pio.h"
 #include "hardware/vreg.h"
 
@@ -99,35 +99,8 @@ volatile uint32_t last_ctrl_pin_sample = 0x0;
  * I'm unsure if SPI will be fast enough, more testing will be needed so see if it's viable.
  */
 
-// Setup the gpio pins connected to the ide control lines, we want input for all of them?
-// TODO some pins might be input/output
 void setup_gpio() {
-	// for(int i = 0; i < 16; i++) {
-	//     gpio_init(i);
-	//     gpio_set_dir(i, false);
-	// }
-
-	gpio_init(MCU2_PIN_A0);
-	gpio_set_dir(MCU2_PIN_A0, false);
-
-	gpio_init(MCU2_PIN_A1);
-	gpio_set_dir(MCU2_PIN_A1, false);
-
-	gpio_init(MCU2_PIN_A2);
-	gpio_set_dir(MCU2_PIN_A2, false);
-
-	gpio_init(MCU2_PIN_IDE_CS0);
-	gpio_set_dir(MCU2_PIN_IDE_CS0, false);
-
-	gpio_init(MCU2_PIN_IDE_CS1);
-	gpio_set_dir(MCU2_PIN_IDE_CS1, false);
-
-	// read and write pins
-	gpio_init(5);
-	gpio_set_dir(5, false);
-
-	gpio_init(6);
-	gpio_set_dir(6, false);
+	// TODO setup with new pins
 }
 
 uint8_t cached_control_line_data = 0;
@@ -141,7 +114,7 @@ int main(void) {
 	sleep_ms(1500);
 
 	printf("MCU2- Setting up interconnect\n");
-	interconnect_init(MCU2_PIN_PIO_COMMS_CTRL1, MCU2_PIN_PIO_COMMS_CTRL2, MCU2_PIN_PIO_COMMS_D0, true);
+	pio_uart_init(MCU2_PIN_PIO_COMMS_D1, MCU2_PIN_PIO_COMMS_D0);
 
 	const int freq_khz = 266000;
 	// const int freq_khz = 336000;
@@ -162,9 +135,6 @@ int main(void) {
 	bool didProcessBuffer = false;
 	volatile uint32_t lineChangeCount = 0;
 	volatile uint32_t startTime = 0;
-	// volatile uint8_t buf[] = {0};
-	// volatile uint8_t v = 0;
-
 	volatile uint32_t c = 0;
 
 	// Loop forever and test
