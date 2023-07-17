@@ -35,21 +35,21 @@ extern uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT];
 
 /* Sega Packet Interface stuff */
 typedef enum SPI_REGISTER_INDEX {
-    SPI_ATA_IO_REGISTER_INDEX = 0       ,
-    SPI_STATUS_REGISTER_INDEX           ,
-    SPI_ALTERNATE_STATUS_REGISTER_INDEX ,
-    SPI_COMMAND_REGISTER_INDEX         ,
-    SPI_BYTE_COUNT_REGISTER_LOW_INDEX      , // Low bits
-    SPI_BYTE_COUNT_REGISTER_HIGH_INDEX      , // high bits
-    SPI_DATA_REGISTER_INDEX             , // use `SPI_data_register` to access this register
-    SPI_DEVICE_CONTROL_REGISTER_INDEX   ,
-    SPI_DRIVE_SELECT_REGISTER_INDEX     ,// ATA Drive/Head register
-    SPI_ERROR_REGISTER_INDEX            ,
-    SPI_FEATURES_REGISTER_INDEX         ,
-    SPI_INTERRUPT_REASON_REGISTER_INDEX , // Read only
-    SPI_SECTOR_COUNT_REGISTER_INDEX     , // Write only
-    SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
-    SPI_REGISTER_COUNT // 14 = (0xE)
+/* 0 */    SPI_ATA_IO_REGISTER_INDEX = 0       ,
+/* 1 */    SPI_STATUS_REGISTER_INDEX           ,
+/* 2 */    SPI_ALTERNATE_STATUS_REGISTER_INDEX ,
+/* 3 */    SPI_COMMAND_REGISTER_INDEX         ,
+/* 4 */    SPI_BYTE_COUNT_REGISTER_LOW_INDEX      , // Low bits
+/* 5 */    SPI_BYTE_COUNT_REGISTER_HIGH_INDEX      , // high bits
+/* 6 */    SPI_DATA_REGISTER_INDEX             , // use `SPI_data_register` to access this register
+/* 7 */    SPI_DEVICE_CONTROL_REGISTER_INDEX   ,
+/* 8 */    SPI_DRIVE_SELECT_REGISTER_INDEX     ,// ATA Drive/Head register
+/* 9 */    SPI_ERROR_REGISTER_INDEX            ,
+/* 10*/    SPI_FEATURES_REGISTER_INDEX         ,
+/* 11*/    SPI_INTERRUPT_REASON_REGISTER_INDEX , // Read only
+/* 12*/    SPI_SECTOR_COUNT_REGISTER_INDEX     , // Write only
+/* 13*/    SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
+/* 14*/    SPI_REGISTER_COUNT // 14 = (0xE)
 } SPI_REGISTER_INDEX;
 extern uint8_t SPI_registers[SPI_REGISTER_COUNT];
 extern uint16_t SPI_data_register; // since this is the only 16 bit register...
@@ -133,11 +133,11 @@ typedef enum {
 typedef enum {
     SPI_SECTOR_COUNT_MODE_VALUE_LSB = 0,
     SPI_SECTOR_COUNT_TRANSFER_MODE_LSB = 4,
-} SPI_SECTOR_COUNT_REGISTER;    
-#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT      (0x0)  // 0000000xb 
-#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_FLOW_CONTROL (0x08) // 00001xxxb 
-#define SPI_SECTOR_COUNT_TRANSFER_MODE_SINGLE_WORD_DMA  (0x10) // 00010xxxb 
-#define SPI_SECTOR_COUNT_TRANSFER_MODE_MULTI_WORD_DMA   (0x40) // 00100xxxb 
+} SPI_SECTOR_COUNT_REGISTER;
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT      (0x0)  // 0000000xb
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_FLOW_CONTROL (0x08) // 00001xxxb
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_SINGLE_WORD_DMA  (0x10) // 00010xxxb
+#define SPI_SECTOR_COUNT_TRANSFER_MODE_MULTI_WORD_DMA   (0x40) // 00100xxxb
 #define SPI_SECTOR_COUNT_TRANSFER_MODE_PSEUDO_DMA       (0x18) // 00011xxxb apparently reserved?
 
 typedef enum {
@@ -203,7 +203,7 @@ extern uint8_t SEGA_PACKET_CMD_REGISTER[12];
 /*************************************/
 // Req mode status bits are placed in the lower 4 bits of the first byte.
 #define REQ_STAT_INFO_STATUS_BUSY        0x00 // State transition
-#define REQ_STAT_INFO_STATUS_PAUSE       0x01 
+#define REQ_STAT_INFO_STATUS_PAUSE       0x01
 #define REQ_STAT_INFO_STATUS_STANDBY     0x02 // drive stop
 #define REQ_STAT_INFO_STATUS_PLAY        0x03
 #define REQ_STAT_INFO_STATUS_SEEK        0x04
@@ -284,14 +284,14 @@ extern uint8_t SEGA_PACKET_CMD_REGISTER[12];
 #define REQ_MODE_HARDWARE_INFO_CDROM_SPEED_12X         0x7
 
 extern uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32];
-/* 
+/*
 = { 0
 
  * Byte 0-1         0x00
  * Byte 2           CD-ROM Speed
  * Byte 3           0x00
  * Byte 4-5         Standby Time, 0 = unlimited, value 0x1 to 0xFFFF
- * Byte 6           
+ * Byte 6
  *      bit 5 = Read Continuous, 1 = playback without delay, data stream may contain errors
  *      bit 4 = ECC, 1 = perform retry if an error occurs. Valid only in mode 1 or Mode 2 Form 1
  *      bit 3 = Read Retry, 1 = retry on error
@@ -301,7 +301,7 @@ extern uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32];
  * Byte 10-17       Drive Information (ASCII), Name of drive, READ ONLY
  * Byte 18-25       System Version (ASCII), CD block version, READ ONLY
  * Byte 26-31       System Date (ASCII), Updated date of CD block, READ ONLY
- 
+
 };
 */
 
@@ -324,7 +324,7 @@ extern uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32];
 //  * Byte 0, 0xF0 (upper 4 bits are 1s)
 //  * Byte 1, 0x0
 //  * Byte 2, bit 3-0, Sense Key
-//  * Byte 4-7, Command specific information, if not defined by a command, the FAD where the error occured is reported 
+//  * Byte 4-7, Command specific information, if not defined by a command, the FAD where the error occured is reported
 //  * Byte 8, Additional Sense Code - TODO Appendix I
 //  * Byte 9, Additional Sense Code Qualifier, TODO Appendix I
 //  */
@@ -362,20 +362,20 @@ extern uint8_t SEGA_PACKET_TOC_INFO[408];
 // };
 
 /*
-Bit 0, 
+Bit 0,
     0 = Audio data without pre-emphasis (CD-DA) At-once recorded track (CD-ROM)
     1 = Audio data with pre-emphasis (CD-DA) Packet-recorded track (CD-ROM
 
-Bit 1, 
-    0 = Digital copy prohibited 
+Bit 1,
+    0 = Digital copy prohibited
     1 = Digital copy allowed
 
-Bit 2, 
-    0 = Audio track 
+Bit 2,
+    0 = Audio track
     1 = Data track
 
-Bit 3, 
-    0 = 2-channel audio 
+Bit 3,
+    0 = 2-channel audio
     1 = 4-channel audio
 */
 
@@ -413,7 +413,7 @@ Bit 3,
 
 
 bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex);
-// Potentially faster version of the above since we need to speed things up a lot. 
+// Potentially faster version of the above since we need to speed things up a lot.
 // The abstraction is nice but the rp2040 and signally don't allow enough time
 void SPI_select_register_coded(uint8_t codedValue, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_register_index);
 

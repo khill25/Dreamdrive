@@ -46,8 +46,11 @@ void sega_databus_extract_raw_control_line_packet(uint8_t rawData, bool rd, bool
      * intrq, x, x, x, dmarq, dmack, x, x
      */
 
-    // This might take too long cycle count wise... This data will take time before it gets here
-    // plus this will take another ~33 cycles worth of processing.
+    // This might take too long cycle count wise...
+    // This will take ~33 cycles worth of processing.
+
+	// Table from gdrom docs CS lines use "A" and "N" which in our case are "0" and "1"
+	// Flipping the CS line order when computing the value will give the right result
 
      cached_port_function_register_da0  =  (rawData >> MCU1_PIN_A0) & 0x1;
      cached_port_function_register_da1  =  (rawData >> MCU1_PIN_A1) & 0x1;
