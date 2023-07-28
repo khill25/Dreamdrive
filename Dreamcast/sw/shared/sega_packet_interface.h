@@ -35,7 +35,7 @@ extern uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT];
 
 /* Sega Packet Interface stuff */
 typedef enum SPI_REGISTER_INDEX {
-/* 0 */    SPI_ATA_IO_REGISTER_INDEX = 0       ,
+/* 0 */    SPI_ATA_IO_REGISTER_INDEX = 0       , // TODO what is this register??? I think this isn't a real register
 /* 1 */    SPI_STATUS_REGISTER_INDEX           ,
 /* 2 */    SPI_ALTERNATE_STATUS_REGISTER_INDEX ,
 /* 3 */    SPI_COMMAND_REGISTER_INDEX         ,
@@ -51,7 +51,7 @@ typedef enum SPI_REGISTER_INDEX {
 /* 13*/    SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
 /* 14*/    SPI_REGISTER_COUNT // 14 = (0xE)
 } SPI_REGISTER_INDEX;
-extern uint8_t SPI_registers[SPI_REGISTER_COUNT];
+extern uint8_t SPI_registers[SPI_REGISTER_COUNT+1];
 extern uint16_t SPI_data_register; // since this is the only 16 bit register...
 
 /*
@@ -415,7 +415,7 @@ Bit 3,
 bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex);
 // Potentially faster version of the above since we need to speed things up a lot.
 // The abstraction is nice but the rp2040 and signally don't allow enough time
-void SPI_select_register_coded(uint8_t codedValue, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_register_index);
+void SPI_select_register_precoded(uint32_t codedValue, bool dior, uint8_t* ret_register, uint8_t* ret_register_index);
 
 void SPI_set_BSY(bool isBusy);
 void SPI_set_DRQ(bool isDataReady);

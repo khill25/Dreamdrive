@@ -19,6 +19,8 @@
 
 #include "sega_packet_interface.h"
 
+#include "hardware/structs/systick.h"
+
 bool isMuxDataLines = true;
 
 /*
@@ -144,8 +146,9 @@ void printNameOfRegister(uint8_t regIndex) {
 
 }
 
+#define DEBUG_UART_BAUD_RATE 115200
+
 int main(void) {
-	stdio_init_all();
 	current_mcu = MCU1;
 
 	sleep_ms(1000);
@@ -155,9 +158,11 @@ int main(void) {
 	// const int freq_khz = 336000;
 	// vreg_set_voltage(VREG_VOLTAGE_1_25); // Usually needed for clocks over 266MHz
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
-	printf("Clock of %uMhz was set: %u\n", freq_khz / 1000, clockWasSet);
 
-	printf("MCU1- Init interconnect\n");
+	// stdio_init_all();
+	stdio_uart_init_full(uart0, DEBUG_UART_BAUD_RATE, 28, -1);
+
+	printf("Clock of %uMhz was set: %u\n", freq_khz / 1000, clockWasSet);
 
 	// Setup the Mux select line
 	gpio_init(MCU1_PIN_MUX_SELECT);
@@ -231,6 +236,56 @@ int main(void) {
 
 	printf("MCU1- Start main loop\n");
 
+	volatile uint8_t statusRegister = 0;
+	volatile uint8_t statusRegisterIndex = 0;
+
+	// Map values to commands, start with all values loaded to invalid (register count)
+	uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
+
+	// Now fill in the values we need
+	// Register Index = Bits = W, R, CS1, CS0, A2, A1, A0 (most->least)
+	registerIndex_map[0x2E] = SPI_ALTERNATE_STATUS_REGISTER_INDEX; // read
+	registerIndex_map[0x4E] = SPI_DEVICE_CONTROL_REGISTER_INDEX; // write
+
+	registerIndex_map[0x30] = SPI_DATA_REGISTER_INDEX; // read
+	registerIndex_map[0x50] = SPI_DATA_REGISTER_INDEX; // write
+
+	registerIndex_map[0x51] = SPI_FEATURES_REGISTER_INDEX;
+	registerIndex_map[0x31] = SPI_ERROR_REGISTER_INDEX;
+
+	registerIndex_map[0x32] = SPI_INTERRUPT_REASON_REGISTER_INDEX; // read only
+
+	registerIndex_map[0x33] = SPI_SECTOR_NUMBER_REGISTER_INDEX; // read only
+
+	registerIndex_map[0x34] = SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // read
+	registerIndex_map[0x54] = SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // write
+
+	registerIndex_map[0x35] = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // read
+	registerIndex_map[0x55] = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // write
+
+	registerIndex_map[0x56] = SPI_DRIVE_SELECT_REGISTER_INDEX; // write
+	registerIndex_map[0x36] = SPI_DRIVE_SELECT_REGISTER_INDEX; // read
+
+	registerIndex_map[0x37] = SPI_STATUS_REGISTER_INDEX; // read
+	registerIndex_map[0x57] = SPI_COMMAND_REGISTER_INDEX; // write
+
+	volatile uint32_t c = 0;
+	// Setup all the pio programs
+	setup_sega_pio_programs();
+
+	test_swapping_cs_rw_detect_programs();
+	// See how long swapping pio programs takes
+	// for(int i = 0; i < 30; i++) {
+	// 	systick_hw->csr = 0x5;
+	// 	systick_hw->rvr = 0x00FFFFFF;
+
+	// 	swap_cs_detect_for_rw_detect();
+
+	// 	sleep_us(10);
+	// }
+
+	printf("FINISHED!\n");
+
 	while(1) {
 		pins = gpio_get_all();
 
@@ -275,11 +330,120 @@ int main(void) {
 							writePinVal = 1;
 						}
 
-						sega_databus_extract_raw_control_line_packet(values[i], readPinVal, writePinVal);
-						sega_databus_process_control_line_data();
+						// This method is too slow. We don't need to do any extraction
+						// sega_databus_extract_raw_control_line_packet(values[i], readPinVal, writePinVal);
 
-						printf("[%x+%u]%u:", values[i], wasARead[i], databus_selected_register_index);
-						printNameOfRegister(databus_selected_register_index);
+						// This method is also too slow
+						//sega_databus_process_control_line_data();
+
+						uint32_t codedValue = values[i];
+						bool dior = wasARead[i];
+						uint8_t* ret_registerIndex;
+						uint8_t* ret_register;
+
+						systick_hw->csr = 0x5;
+    					systick_hw->rvr = 0x00FFFFFF;
+
+						volatile uint32_t end_tick = 0;
+						volatile uint32_t start_tick = systick_hw->cvr;
+
+						// if (wasARead[i]) {
+						// 	*ret_registerIndex = registerIndex_map[codedValue | (1 << 5)];
+						// } else {
+						// 	*ret_registerIndex = registerIndex_map[codedValue | (1 << 6)];
+						// }
+
+						// We can simply pass in the already coded value to the function
+						// SPI_select_register_precoded(values[i], wasARead[i], &statusRegister, &statusRegisterIndex);
+
+						// 	switch (codedValue) {
+						// 	// These are all invalid values
+						// 	case 0x0:
+						// 	case 0x1:
+						// 	case 0x2:
+						// 	case 0x3:
+						// 	case 0x4:
+						// 	case 0x5:
+						// 	case 0x6:
+						// 	case 0x7:
+						// 	case 0x8:
+						// 	case 0x9:
+						// 	case 0xA:
+						// 	case 0xB:
+						// 	case 0xC:
+						// 	case 0xD:
+						// 		*ret_registerIndex = SPI_REGISTER_COUNT;
+						// 		break;
+						// 		// return;
+
+						// 	case 0xE:
+						// 		if (dior == 1) {
+						// 			*ret_registerIndex = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
+						// 		} else {
+						// 			*ret_registerIndex = SPI_DEVICE_CONTROL_REGISTER_INDEX;
+						// 		}
+						// 		break;
+
+						// 	// Another invalid case
+						// 	case 0xF:
+						// 		*ret_registerIndex = SPI_REGISTER_COUNT;
+						// 		break;
+						// 		// return;
+
+						// 	case 0x10:
+						// 		*ret_registerIndex = SPI_DATA_REGISTER_INDEX;
+						// 		break;
+
+						// 	case 0x11:
+						// 		if (dior == 1) {
+						// 			*ret_registerIndex = SPI_ERROR_REGISTER_INDEX;
+						// 		} else {
+						// 			*ret_registerIndex = SPI_FEATURES_REGISTER_INDEX;
+						// 		}
+						// 		break;
+
+						// 	case 0x12:
+						// 		*ret_registerIndex = SPI_INTERRUPT_REASON_REGISTER_INDEX;
+						// 		break;
+
+						// 	case 0x13:
+						// 		*ret_registerIndex = SPI_SECTOR_NUMBER_REGISTER_INDEX;
+						// 		break;
+
+						// 	case 0x14:
+						// 		*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
+						// 		break;
+
+						// 	case 0x15:
+						// 		*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
+						// 		break;
+
+						// 	case 0x16:
+						// 		*ret_registerIndex = SPI_DRIVE_SELECT_REGISTER_INDEX;
+						// 		break;
+
+						// 	case 0x17:
+						// 		if (dior == 1) {
+						// 			*ret_registerIndex = SPI_STATUS_REGISTER_INDEX;
+						// 		} else {
+						// 			*ret_registerIndex = SPI_COMMAND_REGISTER_INDEX;
+						// 		}
+						// 		break;
+
+						// 	default:
+						// 	// All other values are invalid
+						// 		ret_registerIndex =  SPI_REGISTER_COUNT;
+						// 		break;
+						// }
+						// *ret_register = SPI_registers[*ret_registerIndex];
+
+						end_tick = systick_hw->cvr;
+
+						volatile uint32_t totalTicks = (start_tick - end_tick);
+						volatile uint32_t totalTimeNS = totalTicks * 4;
+
+						printf("[%x+%u]%u in %uns[%u ticks]:", values[i], wasARead[i], *ret_registerIndex, totalTimeNS, totalTicks);
+						printNameOfRegister(statusRegisterIndex);
 						printf("\n");
 					}
 					hasPrinted = true;

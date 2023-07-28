@@ -16,7 +16,7 @@ uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
 	0x00,
 };
 
-uint8_t SPI_registers[SPI_REGISTER_COUNT];
+uint8_t SPI_registers[SPI_REGISTER_COUNT+1];
 uint16_t SPI_data_register;
 uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
 uint8_t SEGA_PACKET_TOC_INFO[408] = {0};
@@ -80,6 +80,101 @@ void SPI_issue_device_reset(uint8_t reset_type) {
  *
  */
 
+// Pass in the coded value (raw from the pico, the first 5 bits are the control lines)
+// and if read is true or false
+//
+// Returns are a pointer to the register and its index
+
+inline void SPI_select_register_precoded(uint32_t codedValue, bool dior, uint8_t* ret_register, uint8_t* ret_registerIndex) {
+	switch (codedValue) {
+		// These are all invalid values
+		case 0x0:
+		case 0x1:
+		case 0x2:
+		case 0x3:
+		case 0x4:
+		case 0x5:
+		case 0x6:
+		case 0x7:
+		case 0x8:
+		case 0x9:
+		case 0xA:
+		case 0xB:
+		case 0xC:
+		case 0xD:
+			*ret_registerIndex = SPI_REGISTER_COUNT;
+			break;
+			// return;
+
+		case 0xE:
+			if (dior == 1) {
+				*ret_registerIndex = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
+			} else {
+				*ret_registerIndex = SPI_DEVICE_CONTROL_REGISTER_INDEX;
+			}
+			break;
+
+		// Another invalid case
+		case 0xF:
+			*ret_registerIndex = SPI_REGISTER_COUNT;
+			break;
+			// return;
+
+		case 0x10:
+			*ret_registerIndex = SPI_DATA_REGISTER_INDEX;
+			break;
+
+		case 0x11:
+			if (dior == 1) {
+				*ret_registerIndex = SPI_ERROR_REGISTER_INDEX;
+			} else {
+				*ret_registerIndex = SPI_FEATURES_REGISTER_INDEX;
+			}
+			break;
+
+// 14,15
+		case 0x12:
+			*ret_registerIndex = SPI_INTERRUPT_REASON_REGISTER_INDEX;
+			break;
+
+// 16, 17
+		case 0x13:
+			*ret_registerIndex = SPI_SECTOR_NUMBER_REGISTER_INDEX;
+			break;
+
+// 18, 19
+		case 0x14:
+			*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
+			break;
+
+// 1a, 1b
+		case 0x15:
+			*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
+			break;
+
+// 1c, 1d
+		case 0x16:
+			*ret_registerIndex = SPI_DRIVE_SELECT_REGISTER_INDEX;
+			break;
+
+// 1e, 1f
+		case 0x17:
+			if (dior == 1) {
+				*ret_registerIndex = SPI_STATUS_REGISTER_INDEX;
+			} else {
+				*ret_registerIndex = SPI_COMMAND_REGISTER_INDEX;
+			}
+			break;
+
+		default:
+		// All other values are invalid
+			*ret_registerIndex =  SPI_REGISTER_COUNT;
+			break;
+	}
+
+	*ret_register = SPI_registers[*ret_registerIndex];
+}
+
 inline bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex) {
 	uint8_t coded_register_index = cs1 << 4 | cs0 << 3 | da2 << 2 | da1 << 1 | da0;
 
@@ -139,111 +234,6 @@ inline bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0
 	}
 
 	return true;
-}
-
-inline void SPI_select_register_coded(uint8_t codedValue, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_register_index) {
-	/*
-01110 10 -> 01 01110 -> 0x2E
-01110 01 -> 10 01110 -> 0x4E
-
-00001 10 -> 01 10000 -> 0x30
-00001 01 -> 10 10000 -> 0x50
-
-10001 10 -> 01 10001 -> 0x31
-10001 01 -> 10 10001 -> 0x51
-
-01001 10 -> 01 10010 -> 0x32
-
-11001 10 -> 01 10011 -> 0x33
-
-00101 10 -> 01 10100 -> 0x34
-00101 01 -> 10 10100 -> 0x54
-
-10101 10 -> 01 10101 -> 0x35
-10101 01 -> 10 10101 -> 0x55
-
-01101 10 -> 01 10110 -> 0x36
-01101 01 -> 10 10110 -> 0x56
-
-11101 10 -> 01 10111 -> 0x37
-11101 01 -> 10 10111 -> 0x57
-
-Coded values for read only OR write only registers
-ALTERNATE_STATUS_REGISTER_CODED_INDEX = 0x2E        READ
-DEVICE_CONTROL_REGISTER_CODED_INDEX = 0x4E          WRITE
-
-ERROR_REGISTER_REGISTER_CODED_INDEX = 0x31          READ
-FEATURES_REGISTER_CODED_INDEX = 0x51                WRITE
-
-INTERRUPT_REASON_REGISTER_CODED_INDEX = 0x32        READ
-
-SECTOR_NUMBER_REGISTER_CODED_INDEX = 0x33           READ
-
-STATUS_REGISTER_CODED_INDEX = 0x37                  READ
-COMMAND_REGISTER_CODED_INDEX = 0x57                 WRITE
-
-Coded values for read AND write registers
-READ_DATA_REGISTER_REGISTER_CODED_INDEX = 0x30      READ
-WRITE_DATA_REGISTER_CODED_INDEX = 0x50              WRITE
-
-READ_LOW_BYTE_COUNT_REGISTER_CODED_INDEX = 0x34     READ
-WRITE_LOW_BYTE_COUNT_REGISTER_CODED_INDEX = 0x54    WRITE
-
-READ_HIGH_BYTE_COUNT_REGISTER_CODED_INDEX = 0x35    READ
-WRITE_HIGH_BYTE_COUNT_REGISTER_CODED_INDEX = 0x55   WRITE
-
-READ_DRIVE_SELECT_REGISTER_CODED_INDEX = 0x36       READ
-WRITE_DRIVE_SELECT_REGISTER_CODED_INDEX = 0x56      WRITE
-*/
-
-	uint8_t register_index = SPI_REGISTER_COUNT;
-	if (0x8 == codedValue) {
-		register_index = SPI_DATA_REGISTER_INDEX;
-
-	} else if (0x9 == codedValue) {
-		if (dior == 1) {
-			register_index = SPI_ERROR_REGISTER_INDEX;
-		} else {
-			register_index = SPI_FEATURES_REGISTER_INDEX;
-		}
-
-	} else if (0xA == codedValue) {
-		register_index = SPI_INTERRUPT_REASON_REGISTER_INDEX;
-
-	} else if (0xB == codedValue) {
-		register_index = SPI_SECTOR_NUMBER_REGISTER_INDEX;
-
-	} else if (0xC == codedValue) {
-		register_index = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
-
-	} else if (0xD == codedValue) {
-		register_index = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
-
-	} else if (0xE == codedValue) {
-		register_index = SPI_DRIVE_SELECT_REGISTER_INDEX;
-
-	} else if (0xF == codedValue) {
-		if (dior == 1) {
-			register_index = SPI_STATUS_REGISTER_INDEX;
-		} else {
-			register_index = SPI_COMMAND_REGISTER_INDEX;
-		}
-
-	} else if (0x16 == codedValue) {
-		if (dior == 1) {
-			register_index = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
-		} else {
-			register_index = SPI_DEVICE_CONTROL_REGISTER_INDEX;
-		}
-	}
-
-	if (ret_register_index) {
-		*ret_register_index = register_index;
-	}
-
-	if(ret_register) {
-		ret_register = &SPI_registers[register_index];
-	}
 }
 
 /*

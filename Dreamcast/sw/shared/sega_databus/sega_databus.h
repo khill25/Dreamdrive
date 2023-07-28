@@ -43,3 +43,5 @@ void sega_databus_process_control_line_data();
 
 void setup_sega_pio_programs();
 void swap_cs_detect_for_rw_detect();
+
+void test_swapping_cs_rw_detect_programs();
