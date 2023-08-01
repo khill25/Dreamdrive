@@ -15,7 +15,7 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "1.3.0")
 endif()
 
 # Copy program to ram during boot
-# set(PICO_COPY_TO_RAM 1)
+set(PICO_COPY_TO_RAM 1)
 
 add_compile_options(
         # -Wall
@@ -40,4 +40,4 @@ add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
 # Add applications
 add_subdirectory(mcu1)
-add_subdirectory(mcu2)
+# add_subdirectory(mcu2)

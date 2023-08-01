@@ -23,6 +23,9 @@ target_link_libraries(dreamdrivecast_mcu1
     dreamdrivecast_shared
 )
 
+# Copy program to ram during boot
+set(PICO_COPY_TO_RAM 1)
+
 # stdio config
 pico_enable_stdio_usb(dreamdrivecast_mcu1 0)
 pico_enable_stdio_uart(dreamdrivecast_mcu1 1)

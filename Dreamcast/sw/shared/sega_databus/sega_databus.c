@@ -99,6 +99,9 @@ struct sega_pio_program_t {
 	pio_sm_config config;
 	bool isRunning;
 	bool isLoaded;
+	// For easy jmp encoding to move around in the pio program
+	uint csxOffset; // the value to start the cs detect at (inclues the loaded program offset)
+	uint rwOffset; // the vaue to start read or write detect at (inclues the loaded program offset)
 };
 
 void init_test_irq_detect_program(sega_pio_program_t* sega_pio_program); // TODO this needs to be renamed (all the way down the PIO program name)
@@ -106,8 +109,11 @@ void init_sega_cs0_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_cs1_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_read_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_write_detect_program(sega_pio_program_t* sega_pio_program);
+// Combined program forward declares
+void init_sega_combined_cs0_read_detect_program(sega_pio_program_t* sega_pio_program);
+void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_program);
 
-sega_pio_program_t sega_pio_programs[5] = {
+sega_pio_program_t sega_pio_programs[7] = {
 	// Bus program
 	{ .pio=pio1, .sm=0, .program=&test_irq_set_gpio_program,	.funcPointer_default_config=test_irq_set_gpio_program_get_default_config,	.funcPointer_init=init_test_irq_detect_program },
 
@@ -118,6 +124,10 @@ sega_pio_program_t sega_pio_programs[5] = {
 	// READ and WRITE lines
 	{ .pio=pio1, .sm=1, .program=&sega_read_detect_program,		.funcPointer_default_config=sega_read_detect_program_get_default_config,	.funcPointer_init=init_sega_read_detect_program}, // Use SM1 as this will be swapped out with cs0 detect program
 	{ .pio=pio1, .sm=2, .program=&sega_write_detect_program,	.funcPointer_default_config=sega_write_detect_program_get_default_config,	.funcPointer_init=init_sega_write_detect_program}, // Use SM2 as this will be swapped out with cs1 detect program
+
+	// COMBINED PROGRAMS
+	{ .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
+	{ .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
 };
 bool isRunningCSDetect = true; // used when swapping CS detect for READ/WRITE detect and vice versa.
 
@@ -363,6 +373,14 @@ void init_sega_write_detect_program(sega_pio_program_t* sega_pio_program) {
 	pio_sm_config c = (*sega_pio_program).config;
 }
 
+void init_sega_combined_cs0_read_detect_program(sega_pio_program_t* sega_pio_program) {
+
+}
+
+void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_program) {
+
+}
+
 void init_test_irq_detect_program(sega_pio_program_t* sega_pio_program) {
 
 // TODO THIS FUNCTION WAS LEFT OVER WHEN PINS WERE CONNECTED TO MCU2
@@ -399,8 +417,8 @@ void init_test_irq_detect_program(sega_pio_program_t* sega_pio_program) {
 }
 
 inline void test_swapping_cs_rw_detect_programs() {
-volatile uint32_t startTicks[5] = {0};
-volatile uint32_t endTicks[5] = {0};
+volatile uint32_t startTicks[10] = {0};
+volatile uint32_t endTicks[10] = {0};
 volatile uint32_t st1, et1;
 /* SETUP CYCLE COUNT MEASUREMENT (Requires 5 cycles to measure, subtract from final value for a more accurate count of the actual code) */
 systick_hw->csr = 0x5;
@@ -416,61 +434,114 @@ endTicks[0] = systick_hw->cvr;
 	startTicks[1] = systick_hw->cvr;
 
 /* TEST 1*/
-	uint from_program0;
-	uint from_program1;
-	uint to_program0;
-	uint to_program1;
-	uint32_t mask = 0x6;
 
-	from_program0 = 1;
-	from_program1 = 2;
-	to_program0 = 3;
-	to_program1 = 4;
+	uint offset1 = 0;
+	uint offset2 = 0;
+
+	// pio_sm_exec(pio, sm, pio_encode_jmp(initial_pc));
+	pio_sm_exec(pio1, 1, pio_encode_jmp(offset1));
+	pio_sm_exec(pio1, 2, pio_encode_jmp(offset2));
 
 
+	// uint from_program0;
+	// uint from_program1;
+	// uint to_program0;
+	// uint to_program1;
+	// uint32_t mask = 0x6;
+
+	// from_program0 = 1;
+	// from_program1 = 2;
+	// to_program0 = 3;
+	// to_program1 = 4;
 	// Mask disable
-	pio1->ctrl = (pio1->ctrl & ~mask) | (0u);
+	// startTicks[3] = systick_hw->cvr;
+	// 	pio1->ctrl = (pio1->ctrl & ~mask) | (0u);
+	// endTicks[3] = systick_hw->cvr;
 
 	// Init new programs
-	pio_sm_init(pio1, 1, sega_pio_programs[to_program0].offset, &sega_pio_programs[to_program0].config);
-	pio_sm_init(pio1, 2, sega_pio_programs[to_program1].offset, &sega_pio_programs[to_program1].config);
+	// START
+	// startTicks[2] = systick_hw->cvr;
+	// 	// pio_sm_init(pio1, 1, sega_pio_programs[to_program0].offset, &sega_pio_programs[to_program0].config);
 
-	// Mask enable
-	pio1->ctrl = (pio1->ctrl & ~mask) | (mask);
+	// 	pio_sm_set_config(pio1, 1, &sega_pio_programs[to_program0].config);
+	// 	hw_xor_bits(&pio1->sm[1].shiftctrl, PIO_SM0_SHIFTCTRL_FJOIN_RX_BITS);
+    // 	hw_xor_bits(&pio1->sm[1].shiftctrl, PIO_SM0_SHIFTCTRL_FJOIN_RX_BITS);
+	// 	// Clear FIFO debug flags
+    // 	const uint32_t fdebug_sm_mask1 =
+    //         (1u << PIO_FDEBUG_TXOVER_LSB) |
+    //         (1u << PIO_FDEBUG_RXUNDER_LSB) |
+    //         (1u << PIO_FDEBUG_TXSTALL_LSB) |
+    //         (1u << PIO_FDEBUG_RXSTALL_LSB);
+    // 	pio1->fdebug = fdebug_sm_mask1 << 1;
 
-	/* CALCULATE CYCLE COUNT */
-	endTicks[1] = systick_hw->cvr;
+	// 	// Restart the SM
+	// 	pio1->ctrl |= 1u << (PIO_CTRL_SM_RESTART_LSB + 1);
+	// 	pio1->ctrl |= 1u << (PIO_CTRL_CLKDIV_RESTART_LSB + 1);
 
-/* TEST 2 */
-	startTicks[2] = systick_hw->cvr;
-	from_program0 = 3;
-	from_program1 = 4;
-	to_program0 = 1;
-	to_program1 = 2;
+	// 	// pio_sm_exec
+	// 	pio1->sm[1].instr = (pio_instr_bits_jmp | (0 << 5u) | ((sega_pio_programs[to_program0].offset) & 0x1fu));
 
-	// Mask disable
-	pio1->ctrl = (pio1->ctrl & ~mask) | (0u);
-	// pio_set_sm_mask_enabled(pio1, mask, true to enable/false to disable)
-	// Disable the SMs we are swapping from
-	// pio_sm_set_enabled(pio1, 1, false);
-	// pio_sm_set_enabled(pio1, 2, false);
+	// // END
+	// endTicks[2] = systick_hw->cvr;
 
-	// Start new program 0
-	pio_sm_init(pio1, 1, sega_pio_programs[to_program0].offset, &sega_pio_programs[to_program0].config);
-	// pio_sm_set_enabled(pio1, 1, true);
+	// //pio_sm_init(pio1, 2, sega_pio_programs[to_program1].offset, &sega_pio_programs[to_program1].config);
 
-	// Start new program 1
-	pio_sm_init(pio1, 2, sega_pio_programs[to_program1].offset, &sega_pio_programs[to_program1].config);
-	// pio_sm_set_enabled(pio1, 2, true);
+	// pio_sm_set_config(pio1, 2, &sega_pio_programs[to_program1].config);
+	// 	hw_xor_bits(&pio1->sm[2].shiftctrl, PIO_SM0_SHIFTCTRL_FJOIN_RX_BITS);
+    // 	hw_xor_bits(&pio1->sm[2].shiftctrl, PIO_SM0_SHIFTCTRL_FJOIN_RX_BITS);
+	// 	// Clear FIFO debug flags
+    // 	const uint32_t fdebug_sm_mask2 =
+    //         (1u << PIO_FDEBUG_TXOVER_LSB) |
+    //         (1u << PIO_FDEBUG_RXUNDER_LSB) |
+    //         (1u << PIO_FDEBUG_TXSTALL_LSB) |
+    //         (1u << PIO_FDEBUG_RXSTALL_LSB);
+    // 	pio1->fdebug = fdebug_sm_mask2 << 2;
 
-	// Mask enable
-	pio1->ctrl = (pio1->ctrl & ~mask) | (mask);
+	// 	// Restart the SM
+	// 	pio1->ctrl |= 1u << (PIO_CTRL_SM_RESTART_LSB + 2);
+	// 	pio1->ctrl |= 1u << (PIO_CTRL_CLKDIV_RESTART_LSB + 2);
 
-	endTicks[2] = systick_hw->cvr;
+	// 	// pio_sm_exec
+	// 	pio1->sm[2].instr = (pio_instr_bits_jmp | (0 << 5u) | ((sega_pio_programs[to_program1].offset) & 0x1fu));
+
+	// // Mask enable
+	// startTicks[4] = systick_hw->cvr;
+	// 	pio1->ctrl = (pio1->ctrl & ~mask) | (mask);
+	// endTicks[4] = systick_hw->cvr;
+
+	// /* CALCULATE CYCLE COUNT */
+	// endTicks[1] = systick_hw->cvr;
+
+// /* TEST 2 */
+// 	startTicks[2] = systick_hw->cvr;
+// 	from_program0 = 3;
+// 	from_program1 = 4;
+// 	to_program0 = 1;
+// 	to_program1 = 2;
+
+// 	// Mask disable
+// 	pio1->ctrl = (pio1->ctrl & ~mask) | (0u);
+// 	// pio_set_sm_mask_enabled(pio1, mask, true to enable/false to disable)
+// 	// Disable the SMs we are swapping from
+// 	// pio_sm_set_enabled(pio1, 1, false);
+// 	// pio_sm_set_enabled(pio1, 2, false);
+
+// 	// Start new program 0
+// 	pio_sm_init(pio1, 1, sega_pio_programs[to_program0].offset, &sega_pio_programs[to_program0].config);
+// 	// pio_sm_set_enabled(pio1, 1, true);
+
+// 	// Start new program 1
+// 	pio_sm_init(pio1, 2, sega_pio_programs[to_program1].offset, &sega_pio_programs[to_program1].config);
+// 	// pio_sm_set_enabled(pio1, 2, true);
+
+// 	// Mask enable
+// 	pio1->ctrl = (pio1->ctrl & ~mask) | (mask);
+
+// 	endTicks[2] = systick_hw->cvr;
 
 
-	printf("---[s=%u, e=%u]\n", st1, et1);
+// 	printf("---[s=%u, e=%u]\n", st1, et1);
 	printf("TEST INIT == %u ticks [s=%u, e=%u]\n", startTicks[0] - endTicks[0], startTicks[0], endTicks[0]);
 	printf("TEST1: %u ticks [s=%u, e=%u]\n", startTicks[1] - endTicks[1], startTicks[1], endTicks[1]);
-	printf("TEST2: %u ticks [s=%u, e=%u]\n", startTicks[2] - endTicks[2], startTicks[2], endTicks[2]);
+	printf("2=%u, 3=%u, 4=%u\n", startTicks[2] - endTicks[2], startTicks[3] - endTicks[3], startTicks[4] - endTicks[4]);
 }

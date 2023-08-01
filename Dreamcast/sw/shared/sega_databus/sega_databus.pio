@@ -11,10 +11,10 @@ set pindirs, 1
 	wait 1 gpio 4
 .wrap
 
-
 ; .define sega_cs0 3
 .program sega_cs0_detect
 .wrap_target
+cs0_detect:
 	wait 0 gpio 3
 	irq 4
 	wait 1 gpio 3
@@ -43,6 +43,44 @@ set pindirs, 1
 	irq 5
 	wait 1 gpio 17
 .wrap
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Combined programs ;;;
+
+;; CS0 and Read combined
+; .define sega_cs0(gpio 3) and RD (gpio 16) detect
+.program sega_cs0_read_detect
+.wrap_target
+cs0_detect:
+	wait 0 gpio 3
+	irq 4
+	wait 1 gpio 3
+.wrap
+
+read_detect:
+	wait 0 gpio 16
+	irq 5
+	wait 1 gpio 16
+	jmp read_detect
+
+;; CS1 and Write combineid
+; .define sega_cs1(gpio 4) and WR (gpio 17) detect
+.program sega_cs1_write_detect
+.wrap_target
+cs1_detect:
+	wait 0 gpio 4
+	irq 4
+	wait 1 gpio 4
+.wrap
+
+write_detect:
+	wait 0 gpio 17
+	irq 5
+	wait 1 gpio 17
+	jmp write_detect
+
+;;; END combined programs ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .program test_irq_set_gpio
 set pindirs, 1
