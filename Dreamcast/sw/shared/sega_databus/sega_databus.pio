@@ -91,14 +91,7 @@ wait_for_cs:
 	mov osr, null
     out pindirs, 32 side 1 ;; also set MUX to control lines | HIGH for control lines
 
-	wait 1 irq 4
-
-	;; sample control pins (CS0, CS1, A0, A1, A2)
-	;; flip the mux to data pins
-	;; determine which register that is
-	;; wait for read/write to go low
-	;; if write: read data from bus
-	;; if read: write data to bus
+	wait 1 irq 4 ;; wait for CS lines
 
 	;in pins, 5
 	;push side 0 ;; push data and also set mux to data pins | LOW for data lines
@@ -109,26 +102,25 @@ wait_for_cs:
 	in pins, 18 side 0 ;; read in all the data pins, read and write THEN change MUX to data lines | LOW for data lines
 	;; this gives us the control lines, read, and write values
 	;; C code can mask to get whatever info it needs
-	push
+	push ;; send values to C
 
 	;; The READ pin is assigned to the JMP pin so we can jmp to write if READ is high (WRITE is low)
-	jmp pin write_to_bus
+; 	jmp pin write_to_bus
 
-	;; sample here instead?
+; ;; WRITE low, read the pins and write to a register.
+; read_from_bus:
+; 	in pins, 16
+; 	push
+; 	jmp wait_for_cs
 
-;; WRITE low, read the pins and write to a register.
-read_from_bus:
-	;; Change pins to output
-	mov osr, ~null
-    out pindirs, 32 ;; only pins setup in sm_config_set_out pin are affected
+; ;; READ low, means we put data on lines from a register
+; write_to_bus:
+; 	;; Change pins to output
+; 	mov osr, ~null
+;     out pindirs, 32 ;; only pins setup in sm_config_set_out pin are affected
 
-	in pins, 8 ;; TODO this should be 16 but everything is setup for 8 right now
-	push
-	jmp wait_for_cs
-
-;; READ low, means we put data on lines from a register
-write_to_bus:
-	pull
-	out pins, 8 ;; TODO this should be 16 but everything is setup for 8 right now
+; 	;; Put data from C on pins
+; 	pull
+; 	out pins, 16
 
 .wrap

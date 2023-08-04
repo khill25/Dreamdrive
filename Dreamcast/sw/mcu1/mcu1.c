@@ -142,11 +142,11 @@ int main(void) {
 		gpio_set_dir(i, false); // set to input
 	}
 
-	// gpio_init(MCU1_PIN_MUX_SELECT);
-	// gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+	gpio_init(MCU1_PIN_MUX_SELECT);
+	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
 
 	// MUX to control lines
-	// gpio_put(MCU1_PIN_MUX_SELECT, true);
+	gpio_put(MCU1_PIN_MUX_SELECT, true);
 
 	//invalid address
 	//00xxx = 0; cs0 & cs1 are both low; cs0 == 0 && cs1 == 0
@@ -241,8 +241,19 @@ int main(void) {
 	start_sega_pio_programs();
 
 	PIO pio = pio1;
+	volatile uint32_t rawLineValues = 0;
 	volatile uint32_t controlLineValue = 0;
 	volatile bool isRead = false;
+
+	uint32_t controlLineMask = 0x1F;
+	uint32_t readLineMask =    0x10000;
+	uint32_t writeLineMask =   0x20000;
+
+	// DEBUG
+	volatile uint32_t debugAt = 5;
+	volatile uint32_t debugValues[100] = {0};
+	volatile uint32_t debugValueCount = 0;
+	volatile bool hasPrintedDebug = false;
 
 	// Main Loop
 	while(1) {
@@ -252,13 +263,26 @@ int main(void) {
 		 * Read pushes data
 		 * Write pulls data
 		 */
-		controlLineValue = pio_sm_get_blocking(pio, sega_databus_handler_sm) & control_pin_mask;
+		rawLineValues = pio_sm_get_blocking(pio, sega_databus_handler_sm);
 
-		// TODO Need to know if this will be a rd or wr
-		// ...
-		
+		printf("value: %x\n");
 
+		// Create the hex value we can use to lookup the register from the table
+		controlLineValue = (rawLineValues & controlLineMask) | ((rawLineValues & readLineMask) << 5) | ((rawLineValues & writeLineMask) << 6);
 
+		if (debugValueCount < debugAt) {
+			debugValues[debugValueCount++] = controlLineValue;
+		} else if ((debugValueCount >= debugAt) && (hasPrintedDebug == false)) {
+			hasPrintedDebug = true;
+			for(int i = 0; i < debugValueCount; i++) {
+				if (i % 8 == 0) {
+					printf("\n");
+				}
+				printf("%x, ", debugValues[i]);
+			}
+		}
+
+		//registerIndex_map[con]
 
 	}
 
