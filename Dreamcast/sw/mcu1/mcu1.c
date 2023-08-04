@@ -50,45 +50,6 @@ bool isMuxDataLines = true;
  */
 
 /*
- * Once MCU1 has recieved info from MCU2 (control line update)
- * Process it and act if needed
- */
-static void process_mcu2_data_and_exec_SPI_cmd_if_needed(bool rd, bool wr) {
-	// Grab the state of the pins
-	uint32_t current_databus_value = gpio_get_all(); /// TODO mask this data for the actual data bus pins
-	// bool rd = current_databus_value & 0x10000000; // pin 28
-	// bool wr = current_databus_value & 0x20000000; // pin 29
-
-	uint8_t controlValues = mcu1_received_control_line_buffer.buf[mcu1_received_control_line_buffer.head-1];
-
-	sega_databus_extract_raw_control_line_packet(controlValues, rd, wr);
-
-	// at least 22 cycles coming to this line
-	sega_databus_process_control_line_data(); // worst case another at least 24 cycles here
-
-	//
-
-	// At this point we have the register and register "name" (index)
-
-	printf("data:%04x, index:%02x, rd:%u, wr:%u\n", databus_selected_register, databus_selected_register_index, rd, wr);
-
-	if (databus_selected_register_index == SPI_REGISTER_COUNT) {
-		return; // nothing to do here, invalid state
-	}
-
-	// Need to put sampled data into relevant registers
-
-	// Once the register is the COMMAND_REGISTER, we can start processing as we will have all the data
-	// set in the appropriate registers
-	if(databus_selected_register_index == SPI_COMMAND_REGISTER_INDEX) {
-
-	}
-
-	// In most cases BSY register must be set within 400ns of the host sending this data
-	// and we have likely spent most of that shuffling the data from mcu2 and then decoding it.
-
-}
-/*
 May need to do something faster than waiting for mcu2 to send a packet every time it samples pins
 
 MCU2 captures all the signal lines state changes
@@ -151,8 +112,6 @@ void printNameOfRegister(uint8_t regIndex) {
 int main(void) {
 	current_mcu = MCU1;
 
-	sleep_ms(1000);
-
 	// Set clock speed to 266MHz (3.76ns per cycle)
 	const int freq_khz = 266000;
 	// const int freq_khz = 336000;
@@ -183,11 +142,11 @@ int main(void) {
 		gpio_set_dir(i, false); // set to input
 	}
 
-	gpio_init(MCU1_PIN_MUX_SELECT);
-	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+	// gpio_init(MCU1_PIN_MUX_SELECT);
+	// gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
 
 	// MUX to control lines
-	gpio_put(MCU1_PIN_MUX_SELECT, true);
+	// gpio_put(MCU1_PIN_MUX_SELECT, true);
 
 	//invalid address
 	//00xxx = 0; cs0 & cs1 are both low; cs0 == 0 && cs1 == 0
@@ -228,16 +187,7 @@ int main(void) {
 	bool csIsReady = false;
 	volatile uint32_t pins = 0;
 
-	// debugging stuff
-	volatile uint8_t wasARead[100] = {};
-	volatile uint32_t values[100] = {};
-	volatile uint32_t valIndex = 0;
-	volatile bool hasPrinted = false;
-
 	printf("MCU1- Start main loop\n");
-
-	volatile uint8_t statusRegister = 0;
-	volatile uint8_t statusRegisterIndex = 0;
 
 	// Map values to commands, start with all values loaded to invalid (register count)
 	uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
@@ -269,23 +219,10 @@ int main(void) {
 	registerIndex_map[0x37] = SPI_STATUS_REGISTER_INDEX; // read
 	registerIndex_map[0x57] = SPI_COMMAND_REGISTER_INDEX; // write
 
-	volatile uint32_t c = 0;
-	// Setup all the pio programs
-	setup_sega_pio_programs();
-
-	test_swapping_cs_rw_detect_programs();
-	// See how long swapping pio programs takes
-	// for(int i = 0; i < 30; i++) {
-	// 	systick_hw->csr = 0x5;
-	// 	systick_hw->rvr = 0x00FFFFFF;
-
-	// 	swap_cs_detect_for_rw_detect();
-
-	// 	sleep_us(10);
-	// }
-
 	printf("FINISHED!\n");
 
+	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
+	// Wait for that to be finished before we start out programs
 	while(1) {
 		pins = gpio_get_all();
 
@@ -298,218 +235,32 @@ int main(void) {
 	}
 
 	printf("Dreamcast started!\n");
-	busy_wait_ms(1350);
+	// Setup the databus programs and run them
+	setup_sega_pio_programs();
+	busy_wait_ms(100); // TODO this is likely not needed
+	start_sega_pio_programs();
 
+	PIO pio = pio1;
+	volatile uint32_t controlLineValue = 0;
+	volatile bool isRead = false;
+
+	// Main Loop
 	while(1) {
-		pins = gpio_get_all();
+		/*
+		 * databus program sends control line values
+		 * Toggles mux and waits for rd or wr low
+		 * Read pushes data
+		 * Write pulls data
+		 */
+		controlLineValue = pio_sm_get_blocking(pio, sega_databus_handler_sm) & control_pin_mask;
 
-		if (((pins & cs_mask) == cs_mask) || ((pins & cs_mask) == 0)) {
-			continue;
-		}
+		// TODO Need to know if this will be a rd or wr
+		// ...
+		
 
-		rd = pins & read_mask;
-		wr = pins & write_mask;
 
-		if ((rd == 0 && last_rd == 1) || (wr == 0 && last_wr == 1)) {
 
-			if (valIndex < 100) {
-				wasARead[valIndex] = rd == 0 ? 1 : 0;
-				values[valIndex++] = (pins & control_pin_mask);
-			} else {
-				if (!hasPrinted) {
-					for(int i = 0; i < valIndex; i++) {
-						// if (i % 8 == 0) { printf("\n"); }
-						bool readPinVal = 0;
-						bool writePinVal = 0;
-
-						if (wasARead[i] == 1) {
-							readPinVal = 1;
-							writePinVal = 0;
-						} else {
-							readPinVal = 0;
-							writePinVal = 1;
-						}
-
-						// This method is too slow. We don't need to do any extraction
-						// sega_databus_extract_raw_control_line_packet(values[i], readPinVal, writePinVal);
-
-						// This method is also too slow
-						//sega_databus_process_control_line_data();
-
-						uint32_t codedValue = values[i];
-						bool dior = wasARead[i];
-						uint8_t* ret_registerIndex;
-						uint8_t* ret_register;
-
-						systick_hw->csr = 0x5;
-    					systick_hw->rvr = 0x00FFFFFF;
-
-						volatile uint32_t end_tick = 0;
-						volatile uint32_t start_tick = systick_hw->cvr;
-
-						// if (wasARead[i]) {
-						// 	*ret_registerIndex = registerIndex_map[codedValue | (1 << 5)];
-						// } else {
-						// 	*ret_registerIndex = registerIndex_map[codedValue | (1 << 6)];
-						// }
-
-						// We can simply pass in the already coded value to the function
-						// SPI_select_register_precoded(values[i], wasARead[i], &statusRegister, &statusRegisterIndex);
-
-						// 	switch (codedValue) {
-						// 	// These are all invalid values
-						// 	case 0x0:
-						// 	case 0x1:
-						// 	case 0x2:
-						// 	case 0x3:
-						// 	case 0x4:
-						// 	case 0x5:
-						// 	case 0x6:
-						// 	case 0x7:
-						// 	case 0x8:
-						// 	case 0x9:
-						// 	case 0xA:
-						// 	case 0xB:
-						// 	case 0xC:
-						// 	case 0xD:
-						// 		*ret_registerIndex = SPI_REGISTER_COUNT;
-						// 		break;
-						// 		// return;
-
-						// 	case 0xE:
-						// 		if (dior == 1) {
-						// 			*ret_registerIndex = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
-						// 		} else {
-						// 			*ret_registerIndex = SPI_DEVICE_CONTROL_REGISTER_INDEX;
-						// 		}
-						// 		break;
-
-						// 	// Another invalid case
-						// 	case 0xF:
-						// 		*ret_registerIndex = SPI_REGISTER_COUNT;
-						// 		break;
-						// 		// return;
-
-						// 	case 0x10:
-						// 		*ret_registerIndex = SPI_DATA_REGISTER_INDEX;
-						// 		break;
-
-						// 	case 0x11:
-						// 		if (dior == 1) {
-						// 			*ret_registerIndex = SPI_ERROR_REGISTER_INDEX;
-						// 		} else {
-						// 			*ret_registerIndex = SPI_FEATURES_REGISTER_INDEX;
-						// 		}
-						// 		break;
-
-						// 	case 0x12:
-						// 		*ret_registerIndex = SPI_INTERRUPT_REASON_REGISTER_INDEX;
-						// 		break;
-
-						// 	case 0x13:
-						// 		*ret_registerIndex = SPI_SECTOR_NUMBER_REGISTER_INDEX;
-						// 		break;
-
-						// 	case 0x14:
-						// 		*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
-						// 		break;
-
-						// 	case 0x15:
-						// 		*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
-						// 		break;
-
-						// 	case 0x16:
-						// 		*ret_registerIndex = SPI_DRIVE_SELECT_REGISTER_INDEX;
-						// 		break;
-
-						// 	case 0x17:
-						// 		if (dior == 1) {
-						// 			*ret_registerIndex = SPI_STATUS_REGISTER_INDEX;
-						// 		} else {
-						// 			*ret_registerIndex = SPI_COMMAND_REGISTER_INDEX;
-						// 		}
-						// 		break;
-
-						// 	default:
-						// 	// All other values are invalid
-						// 		ret_registerIndex =  SPI_REGISTER_COUNT;
-						// 		break;
-						// }
-						// *ret_register = SPI_registers[*ret_registerIndex];
-
-						end_tick = systick_hw->cvr;
-
-						volatile uint32_t totalTicks = (start_tick - end_tick);
-						volatile uint32_t totalTimeNS = totalTicks * 4;
-
-						printf("[%x+%u]%u in %uns[%u ticks]:", values[i], wasARead[i], *ret_registerIndex, totalTimeNS, totalTicks);
-						printNameOfRegister(statusRegisterIndex);
-						printf("\n");
-					}
-					hasPrinted = true;
-				}
-			}
-
-			//  Lets just print the pins out
-			// rd and wr values need to be negated either HERE or in the METHOD as it's checking for read==1 when setting the register
-			// sega_databus_extract_raw_control_line_packet(pins, !rd, !wr); // 33 cycles (~125ns @ 266MHz)
-			// sega_databus_process_control_line_data();
-
-			// if (databus_selected_register_index != 14) {
-			// 	printf("%u=0x%x ", databus_selected_register_index, (pins & control_pin_mask));
-			// }
-
-			// This register pointer contains the data from the last command
-			// databus_selected_register
-
-			/* FOR NOW PRINT EVERYTHING OUT
-			// If this is a read, we need to send data back and set some lines
-			//SPI_COMMAND_REGISTER_INDEX == databus_selected_register_index
-			if (wr == 1 && databus_selected_register_index != 14) {
-				gpio_put(MCU1_PIN_MUX_SELECT, false); // switch to data lines
-
-				uint32_t dataPins = gpio_get_all();
-
-				gpio_put(MCU1_PIN_MUX_SELECT, true); // switch back to control lines
-
-				uint8_t cmd = (uint8_t)(dataPins & 0x000000FF);
-				printf("%u=0x%x ", databus_selected_register_index, cmd);
-			}
-			*/
-
-			// printf("%u. ", databus_selected_register_index);
-		}
-
-		last_rd = rd;
-		last_wr = wr;
 	}
-
-	// Debugging cs lines and IMPORTANT, var & bitmask need to be in PARENS!!!!!
-	// LEAVING TO REMEMBER THE WARNING
-	// while(1) {
-	//     pins = gpio_get_all();
-
-	//     if (((pins & cs_mask) == cs_mask) || ((pins & cs_mask) == 0)) {
-	//         continue;
-	//     } else {
-	//         if (numPrints < 100) {
-	//             printf("%x ", pins);
-	//             numPrints++;
-	//         }
-	//     }
-
-	//     rd = pins & read_mask;
-	//     wr = pins & write_mask;
-
-	//     if (rd == 0 && last_rd == 1) {
-	//         printf("r ");
-	//     } else if (wr == 0 && last_wr == 1) {
-	//         printf("w ");
-	//     }
-
-	//     last_rd = rd;
-	//     last_wr = wr;
-	// }
 
 	return 0;
 }
