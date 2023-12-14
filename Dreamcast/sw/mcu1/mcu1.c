@@ -252,7 +252,7 @@ int main(void) {
 	uint32_t writeLineMask =   0x20000;
 
 	// DEBUG
-	volatile uint32_t debugAt = 5;
+	volatile uint32_t debugAt = 1;
 	volatile uint32_t debugValues[100] = {0};
 	volatile uint32_t debugRawValues[100] = {0};
 	volatile uint32_t debugValueCount = 0;
@@ -295,7 +295,10 @@ int main(void) {
 				}
 				printf("%x, ", debugValues[i]);
 			}
-			printf("\nEND\n\n\n\n");
+
+			debugValueCount = 0;
+			debugRawValueCount = 0;
+			printf("\n\nEND\n\n");
 			return 0;
 		}
 

@@ -80,14 +80,15 @@ write_detect:
 	jmp write_detect
 
 
-;;;;;;; Experimental Combined program WIP ;;;;;;;;
-;; CS0 and Read combined
-;; Start in pins at gpio 3(cs0) and go to gpio 17(write)
-;; We can dump extra bit we don't want
+
+
+
 .program sega_cs_rw_detect
 .wrap_target
+	set y, 2
 cs_detect:
 	; sample both cs lines
+	in NULL, 32 ;; 0 out the isr
 	in pins, 2 ; in pins should be gpio 3,4
 	mov x, isr ; put the 2 bits into the x register to compare
 	
@@ -100,30 +101,65 @@ x_check:
 	jmp cs_detect ;; else restart waiting for signal
 
 set_cs_irq:
-	; if sample is 1 or 0 then we send irq
 	irq 4
-	
-rw_detect:
-    mov osr, pins ; Read all pins into OSR
-    out null, 13 ; Dump 13 bits of OSR contents to get to gpio 16, 17
-	mov x, osr
-
-	;; Check that r/w lines are not both 0 or 1
-	jmp x--, x_rw_check ;; x>0 and then x--
-	jmp rw_detect ;; else x IS 0 then we just restart and keep waiting for r/w line to go low
-
-x_rw_check:
-	jmp !x, set_rw_irq ;;if x == 0 which means x was 1, the only valid case, jmp to set irq
-	jmp cs_detect ;; else restart waiting for signal
-
-set_rw_irq:
-	irq 5
 
 wait_for_both_cs_high:
+	in NULL, 32 ;; 0 out the isr
 	in pins, 2
 	mov x, isr
 	jmp x!=y, wait_for_both_cs_high
 .wrap
+
+
+;;;;;;; Experimental Combined program WIP ;;;;;;;;
+;; CS0 and Read combined
+;; Start in pins at gpio 3(cs0) and go to gpio 17(write)
+;; We can dump extra bit we don't want
+; .program sega_cs_rw_detect
+; .wrap_target
+; 	set y, 2
+; cs_detect:
+; 	; sample both cs lines
+; 	set x, 0 ; clear x
+; 	in pins, 2 ; in pins should be gpio 3,4
+; 	mov x, isr ; put the 2 bits into the x register to compare
+	
+; 	;; Check that cs lines are not both 0 or 1
+; 	jmp x--, x_check ;; x>0 and then x--
+; 	jmp cs_detect ;; else x IS 0 then we just restart
+
+; x_check:
+; 	jmp !x, set_cs_irq ;;if x == 0 which means x was 1, the only valid case, jmp to set irq
+; 	jmp cs_detect ;; else restart waiting for signal
+
+; set_cs_irq:
+; 	; if sample is 1 or 0 then we send irq
+; 	irq 4
+
+
+; Just check for CS pins for now	
+; rw_detect:
+;     mov osr, pins ; Read all pins into OSR
+;     out null, 13 ; Dump 13 bits of OSR contents to get to gpio 16, 17
+; 	mov x, osr
+
+; 	;; Check that r/w lines are not both 0 or 1
+; 	jmp x--, x_rw_check ;; x>0 and then x--
+; 	jmp rw_detect ;; else x IS 0 then we just restart and keep waiting for r/w line to go low
+
+; x_rw_check:
+; 	jmp !x, set_rw_irq ;;if x == 0 which means x was 1, the only valid case, jmp to set irq
+; 	jmp cs_detect ;; else restart waiting for signal
+
+; set_rw_irq:
+; 	irq 5
+
+; wait_for_both_cs_high:
+; 	set x, 0 ; clear x
+; 	in pins, 2
+; 	mov x, isr
+; 	jmp x!=y, wait_for_both_cs_high
+; .wrap
 
 ;;; END combined programs ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -139,8 +175,12 @@ wait_for_cs:
 
 	wait 1 irq 4 ;; wait for CS lines
 
-	;in pins, 5
-	;push side 0 ;; push data and also set mux to data pins | LOW for data lines
+	in pins, 5
+	push ;;side 0 ;; push data and also set mux to data pins | LOW for data lines
+
+;; debug jmp to ignore the rest of the program
+jmp wait_for_cs
+
 
 	;; wait for read/write pio programs to detect a low signal
 	wait 1 irq 5

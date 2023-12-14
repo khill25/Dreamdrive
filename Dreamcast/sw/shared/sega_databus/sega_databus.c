@@ -150,9 +150,9 @@ void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_progra
 	// We want to be able to read in cs0, cs1, read, write
 	// Pins 3,4 and 16,17
 	// pio program will throw away extra bits when checking values
-	for(int i = 3; i < 18; i++) {
-		pio_gpio_init(pio, i);
-	}
+	// for(int i = 3; i < 18; i++) {
+	// 	pio_gpio_init(pio, i);
+	// }
 	pio_sm_set_consecutive_pindirs(pio, sm, 3, 15, false); // cs lines (plus 11 data lines separating the two chunks of pins) + read + write = 15
 	sm_config_set_in_pins(&c, 3);
 }
