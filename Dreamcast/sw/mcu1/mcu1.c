@@ -238,7 +238,9 @@ int main(void) {
 	// Setup the databus programs and run them
 	setup_sega_pio_programs();
 	busy_wait_ms(100); // TODO this is likely not needed
+	printf("Starting pio programs...\n");
 	start_sega_pio_programs();
+	printf("Starting main loop\n");
 
 	PIO pio = pio1;
 	volatile uint32_t rawLineValues = 0;

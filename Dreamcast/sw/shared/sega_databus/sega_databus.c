@@ -81,12 +81,14 @@ void setup_sega_pio_programs() {
 		printf("done!\n");
 	}
 
-	printf("Loading BUS, CS0 Detect, CS1 Detect\n");
+	printf("Loading BUS, CS0 Detect, CS1 Detect...");
 
 	// Load BUS, CS0 Detect, and CS1 Detect
 	for (int i = 0; i < 3; i++) {
 		pio_sm_init(sega_pio_programs[i].pio, sega_pio_programs[i].sm, sega_pio_programs[i].offset, &sega_pio_programs[i].config);
 	}
+
+	printf("DONE!\n");
 
 	// These are the two functions that need to be called in order to start a program
 	//pio_sm_init(pio, sm, offset, &c);
@@ -143,7 +145,7 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 	// TODO might need to be pins 0-16 for 16 bit data?
 	// pin 16 is read
 	// pin 17 is write
-	for(int i = 0; i < 17; i++) {
+	for(int i = 0; i < 18; i++) {
 		pio_gpio_init(pio, i);
 	}
 	pio_sm_set_consecutive_pindirs(pio, sm, 0, 18, false); // 16 data pins + read + write = 18
