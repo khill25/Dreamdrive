@@ -237,7 +237,7 @@ int main(void) {
 	printf("Dreamcast started!\n");
 	// Setup the databus programs and run them
 	setup_sega_pio_programs();
-	busy_wait_ms(100); // TODO this is likely not needed
+	//busy_wait_ms(1100); // TODO this is likely not needed
 	printf("Starting pio programs...\n");
 	start_sega_pio_programs();
 	printf("Starting main loop\n");
@@ -254,7 +254,9 @@ int main(void) {
 	// DEBUG
 	volatile uint32_t debugAt = 5;
 	volatile uint32_t debugValues[100] = {0};
+	volatile uint32_t debugRawValues[100] = {0};
 	volatile uint32_t debugValueCount = 0;
+	volatile uint32_t debugRawValueCount = 0;
 	volatile bool hasPrintedDebug = false;
 
 	// Main Loop
@@ -266,8 +268,9 @@ int main(void) {
 		 * Write pulls data
 		 */
 		rawLineValues = pio_sm_get_blocking(pio, sega_databus_handler_sm);
-
-		printf("value: %x\n");
+		
+		// printf("value: %x\n");
+		debugRawValues[debugRawValueCount++] = rawLineValues;
 
 		// Create the hex value we can use to lookup the register from the table
 		controlLineValue = (rawLineValues & controlLineMask) | ((rawLineValues & readLineMask) << 5) | ((rawLineValues & writeLineMask) << 6);
@@ -276,12 +279,24 @@ int main(void) {
 			debugValues[debugValueCount++] = controlLineValue;
 		} else if ((debugValueCount >= debugAt) && (hasPrintedDebug == false)) {
 			hasPrintedDebug = true;
+
+			printf("Raw values:\n");
+			for(int i = 0; i < debugValueCount; i++) {
+				if (i % 8 == 0) {
+					printf("\n");
+				}
+				printf("%x, ", debugRawValues[i]);
+			}
+
+			printf("\nControl line values:\n");
 			for(int i = 0; i < debugValueCount; i++) {
 				if (i % 8 == 0) {
 					printf("\n");
 				}
 				printf("%x, ", debugValues[i]);
 			}
+			printf("\nEND\n\n\n\n");
+			return 0;
 		}
 
 		//registerIndex_map[con]

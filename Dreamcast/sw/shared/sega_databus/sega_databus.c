@@ -51,21 +51,27 @@ struct sega_pio_program_t {
 void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program);
 void init_sega_combined_cs0_read_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_program);
+void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_program);
 
+const int sega_pio_program_count = 2;
 sega_pio_program_t sega_pio_programs[4] = {
 	// Bus program
 	{ .pio=pio1, .sm=0, .program=&sega_databus_handler_program,	.funcPointer_default_config=sega_databus_handler_program_get_default_config,	.funcPointer_init=init_sega_databus_handler_program },
 
-	// COMBINED PROGRAMS
-	{ .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
-	{ .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
+	// // COMBINED PROGRAMS
+	// { .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
+	// { .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
+
+	//sega_cs_rw_detect
+	{ .pio=pio1, .sm=1, .program=&sega_cs_rw_detect_program,		.funcPointer_default_config=sega_cs_rw_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs_rw_detect_program},
 };
 
 void setup_sega_pio_programs() {
 	printf("Setting up databus pio programs...\n");
 
 	// Add and load all programs
-	for(uint i = 0; i < 3; i++) {
+	// load sega_pio_program_count programs
+	for(uint i = 0; i < sega_pio_program_count; i++) {
 		printf("Loading program %u...", i);
 		PIO pio = sega_pio_programs[i].pio;
 		const pio_program_t* program = sega_pio_programs[i].program;
@@ -81,10 +87,10 @@ void setup_sega_pio_programs() {
 		printf("done!\n");
 	}
 
-	printf("Loading BUS, CS0 Detect, CS1 Detect...");
+	printf("Loading BUS programs...");
 
-	// Load BUS, CS0 Detect, and CS1 Detect
-	for (int i = 0; i < 3; i++) {
+	// Load BUS, and combined cs, r/w program
+	for (int i = 0; i < sega_pio_program_count; i++) {
 		pio_sm_init(sega_pio_programs[i].pio, sega_pio_programs[i].sm, sega_pio_programs[i].offset, &sega_pio_programs[i].config);
 	}
 
@@ -96,7 +102,7 @@ void setup_sega_pio_programs() {
 }
 
 void start_sega_pio_programs() {
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < sega_pio_program_count; i++) {
 		pio_sm_set_enabled(sega_pio_programs[i].pio, sega_pio_programs[i].sm, true);
 	}
 }
@@ -133,6 +139,22 @@ void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_pr
 
 	(*sega_pio_program).csxOffset = 0;
 	(*sega_pio_program).rwOffset = 3;
+}
+
+void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_program) {
+	PIO pio = (*sega_pio_program).pio;
+	uint sm = (*sega_pio_program).sm;
+	uint offset = (*sega_pio_program).offset;
+	pio_sm_config c = (*sega_pio_program).config;
+
+	// We want to be able to read in cs0, cs1, read, write
+	// Pins 3,4 and 16,17
+	// pio program will throw away extra bits when checking values
+	for(int i = 3; i < 18; i++) {
+		pio_gpio_init(pio, i);
+	}
+	pio_sm_set_consecutive_pindirs(pio, sm, 3, 15, false); // cs lines (plus 11 data lines separating the two chunks of pins) + read + write = 15
+	sm_config_set_in_pins(&c, 3);
 }
 
 void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
