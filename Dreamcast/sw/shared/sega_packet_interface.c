@@ -6,7 +6,7 @@
 
 #include "sega_packet_interface.h"
 
-uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
+uint16_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
 	0x00,
 	0x01,
 	0x01,
@@ -16,19 +16,10 @@ uint8_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
 	0x00,
 };
 
-uint8_t SPI_registers[SPI_REGISTER_COUNT+1];
+uint16_t SPI_registers[SPI_REGISTER_COUNT+1];
 uint16_t SPI_data_register;
 uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
 uint8_t SEGA_PACKET_TOC_INFO[408] = {0};
-
-/*
-High level data flow
- * mcu1 d0-15 read data, only d0-d7 will be valid most of the time reading and writing to registers
- * mcu2 sends mcu1 data when control pins change (indicating a command)
-	* a0-a2, cs0, cs1, read, write (and when doing DMA, DMACK)
- * mcu1 processes
- * mcu1 tells mcu2 to assert/deassert signal lines (probably INTRQ or DMARQ)
- */
 
 void SPI_issue_device_reset(uint8_t reset_type) {
 	switch(reset_type) {
@@ -80,161 +71,6 @@ void SPI_issue_device_reset(uint8_t reset_type) {
  *
  */
 
-// Pass in the coded value (raw from the pico, the first 5 bits are the control lines)
-// and if read is true or false
-//
-// Returns are a pointer to the register and its index
-
-inline void SPI_select_register_precoded(uint32_t codedValue, bool dior, uint8_t* ret_register, uint8_t* ret_registerIndex) {
-	switch (codedValue) {
-		// These are all invalid values
-		case 0x0:
-		case 0x1:
-		case 0x2:
-		case 0x3:
-		case 0x4:
-		case 0x5:
-		case 0x6:
-		case 0x7:
-		case 0x8:
-		case 0x9:
-		case 0xA:
-		case 0xB:
-		case 0xC:
-		case 0xD:
-			*ret_registerIndex = SPI_REGISTER_COUNT;
-			break;
-			// return;
-
-		case 0xE:
-			if (dior == 1) {
-				*ret_registerIndex = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
-			} else {
-				*ret_registerIndex = SPI_DEVICE_CONTROL_REGISTER_INDEX;
-			}
-			break;
-
-		// Another invalid case
-		case 0xF:
-			*ret_registerIndex = SPI_REGISTER_COUNT;
-			break;
-			// return;
-
-		case 0x10:
-			*ret_registerIndex = SPI_DATA_REGISTER_INDEX;
-			break;
-
-		case 0x11:
-			if (dior == 1) {
-				*ret_registerIndex = SPI_ERROR_REGISTER_INDEX;
-			} else {
-				*ret_registerIndex = SPI_FEATURES_REGISTER_INDEX;
-			}
-			break;
-
-// 14,15
-		case 0x12:
-			*ret_registerIndex = SPI_INTERRUPT_REASON_REGISTER_INDEX;
-			break;
-
-// 16, 17
-		case 0x13:
-			*ret_registerIndex = SPI_SECTOR_NUMBER_REGISTER_INDEX;
-			break;
-
-// 18, 19
-		case 0x14:
-			*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
-			break;
-
-// 1a, 1b
-		case 0x15:
-			*ret_registerIndex = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
-			break;
-
-// 1c, 1d
-		case 0x16:
-			*ret_registerIndex = SPI_DRIVE_SELECT_REGISTER_INDEX;
-			break;
-
-// 1e, 1f
-		case 0x17:
-			if (dior == 1) {
-				*ret_registerIndex = SPI_STATUS_REGISTER_INDEX;
-			} else {
-				*ret_registerIndex = SPI_COMMAND_REGISTER_INDEX;
-			}
-			break;
-
-		default:
-		// All other values are invalid
-			*ret_registerIndex =  SPI_REGISTER_COUNT;
-			break;
-	}
-
-	*ret_register = SPI_registers[*ret_registerIndex];
-}
-
-inline bool SPI_select_register(bool cs0, bool cs1, bool da2, bool da1, bool da0, bool dior, bool diow, uint8_t* ret_register, uint8_t* ret_registerIndex) {
-	uint8_t coded_register_index = cs1 << 4 | cs0 << 3 | da2 << 2 | da1 << 1 | da0;
-
-	// High imped
-	if (cs0 == 0 && cs1 == 0) {
-		return false;
-	}
-
-	uint8_t register_index = SPI_REGISTER_COUNT;
-	if (0x10 == coded_register_index) {
-		register_index = SPI_DATA_REGISTER_INDEX;
-
-	} else if (0x11 == coded_register_index) {
-		if (dior == 1) {
-			register_index = SPI_ERROR_REGISTER_INDEX;
-		} else {
-			register_index = SPI_FEATURES_REGISTER_INDEX;
-		}
-
-	} else if (0x12 == coded_register_index) {
-		register_index = SPI_INTERRUPT_REASON_REGISTER_INDEX;
-
-	} else if (0x13 == coded_register_index) {
-		register_index = SPI_SECTOR_NUMBER_REGISTER_INDEX;
-
-	} else if (0x14 == coded_register_index) {
-		register_index = SPI_BYTE_COUNT_REGISTER_LOW_INDEX;
-
-	} else if (0x15 == coded_register_index) {
-		register_index = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX;
-
-	} else if (0x16 == coded_register_index) {
-		register_index = SPI_DRIVE_SELECT_REGISTER_INDEX;
-
-	} else if (0x17 == coded_register_index) {
-		if (dior == 1) {
-			register_index = SPI_STATUS_REGISTER_INDEX;
-		} else {
-			register_index = SPI_COMMAND_REGISTER_INDEX;
-		}
-
-	} else if (0xE == coded_register_index) {
-		if (dior == 1) {
-			register_index = SPI_ALTERNATE_STATUS_REGISTER_INDEX;
-		} else {
-			register_index = SPI_DEVICE_CONTROL_REGISTER_INDEX;
-		}
-	}
-
-	if (ret_registerIndex) {
-		*ret_registerIndex = register_index;
-	}
-
-	if(ret_register) {
-		// ret_register = &SPI_registers[register_index];
-		*ret_register = coded_register_index;
-	}
-
-	return true;
-}
 
 /*
  * IO and CoD are from the Interrupt reason register
@@ -269,7 +105,7 @@ void SPI_assert_INTRQ(bool valueHigh) {
 // Handles calling the right functions based on the command function
 void SPI_execute_cmd() {
 	// Access command register
-	uint8_t commandRegister = SPI_registers[SPI_COMMAND_REGISTER_INDEX];
+	uint16_t commandRegister = SPI_registers[SPI_COMMAND_REGISTER_INDEX];
 	switch (commandRegister) {
 		case ATA_CMD_NOP:
 			break;
@@ -318,7 +154,7 @@ Command flow
 	SPI_set_BSY(true);
 
 	// Access command register
-	uint8_t* commandRegister = &SPI_registers[SPI_COMMAND_REGISTER_INDEX];
+	uint16_t* commandRegister = &SPI_registers[SPI_COMMAND_REGISTER_INDEX];
 	// command should be ATA_CMD_IDENTIFY_DEVICE
 
 	// Fetch data

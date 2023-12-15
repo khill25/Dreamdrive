@@ -175,7 +175,7 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 	sm_config_set_in_pins(&c, 0);
 
 	// Set OUT pins the same as IN since they are bidirectional
-	// sm_config_set_out_pins(&c, 0, 8);
+	sm_config_set_out_pins(&c, 0, 16);
 
 	// Setup JMP pin on the READ pin, gpio 16
 	pio_gpio_init(pio, 16);
@@ -183,12 +183,10 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	// pio_gpio_init(pio, 27);
-	// sm_config_set_sideset_pins(&c, 27);
+	pio_gpio_init(pio, 27);
+	sm_config_set_sideset_pins(&c, 27);
 
 	// DONT START HERE
 	// pio_sm_init(pio, sm, offset, &c);
 	// pio_sm_set_enabled(pio, sm, true);
-
-	sm_config_set_in_shift(&c, true, false, 32);
 }

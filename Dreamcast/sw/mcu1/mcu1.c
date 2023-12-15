@@ -107,6 +107,47 @@ void printNameOfRegister(uint8_t regIndex) {
 
 }
 
+// You can use the result of this function to pass into printNameOfRegister to get a string name of the register
+int registerIndexFromControlValue(uint32_t controlValue) {
+	switch(controlValue) {
+    case 0x2E:
+        return SPI_ALTERNATE_STATUS_REGISTER_INDEX; // read
+    case 0x4E:
+        return SPI_DEVICE_CONTROL_REGISTER_INDEX; // write
+    case 0x30:
+        return SPI_DATA_REGISTER_INDEX; // read
+    case 0x50:
+        return SPI_DATA_REGISTER_INDEX; // write
+    case 0x51:
+        return SPI_FEATURES_REGISTER_INDEX;
+    case 0x31:
+        return SPI_ERROR_REGISTER_INDEX;
+    case 0x32:
+        return SPI_INTERRUPT_REASON_REGISTER_INDEX; // read only
+    case 0x33:
+        return SPI_SECTOR_NUMBER_REGISTER_INDEX; // read only
+    case 0x34:
+        return SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // read
+    case 0x54:
+        return SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // write
+    case 0x35:
+        return SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // read
+    case 0x55:
+        return SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // write
+    case 0x56:
+        return SPI_DRIVE_SELECT_REGISTER_INDEX; // write
+    case 0x36:
+        return SPI_DRIVE_SELECT_REGISTER_INDEX; // read
+    case 0x37:
+        return SPI_STATUS_REGISTER_INDEX; // read
+    case 0x57:
+        return SPI_COMMAND_REGISTER_INDEX; // write
+    default:
+        // Handle unexpected index
+        return SPI_REGISTER_COUNT;
+	}
+}
+
 #define DEBUG_UART_BAUD_RATE 115200
 
 int main(void) {
@@ -187,12 +228,12 @@ int main(void) {
 	bool csIsReady = false;
 	volatile uint32_t pins = 0;
 
-	printf("MCU1- Start main loop\n");
+	printf("Setting up register map...");
 
 	// Map values to commands, start with all values loaded to invalid (register count)
 	uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
 
-	// Now fill in the values we need
+	// This is used to quickly get the right register, read/write should be handled by whatever is doing the lookup
 	// Register Index = Bits = W, R, CS1, CS0, A2, A1, A0 (most->least)
 	registerIndex_map[0x2E] = SPI_ALTERNATE_STATUS_REGISTER_INDEX; // read
 	registerIndex_map[0x4E] = SPI_DEVICE_CONTROL_REGISTER_INDEX; // write
@@ -219,7 +260,13 @@ int main(void) {
 	registerIndex_map[0x37] = SPI_STATUS_REGISTER_INDEX; // read
 	registerIndex_map[0x57] = SPI_COMMAND_REGISTER_INDEX; // write
 
-	printf("FINISHED!\n");
+	for(int i = 0; i < 128; i++) {
+		if (registerIndex_map[i] == 0) {
+			registerIndex_map[i] = SPI_REGISTER_COUNT;
+		}
+	}
+
+	printf("DONE!\n");
 
 	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
 	// Wait for that to be finished before we start out programs
@@ -237,7 +284,7 @@ int main(void) {
 	printf("Dreamcast started!\n");
 	// Setup the databus programs and run them
 	setup_sega_pio_programs();
-	busy_wait_ms(1300); // TODO this is likely not needed
+	busy_wait_ms(100); // TODO this is likely not needed? 
 	printf("Starting pio programs...\n");
 	start_sega_pio_programs();
 	printf("Starting main loop\n");
@@ -245,11 +292,15 @@ int main(void) {
 	PIO pio = pio1;
 	volatile uint32_t rawLineValues = 0;
 	volatile uint32_t controlLineValue = 0;
-	volatile bool isRead = false;
+	volatile uint32_t lineData = 0;
+	volatile uint32_t isRead = 1; // 0 = write, 1 = read
 
-	uint32_t controlLineMask = 0x1F;
-	uint32_t readLineMask =    0x10000;
-	uint32_t writeLineMask =   0x20000;
+	const uint32_t controlLineMask = 0x1F;
+	const uint32_t readLineMask =    0x10000;
+	const uint32_t writeLineMask =   0x20000;
+
+	volatile uint32_t rwValue = 0;
+	volatile uint32_t lastRWValue = 0;
 
 	// DEBUG
 	volatile uint32_t debugAt = 30;
@@ -270,37 +321,64 @@ int main(void) {
 
 		rawLineValues = pio_sm_get_blocking(pio, sega_databus_handler_sm);
 
-		// printf("value: %x -- pins: %x\n", rawLineValues, p);
 		debugRawValues[debugRawValueCount++] = rawLineValues;
 
 		// Create the hex value we can use to lookup the register from the table
-		controlLineValue = (rawLineValues & controlLineMask) | ((rawLineValues & readLineMask) << 5) | ((rawLineValues & writeLineMask) << 6);
+		controlLineValue = (rawLineValues & controlLineMask) | (((rawLineValues & readLineMask) == readLineMask) << 5) | (((rawLineValues & writeLineMask) == writeLineMask) << 6);
 
-		if (debugValueCount < debugAt) {
-			debugValues[debugValueCount++] = controlLineValue;
-		} else if ((debugValueCount >= debugAt) && (hasPrintedDebug == false)) {
-			hasPrintedDebug = true;
+		// Using control line values, determine what register we are accessing
+		// TODO ...
 
-			printf("Raw values:\n");
-			for(int i = 0; i < debugValueCount; i++) {
-				if (i % 8 == 0) {
-					printf("\n");
-				}
-				printf("%x, ", debugRawValues[i]);
+		// wait for read/write low
+		// To save cycles doing extra comparison, just do everything in the if blocks
+		while(1) {
+			rwValue = sio_hw->gpio_in;
+			if (rwValue & readLineMask == 0) {
+				// tell PIO to check r/w pin
+				pio_sm_put_blocking(pio, sega_databus_handler_sm, 0);
+				
+				// Send the register data
+				lineData = SPI_registers[registerIndex_map[controlLineValue]]; // From the control line values, get the register index, then get the register value
+				pio_sm_put_blocking(pio, sega_databus_handler_sm, lineData);
+
+			} else if (rwValue & writeLineMask == 0) {
+				// tell PIO to check r/w pin
+				pio_sm_put_blocking(pio, sega_databus_handler_sm, 0);
+
+				// Get data from the pins
+				lineData = pio_sm_get_blocking(pio, sega_databus_handler_sm);
+				SPI_registers[registerIndex_map[controlLineValue]] = lineData;
+				// Write data to register
 			}
-
-			printf("\nControl line values:\n");
-			for(int i = 0; i < debugValueCount; i++) {
-				if (i % 8 == 0) {
-					printf("\n");
-				}
-				printf("%x, ", debugValues[i]);
-			}
-
-			debugValueCount = 0;
-			debugRawValueCount = 0;
 		}
 
+		
+
+		// Debug prints
+		// if (debugValueCount < debugAt) {
+		// 	debugValues[debugValueCount++] = controlLineValue;
+		// } else if ((debugValueCount >= debugAt) && (hasPrintedDebug == false)) {
+		// 	hasPrintedDebug = true;
+
+		// 	printf("Raw values:\n");
+		// 	for(int i = 0; i < debugValueCount; i++) {
+		// 		if (i % 8 == 0) {
+		// 			printf("\n");
+		// 		}
+		// 		printf("%x, ", debugRawValues[i]);
+		// 	}
+
+		// 	printf("\nControl line values:\n");
+		// 	for(int i = 0; i < debugValueCount; i++) {
+		// 		if (i % 8 == 0) {
+		// 			printf("\n");
+		// 		}
+		// 		printf("%x, ", debugValues[i]);
+		// 	}
+
+		// 	debugValueCount = 0;
+		// 	debugRawValueCount = 0;
+		// }
 	}
 
 	return 0;
