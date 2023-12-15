@@ -80,6 +80,7 @@ write_detect:
 	jmp write_detect
 
 ;; CS0, CS1, Read, and Write combined
+;; ... this will need to be integrated into the bus program because of the MUX :facepalm:
 .program sega_cs_rw_detect
 .wrap_target
 set y, 3
@@ -99,6 +100,7 @@ wait_for_both_cs_high:
 	in pins, 2
 	mov x, isr
 	jmp x!=y, wait_for_both_cs_high ;; Wait until both pins ARE high
+
 .wrap
 
 ;;; END combined programs ;;;
