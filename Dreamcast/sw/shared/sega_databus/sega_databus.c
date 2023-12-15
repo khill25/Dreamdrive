@@ -53,17 +53,17 @@ void init_sega_combined_cs0_read_detect_program(sega_pio_program_t* sega_pio_pro
 void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_program);
 
-const int sega_pio_program_count = 2;
+const int sega_pio_program_count = 3;
 sega_pio_program_t sega_pio_programs[4] = {
 	// Bus program
 	{ .pio=pio1, .sm=0, .program=&sega_databus_handler_program,	.funcPointer_default_config=sega_databus_handler_program_get_default_config,	.funcPointer_init=init_sega_databus_handler_program },
 
 	// // COMBINED PROGRAMS
-	// { .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
-	// { .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
+	{ .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
+	{ .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
 
 	//sega_cs_rw_detect
-	{ .pio=pio1, .sm=1, .program=&sega_cs_rw_detect_program,		.funcPointer_default_config=sega_cs_rw_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs_rw_detect_program},
+	// { .pio=pio1, .sm=1, .program=&sega_cs_rw_detect_program,		.funcPointer_default_config=sega_cs_rw_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs_rw_detect_program},
 };
 
 void setup_sega_pio_programs() {
@@ -155,6 +155,7 @@ void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_progra
 	// }
 	pio_sm_set_consecutive_pindirs(pio, sm, 3, 15, false); // cs lines (plus 11 data lines separating the two chunks of pins) + read + write = 15
 	sm_config_set_in_pins(&c, 3);
+	sm_config_set_in_shift(&c, false, false, 32);
 }
 
 void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
@@ -174,7 +175,7 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 	sm_config_set_in_pins(&c, 0);
 
 	// Set OUT pins the same as IN since they are bidirectional
-	sm_config_set_out_pins(&c, 0, 8);
+	// sm_config_set_out_pins(&c, 0, 8);
 
 	// Setup JMP pin on the READ pin, gpio 16
 	pio_gpio_init(pio, 16);
@@ -182,10 +183,12 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	pio_gpio_init(pio, 27);
-	sm_config_set_sideset_pins(&c, 27);
+	// pio_gpio_init(pio, 27);
+	// sm_config_set_sideset_pins(&c, 27);
 
 	// DONT START HERE
 	// pio_sm_init(pio, sm, offset, &c);
 	// pio_sm_set_enabled(pio, sm, true);
+
+	sm_config_set_in_shift(&c, true, false, 32);
 }

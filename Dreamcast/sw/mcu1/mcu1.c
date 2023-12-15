@@ -126,7 +126,7 @@ int main(void) {
 	// Setup the Mux select line
 	gpio_init(MCU1_PIN_MUX_SELECT);
 	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
-	gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to data lines
+	gpio_set_pulls(MCU1_PIN_MUX_SELECT, true, true); // enable pull down to default to data lines
 
 	// TODO Reestablish uart comms with mcu2
 	// pio_uart_init(MCU1_PIN_PIO_COMMS_D0, MCU1_PIN_PIO_COMMS_D1);
@@ -237,7 +237,7 @@ int main(void) {
 	printf("Dreamcast started!\n");
 	// Setup the databus programs and run them
 	setup_sega_pio_programs();
-	//busy_wait_ms(1100); // TODO this is likely not needed
+	busy_wait_ms(1300); // TODO this is likely not needed
 	printf("Starting pio programs...\n");
 	start_sega_pio_programs();
 	printf("Starting main loop\n");
@@ -252,7 +252,7 @@ int main(void) {
 	uint32_t writeLineMask =   0x20000;
 
 	// DEBUG
-	volatile uint32_t debugAt = 1;
+	volatile uint32_t debugAt = 30;
 	volatile uint32_t debugValues[100] = {0};
 	volatile uint32_t debugRawValues[100] = {0};
 	volatile uint32_t debugValueCount = 0;
@@ -267,9 +267,10 @@ int main(void) {
 		 * Read pushes data
 		 * Write pulls data
 		 */
+
 		rawLineValues = pio_sm_get_blocking(pio, sega_databus_handler_sm);
-		
-		// printf("value: %x\n");
+
+		// printf("value: %x -- pins: %x\n", rawLineValues, p);
 		debugRawValues[debugRawValueCount++] = rawLineValues;
 
 		// Create the hex value we can use to lookup the register from the table
@@ -298,11 +299,7 @@ int main(void) {
 
 			debugValueCount = 0;
 			debugRawValueCount = 0;
-			printf("\n\nEND\n\n");
-			return 0;
 		}
-
-		//registerIndex_map[con]
 
 	}
 
