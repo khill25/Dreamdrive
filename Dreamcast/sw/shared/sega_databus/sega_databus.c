@@ -174,6 +174,15 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 	pio_sm_set_consecutive_pindirs(pio, sm, 0, 18, false); // 16 data pins + read + write = 18
 	sm_config_set_in_pins(&c, 0);
 
+	// Think this is going to be needed now that we are doing the cs/r/w/ pin checks here now
+	sm_config_set_in_shift(&c, false, false, 32);
+	sm_config_set_out_shift(&c, true, false, 32);
+
+// TODO IMPORTANT
+// TODO IMPORTANT, this must be done after init and before the program starts!!!
+	pio_sm_exec(pio, 0, 0xe043);
+// TODO IMPORTANT
+
 	// Set OUT pins the same as IN since they are bidirectional
 	sm_config_set_out_pins(&c, 0, 16);
 

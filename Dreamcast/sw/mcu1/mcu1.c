@@ -326,9 +326,6 @@ int main(void) {
 		// Create the hex value we can use to lookup the register from the table
 		controlLineValue = (rawLineValues & controlLineMask) | (((rawLineValues & readLineMask) == readLineMask) << 5) | (((rawLineValues & writeLineMask) == writeLineMask) << 6);
 
-		// Using control line values, determine what register we are accessing
-		// TODO ...
-
 		// wait for read/write low
 		// To save cycles doing extra comparison, just do everything in the if blocks
 		while(1) {
@@ -341,6 +338,8 @@ int main(void) {
 				lineData = SPI_registers[registerIndex_map[controlLineValue]]; // From the control line values, get the register index, then get the register value
 				pio_sm_put_blocking(pio, sega_databus_handler_sm, lineData);
 
+				break; // exit wait for read/write signal loop
+
 			} else if (rwValue & writeLineMask == 0) {
 				// tell PIO to check r/w pin
 				pio_sm_put_blocking(pio, sega_databus_handler_sm, 0);
@@ -349,10 +348,10 @@ int main(void) {
 				lineData = pio_sm_get_blocking(pio, sega_databus_handler_sm);
 				SPI_registers[registerIndex_map[controlLineValue]] = lineData;
 				// Write data to register
+
+				break; // exit wait for read/write signal loop
 			}
 		}
-
-		
 
 		// Debug prints
 		// if (debugValueCount < debugAt) {
