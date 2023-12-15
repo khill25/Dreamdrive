@@ -53,14 +53,14 @@ void init_sega_combined_cs0_read_detect_program(sega_pio_program_t* sega_pio_pro
 void init_sega_combined_cs1_write_detect_program(sega_pio_program_t* sega_pio_program);
 void init_sega_combined_cs_rw_detect_program(sega_pio_program_t* sega_pio_program);
 
-const int sega_pio_program_count = 3;
+const int sega_pio_program_count = 1;
 sega_pio_program_t sega_pio_programs[4] = {
 	// Bus program
 	{ .pio=pio1, .sm=0, .program=&sega_databus_handler_program,	.funcPointer_default_config=sega_databus_handler_program_get_default_config,	.funcPointer_init=init_sega_databus_handler_program },
 
 	// // COMBINED PROGRAMS
-	{ .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
-	{ .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
+	// { .pio=pio1, .sm=1, .program=&sega_cs0_read_detect_program,		.funcPointer_default_config=sega_cs0_read_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs0_read_detect_program},
+	// { .pio=pio1, .sm=2, .program=&sega_cs1_write_detect_program,	.funcPointer_default_config=sega_cs1_write_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs1_write_detect_program},
 
 	//sega_cs_rw_detect
 	// { .pio=pio1, .sm=1, .program=&sega_cs_rw_detect_program,		.funcPointer_default_config=sega_cs_rw_detect_program_get_default_config,	.funcPointer_init=init_sega_combined_cs_rw_detect_program},
@@ -92,6 +92,9 @@ void setup_sega_pio_programs() {
 	// Load BUS, and combined cs, r/w program
 	for (int i = 0; i < sega_pio_program_count; i++) {
 		pio_sm_init(sega_pio_programs[i].pio, sega_pio_programs[i].sm, sega_pio_programs[i].offset, &sega_pio_programs[i].config);
+
+		// set scratch register y to 3
+		pio_sm_exec(sega_pio_programs[i].pio, sega_pio_programs[i].sm, 0xe043);
 	}
 
 	printf("DONE!\n");
@@ -177,11 +180,6 @@ void init_sega_databus_handler_program(sega_pio_program_t* sega_pio_program) {
 	// Think this is going to be needed now that we are doing the cs/r/w/ pin checks here now
 	sm_config_set_in_shift(&c, false, false, 32);
 	sm_config_set_out_shift(&c, true, false, 32);
-
-// TODO IMPORTANT
-// TODO IMPORTANT, this must be done after init and before the program starts!!!
-	pio_sm_exec(pio, 0, 0xe043);
-// TODO IMPORTANT
 
 	// Set OUT pins the same as IN since they are bidirectional
 	sm_config_set_out_pins(&c, 0, 16);

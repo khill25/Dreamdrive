@@ -116,32 +116,27 @@ wait_for_cs:
 	mov osr, null
     out pindirs, 32 side 1 ;; also set MUX to control lines | HIGH for control lines
 
-;;; Replaces the `irq 4` line by integrating code from the combined pin detection program
 check_pins:
-	mov osr, ::pins
-    out null, 27
-	mov x, osr
+    mov osr, pins
+    out null, 3
+    out x, 2
 	jmp !x, check_pins ;; x non zero
 	jmp x!=y, cs_data_ready ;; both pins are NOT high
 	jmp check_pins ;; else restart waiting for signal
-;;;
 
 cs_data_ready:
-	in pins, 16
+	in pins, 18
 	push side 0 ;; push data and also set mux to data pins | LOW for data lines
 
 wait_for_read_or_write_low:
-    in NULL, 32
     mov osr, pins
     out null, 16
-    in osr, 2
-	mov x, isr
-	jmp !x, wait_for_read_or_write_low ;; x non zero
+    out x, 2
 	jmp x!=y, check_read_jmp ;; both pins are NOT high
 	jmp wait_for_read_or_write_low ;; else restart waiting for signal
 
 check_read_jmp:
-    ; in pins, 16 ;; Move the r/w pin values into isr and push to C
+    in x, 2
     push
 	;; The READ pin is assigned to the JMP pin so we can jmp to write if READ is high (WRITE is low)
 	jmp pin write_to_bus
@@ -150,9 +145,7 @@ check_read_jmp:
 read_from_bus:
 	in pins, 16
 	push
-	;; TODO need to wait before swapping the MUX to be able to monitor the control lines
-	;; TODO Could also wait for read or write to go high again...
-	jmp wait_for_cs
+	jmp wait_for_read_and_write_high
 
 ;; READ low, means we put data on lines from a register
 write_to_bus:
@@ -166,7 +159,6 @@ write_to_bus:
 
 wait_for_read_and_write_high:
 	;; Wait for both pins to go high
-	in NULL, 32
     mov osr, pins
     out null, 16
     out x, 2
