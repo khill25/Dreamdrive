@@ -41,7 +41,7 @@ typedef enum SPI_REGISTER_INDEX {
 /* 3 */    SPI_COMMAND_REGISTER_INDEX         ,
 /* 4 */    SPI_BYTE_COUNT_REGISTER_LOW_INDEX      , // Low bits
 /* 5 */    SPI_BYTE_COUNT_REGISTER_HIGH_INDEX      , // high bits
-/* 6 */    SPI_DATA_REGISTER_INDEX             , // use `SPI_data_register` to access this register
+/* 6 */    SPI_DATA_REGISTER_INDEX             , 
 /* 7 */    SPI_DEVICE_CONTROL_REGISTER_INDEX   ,
 /* 8 */    SPI_DRIVE_SELECT_REGISTER_INDEX     ,// ATA Drive/Head register
 /* 9 */    SPI_ERROR_REGISTER_INDEX            ,
@@ -51,8 +51,8 @@ typedef enum SPI_REGISTER_INDEX {
 /* 13*/    SPI_SECTOR_NUMBER_REGISTER_INDEX    , // ATA Sector Number Register
 /* 14*/    SPI_REGISTER_COUNT // 14 = (0xE)
 } SPI_REGISTER_INDEX;
+// The registers are all 8 bit except the data register. Just use uint16_t for all of them
 extern uint16_t SPI_registers[SPI_REGISTER_COUNT+1];
-extern uint16_t SPI_data_register; // since this is the only 16 bit register...
 
 /*
  * Bit index enums for various registers that have specific bit indexing

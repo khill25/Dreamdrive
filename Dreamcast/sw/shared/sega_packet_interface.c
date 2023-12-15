@@ -17,7 +17,6 @@ uint16_t ATA_task_file_register[ATA_TFR_REGISTER_COUNT] = {
 };
 
 uint16_t SPI_registers[SPI_REGISTER_COUNT+1];
-uint16_t SPI_data_register;
 uint8_t SEGA_PACKET_CMD_REGISTER[12] = {0};
 uint8_t SEGA_PACKET_TOC_INFO[408] = {0};
 
