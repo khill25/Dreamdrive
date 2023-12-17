@@ -312,47 +312,51 @@ int main(void) {
 
 	// Main Loop
 	while(1) {
-		/*
-		 * databus program sends control line values
-		 * Toggles mux and waits for rd or wr low
-		 * Read pushes data
-		 * Write pulls data
-		 */
+		
+		// Tight loop pull control line values from csx programs 
+		while(1) {
+			if(!pio_sm_is_rx_fifo_empty(pio, sega_cs0_low_sm)) {
+				rawLineValues = pio_sm_get(pio, sega_cs0_low_sm);
+				controlLineValue = rawLineValues & controlLineMask;
+				lineData = rawLineValues & ~controlLineMask;
+				isRead = (rawLineValues & readLineMask) == readLineMask;
+				break;
+			}
 
-		rawLineValues = pio_sm_get_blocking(pio, sega_databus_handler_sm);
+			if(!pio_sm_is_rx_fifo_empty(pio, sega_cs1_low_sm)) {
+				rawLineValues = pio_sm_get(pio, sega_cs0_low_sm);
+				controlLineValue = rawLineValues & controlLineMask;
+				lineData = rawLineValues & ~controlLineMask;
+				isRead = (rawLineValues & readLineMask) == readLineMask;
+				break;
+			}
+		}
 
-		debugRawValues[debugRawValueCount++] = rawLineValues;
+		// Get the register index from the control line value
+		uint8_t registerIndex = registerIndex_map[controlLineValue];
+		// TODO Get the register value using the register index
 
-		// Create the hex value we can use to lookup the register from the table
-		controlLineValue = (rawLineValues & controlLineMask) | (((rawLineValues & readLineMask) == readLineMask) << 5) | (((rawLineValues & writeLineMask) == writeLineMask) << 6);
+		// Tight loop check rd and wr requests
+		while(1) {
+			if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_read_request_sm)) {
+				pio_sm_get(pio, sega_bus_read_request_sm);// consume, since this is just to get C code attention
+				
+				// TODO read register value into rwValue
 
-		isRead = pio_sm_get_blocking(pio, sega_databus_handler_sm); // wait to see if read or write
+				// Send register data to bus_read_request 
+				pio_sm_put(pio, sega_bus_read_request_sm, rwValue);
 
-		printf("%x | %x, ", isRead, rawLineValues);
+				break;
+			}
 
-		debugValues[debugValueCount++] = isRead;
+			if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_write_request_sm)) {
+				rwValue = pio_sm_get(pio, sega_bus_write_request_sm); // Contains data from the pins
+				
+				// TODO write rwValue to register
 
-		/////////
-		// isRead and rawLineValues appear to be the same at this point, which shouldn't be unless the read/write pins are
-		// going down with the cs pins, (which they shouldn't be, according to a logic trace)
-		// WHAT IS GOING ON HERE!?
-
-		isRead = gpio_get(16);
-
-		if (isRead) {
-			// Send the register data
-			lineData = SPI_registers[registerIndex_map[controlLineValue]]; // From the control line values, get the register index, then get the register value
-			pio_sm_put_blocking(pio, sega_databus_handler_sm, lineData);
-
-		} else {
-			// Get data from the pins
-			lineData = pio_sm_get_blocking(pio, sega_databus_handler_sm);
-			SPI_registers[registerIndex_map[controlLineValue]] = lineData;
-
-		} 
-		// else {
-		// 	printf("!%x ", isRead);	
-		// }
+				break;
+			}
+		}
 
 		if (debugRawValueCount >= debugAt) {
 			printf("Raw values:\n");

@@ -11,38 +11,6 @@ set pindirs, 1
 	wait 1 gpio 4
 .wrap
 
-; ; .define sega_cs0 3
-; .program sega_cs0_detect
-; .wrap_target
-; cs0_detect:
-; 	wait 0 gpio 3
-; 	irq 4
-; 	wait 1 gpio 3
-; .wrap
-
-; ; .define sega_cs1 4
-; .program sega_cs1_detect
-; .wrap_target
-; 	wait 0 gpio 4
-; 	irq 4
-; 	wait 1 gpio 4
-; .wrap
-
-; ; .define RD 16
-; .program sega_read_detect
-; .wrap_target
-; 	wait 0 gpio 16
-; 	irq 5
-; 	wait 1 gpio 16
-; .wrap
-
-; ; .define WR 17
-; .program sega_write_detect
-; .wrap_target
-; 	wait 0 gpio 17
-; 	irq 5
-; 	wait 1 gpio 17
-; .wrap
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Combined programs ;;;
@@ -103,22 +71,61 @@ wait_for_both_cs_high:
 
 .wrap
 
-; .program databus_wip
-; .wrap_target
-; start_cs_check:
-; 	mov osr, pins
-; 	out null, 3 ;; dump bits
-; cs_pin_value:
-; 	out x, 1 ;; copy cs pin value to x
-; 	jmp !x, set_cs_irq
-; 	out x, 1
-; 	jmp !x, set_cs_irq
-; 	jmp start_cs_check
+.program cs0_low
+.side_set 1 opt
+.wrap_target
+wait_for_cs:
+	wait 0 gpio 3
+	jmp pin, read_control_lines ;; the mux pin is set to control lines, jump to read them
+	jmp wait_for_cs
+read_control_lines:
+	in pins, 5
+	push 		side 0 ;; push data and also set mux to data pins
+	wait irq 5 ;; wait for a read/write program to let us know the data is ready
+	wait 1 gpio 3
+.wrap
 
-; set_cs_irq:
-; 	irq 4
+.program cs1_low
+.side_set 1 opt
+.wrap_target
+wait_for_cs:
+	wait 0 gpio 4
+	jmp pin, read_control_lines ;; the mux pin is set to control lines, jump to read them
+	jmp wait_for_cs
+read_control_lines:
+	in pins, 5
+	push 		side 0 ;; push data and also set mux to data pins
+	wait irq 5 ;; wait for a read/write program to let us know the data is ready
+	wait 1 gpio 4
+.wrap
 
-; .wrap
+.program bus_read_request
+.side_set 1 opt
+.wrap_target
+wait_for_rd:
+	wait 0 gpio 16
+
+	pull
+	out pins, 16
+	
+	wait 1 gpio 16
+	nop 		side 1 ;; flip the mux
+	irq 5 ;; let the cs programs know they can start monitoring the pins again
+.wrap
+
+.program bus_write_request
+.side_set 1 opt
+.wrap_target
+wait_for_wr:
+	wait 0 gpio 17
+
+	in pins, 16
+	push
+
+	wait 1 gpio 17
+	nop 		side 1 ;; flip the mux
+	irq 5 ;; let the cs programs know they can start monitoring the pins again
+.wrap
 
 ;;; END combined programs ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
