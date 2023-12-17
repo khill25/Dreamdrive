@@ -61,7 +61,7 @@ read_detect:
 	wait 0 gpio 16
 	irq 5
 	wait 1 gpio 16
-	jmp read_detect
+	jmp cs0_detect
 
 ;; CS1 and Write combineid
 ; .define sega_cs1(gpio 4) and WR (gpio 17) detect
@@ -103,6 +103,23 @@ wait_for_both_cs_high:
 
 .wrap
 
+; .program databus_wip
+; .wrap_target
+; start_cs_check:
+; 	mov osr, pins
+; 	out null, 3 ;; dump bits
+; cs_pin_value:
+; 	out x, 1 ;; copy cs pin value to x
+; 	jmp !x, set_cs_irq
+; 	out x, 1
+; 	jmp !x, set_cs_irq
+; 	jmp start_cs_check
+
+; set_cs_irq:
+; 	irq 4
+
+; .wrap
+
 ;;; END combined programs ;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -125,7 +142,7 @@ check_pins:
 	jmp check_pins ;; else restart waiting for signal
 
 cs_data_ready:
-	in pins, 18
+	in pins, 31
 	push side 0 ;; push data and also set mux to data pins | LOW for data lines
 
 wait_for_read_or_write_low:
@@ -136,7 +153,7 @@ wait_for_read_or_write_low:
 	jmp wait_for_read_or_write_low ;; else restart waiting for signal
 
 check_read_jmp:
-    in x, 2
+    in pins, 31
     push
 	;; The READ pin is assigned to the JMP pin so we can jmp to write if READ is high (WRITE is low)
 	jmp pin write_to_bus
@@ -163,5 +180,10 @@ wait_for_read_and_write_high:
     out null, 16
     out x, 2
 	jmp x!=y, wait_for_read_and_write_high ;; Wait until both pins ARE high
+
+;; Wait for cs lines to both be high
+wait_for_cs_reset:
+	wait 1 gpio 3 side 1
+	wait 1 gpio 4
 
 .wrap

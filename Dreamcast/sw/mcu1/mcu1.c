@@ -303,7 +303,7 @@ int main(void) {
 	volatile uint32_t lastRWValue = 0;
 
 	// DEBUG
-	volatile uint32_t debugAt = 30;
+	volatile uint32_t debugAt = 2;
 	volatile uint32_t debugValues[100] = {0};
 	volatile uint32_t debugRawValues[100] = {0};
 	volatile uint32_t debugValueCount = 0;
@@ -326,58 +326,54 @@ int main(void) {
 		// Create the hex value we can use to lookup the register from the table
 		controlLineValue = (rawLineValues & controlLineMask) | (((rawLineValues & readLineMask) == readLineMask) << 5) | (((rawLineValues & writeLineMask) == writeLineMask) << 6);
 
-		// wait for read/write low
-		// To save cycles doing extra comparison, just do everything in the if blocks
-		while(1) {
-			rwValue = sio_hw->gpio_in;
-			if (rwValue & readLineMask == 0) {
-				// tell PIO to check r/w pin
-				pio_sm_put_blocking(pio, sega_databus_handler_sm, 0);
-				
-				// Send the register data
-				lineData = SPI_registers[registerIndex_map[controlLineValue]]; // From the control line values, get the register index, then get the register value
-				pio_sm_put_blocking(pio, sega_databus_handler_sm, lineData);
+		isRead = pio_sm_get_blocking(pio, sega_databus_handler_sm); // wait to see if read or write
 
-				break; // exit wait for read/write signal loop
+		printf("%x | %x, ", isRead, rawLineValues);
 
-			} else if (rwValue & writeLineMask == 0) {
-				// tell PIO to check r/w pin
-				pio_sm_put_blocking(pio, sega_databus_handler_sm, 0);
+		debugValues[debugValueCount++] = isRead;
 
-				// Get data from the pins
-				lineData = pio_sm_get_blocking(pio, sega_databus_handler_sm);
-				SPI_registers[registerIndex_map[controlLineValue]] = lineData;
-				// Write data to register
+		/////////
+		// isRead and rawLineValues appear to be the same at this point, which shouldn't be unless the read/write pins are
+		// going down with the cs pins, (which they shouldn't be, according to a logic trace)
+		// WHAT IS GOING ON HERE!?
 
-				break; // exit wait for read/write signal loop
-			}
-		}
+		isRead = gpio_get(16);
 
-		// Debug prints
-		// if (debugValueCount < debugAt) {
-		// 	debugValues[debugValueCount++] = controlLineValue;
-		// } else if ((debugValueCount >= debugAt) && (hasPrintedDebug == false)) {
-		// 	hasPrintedDebug = true;
+		if (isRead) {
+			// Send the register data
+			lineData = SPI_registers[registerIndex_map[controlLineValue]]; // From the control line values, get the register index, then get the register value
+			pio_sm_put_blocking(pio, sega_databus_handler_sm, lineData);
 
-		// 	printf("Raw values:\n");
-		// 	for(int i = 0; i < debugValueCount; i++) {
-		// 		if (i % 8 == 0) {
-		// 			printf("\n");
-		// 		}
-		// 		printf("%x, ", debugRawValues[i]);
-		// 	}
+		} else {
+			// Get data from the pins
+			lineData = pio_sm_get_blocking(pio, sega_databus_handler_sm);
+			SPI_registers[registerIndex_map[controlLineValue]] = lineData;
 
-		// 	printf("\nControl line values:\n");
-		// 	for(int i = 0; i < debugValueCount; i++) {
-		// 		if (i % 8 == 0) {
-		// 			printf("\n");
-		// 		}
-		// 		printf("%x, ", debugValues[i]);
-		// 	}
-
-		// 	debugValueCount = 0;
-		// 	debugRawValueCount = 0;
+		} 
+		// else {
+		// 	printf("!%x ", isRead);	
 		// }
+
+		if (debugRawValueCount >= debugAt) {
+			printf("Raw values:\n");
+			for(int i = 0; i < debugValueCount; i++) {
+				if (i % 8 == 0) {
+					printf("\n");
+				}
+				printf("%x, ", debugRawValues[i]);
+			}
+
+			printf("\nControl line values:\n");
+			for(int i = 0; i < debugValueCount; i++) {
+				if (i % 8 == 0) {
+					printf("\n");
+				}
+				printf("%x, ", debugValues[i]);
+			}
+
+			debugValueCount = 0;
+			debugRawValueCount = 0;
+		}
 	}
 
 	return 0;
