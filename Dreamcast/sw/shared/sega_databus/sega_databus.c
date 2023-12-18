@@ -62,11 +62,8 @@ sega_pio_program_t sega_pio_programs[4] = {
 void setup_sega_pio_programs() {
 	printf("Setting up databus pio programs...\n");
 
-	// Init all the pins used for control/data (0-7)
-	// TODO might need to be pins 0-16 for 16 bit data?
-	// pin 16 is read
-	// pin 17 is write
-	for(int i = 0; i < 18; i++) {
+	// Init all the pins used for control/data (0-15)
+	for(int i = 0; i < 16; i++) {
 		pio_gpio_init(pio1, i);
 	}
 
@@ -146,7 +143,9 @@ void init_cs0_low_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 5, false);
+	printf("SM: %d\n", sm);
+
+	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
 	sm_config_set_in_pins(&c, 0);
 
 	sm_config_set_in_shift(&c, false, false, 32);
@@ -167,7 +166,9 @@ void init_cs1_low_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 5, false);
+	printf("SM: %d\n", sm);
+
+	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
 	sm_config_set_in_pins(&c, 0);
 
 	sm_config_set_in_shift(&c, false, false, 32);
@@ -188,10 +189,12 @@ void init_bus_read_request_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 18, false);
-	sm_config_set_in_pins(&c, 0);
+	printf("SM: %d\n", sm);
 
-	sm_config_set_in_shift(&c, false, false, 32);
+	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, true);
+	sm_config_set_out_pins(&c, 0, 16);
+
+	sm_config_set_out_shift(&c, false, false, 32);
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
@@ -206,7 +209,9 @@ void init_bus_write_request_program(sega_pio_program_t* sega_pio_program) {
 	uint offset = (*sega_pio_program).offset;
 	pio_sm_config c = (*sega_pio_program).config;
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 18, false);
+	printf("SM: %d\n", sm);
+
+	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
 	sm_config_set_in_pins(&c, 0);
 
 	sm_config_set_in_shift(&c, false, false, 32);

@@ -1,76 +1,3 @@
-.program sega_cs_detect
-set pindirs, 1
-.wrap_target
-	wait 0 gpio 4
-	;; there seems to be 4 cycles of latency between the pin going low and the gpio going high
-	;; This is even with the input synchronizers disabled
-	;; Additionally using `wait pin` instead of `wait gpio` adds another cycle of latency
-	set pins, 1 [3]
-	set pins, 0
-
-	wait 1 gpio 4
-.wrap
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Combined programs ;;;
-
-;; CS0 and Read combined
-; .define sega_cs0(gpio 3) and RD (gpio 16) detect
-.program sega_cs0_read_detect
-.wrap_target
-cs0_detect:
-	wait 0 gpio 3
-	irq 4
-	wait 1 gpio 3
-.wrap
-
-read_detect:
-	wait 0 gpio 16
-	irq 5
-	wait 1 gpio 16
-	jmp cs0_detect
-
-;; CS1 and Write combineid
-; .define sega_cs1(gpio 4) and WR (gpio 17) detect
-.program sega_cs1_write_detect
-.wrap_target
-cs1_detect:
-	wait 0 gpio 4
-	irq 4
-	wait 1 gpio 4
-.wrap
-
-write_detect:
-	wait 0 gpio 17
-	irq 5
-	wait 1 gpio 17
-	jmp write_detect
-
-;; CS0, CS1, Read, and Write combined
-;; ... this will need to be integrated into the bus program because of the MUX :facepalm:
-.program sega_cs_rw_detect
-.wrap_target
-set y, 3
-check_pins:
-	in NULL, 32 ;; 0 out the isr
-	in pins, 2
-	mov x, isr
-	jmp !x, check_pins ;; x non zero
-	jmp x!=y, set_cs_irq ;; both pins are NOT high
-	jmp check_pins ;; else restart waiting for signal
-
-set_cs_irq:
-	irq 4
-
-wait_for_both_cs_high:
-	in NULL, 32 ;; 0 out the isr
-	in pins, 2
-	mov x, isr
-	jmp x!=y, wait_for_both_cs_high ;; Wait until both pins ARE high
-
-.wrap
-
 .program cs0_low
 .side_set 1 opt
 .wrap_target
@@ -78,10 +5,12 @@ wait_for_cs:
 	wait 0 gpio 3
 	jmp pin, read_control_lines ;; the mux pin is set to control lines, jump to read them
 	jmp wait_for_cs
+
 read_control_lines:
 	in pins, 5
-	push 		side 0 ;; push data and also set mux to data pins
-	wait irq 5 ;; wait for a read/write program to let us know the data is ready
+	push 		side 1 ;; push data and also set mux to data pins
+	; irq 4
+	wait 1 irq 5 ;; wait for a read/write program to let us know the data is ready
 	wait 1 gpio 3
 .wrap
 
@@ -89,13 +18,16 @@ read_control_lines:
 .side_set 1 opt
 .wrap_target
 wait_for_cs:
+	wait 1 gpio 4
 	wait 0 gpio 4
 	jmp pin, read_control_lines ;; the mux pin is set to control lines, jump to read them
 	jmp wait_for_cs
+
 read_control_lines:
 	in pins, 5
-	push 		side 0 ;; push data and also set mux to data pins
-	wait irq 5 ;; wait for a read/write program to let us know the data is ready
+	push 		side 1 ;; push data and also set mux to data pins
+	; irq 4
+	wait 1 irq 5 ;; wait for a read/write program to let us know the data is ready
 	wait 1 gpio 4
 .wrap
 
@@ -103,13 +35,15 @@ read_control_lines:
 .side_set 1 opt
 .wrap_target
 wait_for_rd:
+	; wait 1 irq 4 ;; wait for a cs program to detect an edge
 	wait 0 gpio 16
 
-	pull
+	push ;; alert c we are ready for data
+	pull ;; get the data
 	out pins, 16
 	
 	wait 1 gpio 16
-	nop 		side 1 ;; flip the mux
+	nop 		side 0 ;; flip the mux
 	irq 5 ;; let the cs programs know they can start monitoring the pins again
 .wrap
 
@@ -117,80 +51,13 @@ wait_for_rd:
 .side_set 1 opt
 .wrap_target
 wait_for_wr:
+	; wait 1 irq 4 ;; wait for a cs program to detect an edge
 	wait 0 gpio 17
 
 	in pins, 16
 	push
 
 	wait 1 gpio 17
-	nop 		side 1 ;; flip the mux
+	nop 		side 0 ;; flip the mux
 	irq 5 ;; let the cs programs know they can start monitoring the pins again
-.wrap
-
-;;; END combined programs ;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-.program sega_databus_handler
-.side_set 1 opt
-.wrap_target
-; set y, 3 ;; set in C code to save an instruction
-wait_for_cs:
-	;; change pindirs to input
-	;; only pins setup in sm_config_set_out pin are affected
-	mov osr, null
-    out pindirs, 32 side 1 ;; also set MUX to control lines | HIGH for control lines
-
-check_pins:
-    mov osr, pins
-    out null, 3
-    out x, 2
-	jmp !x, check_pins ;; x non zero
-	jmp x!=y, cs_data_ready ;; both pins are NOT high
-	jmp check_pins ;; else restart waiting for signal
-
-cs_data_ready:
-	in pins, 31
-	push side 0 ;; push data and also set mux to data pins | LOW for data lines
-
-wait_for_read_or_write_low:
-    mov osr, pins
-    out null, 16
-    out x, 2
-	jmp x!=y, check_read_jmp ;; both pins are NOT high
-	jmp wait_for_read_or_write_low ;; else restart waiting for signal
-
-check_read_jmp:
-    in pins, 31
-    push
-	;; The READ pin is assigned to the JMP pin so we can jmp to write if READ is high (WRITE is low)
-	jmp pin write_to_bus
-
-;; WRITE low, read the pins and write to a register.
-read_from_bus:
-	in pins, 16
-	push
-	jmp wait_for_read_and_write_high
-
-;; READ low, means we put data on lines from a register
-write_to_bus:
-	;; Change pins to output
-	mov osr, ~null
-    out pindirs, 32 ;; only pins setup in sm_config_set_out pin are affected
-
-	;; Put data from C on pins
-	pull
-	out pins, 16
-
-wait_for_read_and_write_high:
-	;; Wait for both pins to go high
-    mov osr, pins
-    out null, 16
-    out x, 2
-	jmp x!=y, wait_for_read_and_write_high ;; Wait until both pins ARE high
-
-;; Wait for cs lines to both be high
-wait_for_cs_reset:
-	wait 1 gpio 3 side 1
-	wait 1 gpio 4
-
 .wrap
