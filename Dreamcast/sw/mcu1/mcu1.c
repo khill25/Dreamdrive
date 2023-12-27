@@ -265,6 +265,17 @@ int main(void) {
 	registerIndex_map[0x37] = SPI_STATUS_REGISTER_INDEX; // read
 	registerIndex_map[0x57] = SPI_COMMAND_REGISTER_INDEX; // write
 
+	volatile uint8_t validControlLineValues[32] = {0};
+	validControlLineValues[0xE] = 1;
+	validControlLineValues[0x10] = 1;
+	validControlLineValues[0x11] = 1;
+	validControlLineValues[0x12] = 1;
+	validControlLineValues[0x13] = 1;
+	validControlLineValues[0x14] = 1;
+	validControlLineValues[0x15] = 1;
+	validControlLineValues[0x16] = 1;
+	validControlLineValues[0x17] = 1;
+
 	for(int i = 0; i < 128; i++) {
 		if (registerIndex_map[i] == 0) {
 			registerIndex_map[i] = SPI_REGISTER_COUNT;
@@ -286,51 +297,41 @@ int main(void) {
 	// 	last_csMask = (pins & cs_mask);
 	// }
 
-	// while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
+	while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
-	// printf("Dreamcast started!\n");
-	// // Setup the databus programs and run them
-	// setup_sega_pio_programs();
-	// busy_wait_ms(1200); // TODO this is likely not needed? 
-	// printf("Starting pio programs...\n");
-	// start_sega_pio_programs();
+	printf("Dreamcast started!\n");
+	printf("Setting up databus pio programs...\n");
+	// Init all the pins used for control/data (0-15)
+	// for(int i = 0; i < 18; i++) {
+	// 	pio_gpio_init(pio1, i);
+	// }
+	// pio_gpio_init(pio1, 27);
+	
+	// init_cs0_low_program();
+	// init_cs1_low_program();
+	// init_bus_read_request_program();
+	// init_bus_write_request_program();
+
+	busy_wait_ms(1200); // TODO this is likely not needed? 
+
+	// pio_sm_set_enabled(pio1, 0, true);
+	// pio_sm_set_enabled(pio1, 1, true);
+	// pio_sm_set_enabled(pio1, 2, true);
+	// pio_sm_set_enabled(pio1, 3, true);
+
+	// printf("pio running\n");
 	// printf("Starting main loop\n");
 
-	printf("Loading program\n");
-	setup_sega_pio_programs();
-	start_sega_pio_programs();
-	// uint offset = pio_add_program(pio1, &cs0_low_program);
-	// printf("Program at %d\n", offset);
-	// pio_sm_config c = cs0_low_program_get_default_config(offset);
-	// pio_gpio_init(pio1, 27);
-
-	// pio_sm_set_pindirs_with_mask(pio1, 0, 0x800001F, 0x8000000);
-
-	// sm_config_set_in_pins(&c, 0);
-	// sm_config_set_in_shift(&c, false, false, 32);
-	
-	// // Setup JMP pin on the MUX pin, we use it as a mutex to proceed with grabbing values
-	// sm_config_set_jmp_pin(&c, 27);
-
-	// // MUX toggle pin (gpio 27 on MUC1)
-	// // between data bus and control lines
-	// sm_config_set_sideset_pins(&c, 27);
-
-	// pio_sm_init(pio1, 0, offset, &c);
-	// pio_sm_set_enabled(pio1, 0, true);
-
-	printf("pio running\n");
-
-	uint32_t t = 0;
-	while(1) {
-		tight_loop_contents();
-		// busy wait
-		t++;
-		if (t > 10000000) {
-			printf(".");
-			t = 0;
-		}
-	}
+	// uint32_t t = 0;
+	// while(1) {
+	// 	tight_loop_contents();
+	// 	// busy wait
+	// 	t++;
+	// 	if (t > 10000000) {
+	// 		printf(".");
+	// 		t = 0;
+	// 	}
+	// }
 
 	PIO pio = pio1;
 	volatile uint32_t rawLineValues = 0;
@@ -356,6 +357,21 @@ int main(void) {
 
 	volatile bool didReadControlValue = false;
 	volatile bool didHandleRW = false;
+
+	while(1) {
+		
+		// check for valid value
+		do {
+			rawLineValues = sio_hw->gpio_in & controlLineMask;
+		} while(validControlLineValues[rawLineValues] == 0);
+
+		// printf("%x | %x\n", rawLineValues, registerIndex_map[rawLineValues]);
+		debugRawValues[debugRawValueCount++] = rawLineValues;
+
+		do {
+			rawLineValues = sio_hw->gpio_in & controlLineMask;
+		} while(validControlLineValues[rawLineValues] == 1);
+	}
 
 	// Main Loop
 	while(1) {
@@ -394,7 +410,7 @@ int main(void) {
 		// Get the register index from the control line value
 		registerIndex = registerIndex_map[controlLineValue];
 		debugRawValues[debugRawValueCount++] = rawLineValues;
-		// printf("%x|%x ", rawLineValues, gpio_get_all());
+		printf("%x|%x ", rawLineValues, gpio_get_all());
 		// gpio_put(MCU1_PIN_MUX_SELECT, true);
 		// TODO Get the register value using the register index
 		// Not sure if it's worth optimizing yet..., we fetch it in the respective if blocks
@@ -427,32 +443,11 @@ int main(void) {
 		didHandleRW = false;
 		// printf("%x, ", rawLineValues);
 
-		if (debugRawValueCount >= debugAt) {
-			for(int i = 0; i < debugRawValueCount; i++) {
-				printf("%x, ", rawLineValues);
-			}
-			printf("\n");
-			debugRawValueCount = 0;
-		}
-
 		// if (debugRawValueCount >= debugAt) {
-		// 	printf("\nRaw values:\n");
 		// 	for(int i = 0; i < debugRawValueCount; i++) {
-		// 		if (i % 8 == 0) {
-		// 			printf("\n");
-		// 		}
-		// 		printf("%x, ", debugRawValues[i]);
+		// 		printf("%x, ", rawLineValues);
 		// 	}
-
-		// 	// printf("\nControl line values:\n");
-		// 	// for(int i = 0; i < debugValueCount; i++) {
-		// 	// 	if (i % 8 == 0) {
-		// 	// 		printf("\n");
-		// 	// 	}
-		// 	// 	printf("%x, ", debugValues[i]);
-		// 	// }
-
-		// 	// debugValueCount = 0;
+		// 	printf("\n");
 		// 	debugRawValueCount = 0;
 		// }
 	}
