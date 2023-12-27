@@ -51,7 +51,7 @@ void init_cs1_low_program(sega_pio_program_t* sega_pio_program);
 void init_bus_read_request_program(sega_pio_program_t* sega_pio_program);
 void init_bus_write_request_program(sega_pio_program_t* sega_pio_program);
 
-const int sega_pio_program_count = 4;
+const int sega_pio_program_count = 1;
 sega_pio_program_t sega_pio_programs[4] = {
 	{ .pio=pio1, .sm=0, .program=&cs0_low_program,			.funcPointer_default_config=cs0_low_program_get_default_config,				.funcPointer_init=init_cs0_low_program },
 	{ .pio=pio1, .sm=1, .program=&cs1_low_program,			.funcPointer_default_config=cs1_low_program_get_default_config,				.funcPointer_init=init_cs1_low_program },
@@ -63,9 +63,11 @@ void setup_sega_pio_programs() {
 	printf("Setting up databus pio programs...\n");
 
 	// Init all the pins used for control/data (0-15)
-	for(int i = 0; i < 16; i++) {
+	for(int i = 0; i < 18; i++) {
 		pio_gpio_init(pio1, i);
 	}
+
+	pio_gpio_init(pio1, 27);
 
 	// Add and load all programs
 	// load sega_pio_program_count programs
@@ -145,18 +147,16 @@ void init_cs0_low_program(sega_pio_program_t* sega_pio_program) {
 
 	printf("SM: %d\n", sm);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
-	sm_config_set_in_pins(&c, 0);
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800001F, 0x8000000);
 
+	sm_config_set_in_pins(&c, 0);
 	sm_config_set_in_shift(&c, false, false, 32);
 	
 	// Setup JMP pin on the MUX pin, we use it as a mutex to proceed with grabbing values
-	pio_gpio_init(pio, 27);
 	sm_config_set_jmp_pin(&c, 27);
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	pio_gpio_init(pio, 27);
 	sm_config_set_sideset_pins(&c, 27);
 }
 
@@ -168,19 +168,17 @@ void init_cs1_low_program(sega_pio_program_t* sega_pio_program) {
 
 	printf("SM: %d\n", sm);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
-	sm_config_set_in_pins(&c, 0);
-
-	sm_config_set_in_shift(&c, false, false, 32);
-	
 	// Setup JMP pin on the MUX pin, we use it as a mutex to proceed with grabbing values
-	pio_gpio_init(pio, 27);
 	sm_config_set_jmp_pin(&c, 27);
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	pio_gpio_init(pio, 27);
 	sm_config_set_sideset_pins(&c, 27);
+
+	sm_config_set_in_pins(&c, 0);
+	sm_config_set_in_shift(&c, false, false, 32);
+
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800001F, 0x8000000);
 }
 
 void init_bus_read_request_program(sega_pio_program_t* sega_pio_program) {
@@ -191,16 +189,15 @@ void init_bus_read_request_program(sega_pio_program_t* sega_pio_program) {
 
 	printf("SM: %d\n", sm);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, true);
-	sm_config_set_out_pins(&c, 0, 16);
+	// 0-15 output, 16,17 input 	27 output
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x803FFFF, 0x803FFFF);
 
+	sm_config_set_out_pins(&c, 0, 16);
 	sm_config_set_out_shift(&c, false, false, 32);
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	pio_gpio_init(pio, 27);
 	sm_config_set_sideset_pins(&c, 27);
-	
 }
 
 void init_bus_write_request_program(sega_pio_program_t* sega_pio_program) {
@@ -211,13 +208,13 @@ void init_bus_write_request_program(sega_pio_program_t* sega_pio_program) {
 
 	printf("SM: %d\n", sm);
 
-	pio_sm_set_consecutive_pindirs(pio, sm, 0, 16, false);
-	sm_config_set_in_pins(&c, 0);
+	// 0-15 input, 16,17 input 	27 output
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x803FFFF, 0x8030000);
 
+	sm_config_set_in_pins(&c, 0);
 	sm_config_set_in_shift(&c, false, false, 32);
 
 	// MUX toggle pin (gpio 27 on MUC1)
 	// between data bus and control lines
-	pio_gpio_init(pio, 27);
 	sm_config_set_sideset_pins(&c, 27);
 }

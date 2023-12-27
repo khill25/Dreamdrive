@@ -21,6 +21,8 @@
 
 #include "hardware/structs/systick.h"
 
+#include "sega_databus.pio.h"
+
 bool isMuxDataLines = true;
 
 /*
@@ -167,7 +169,7 @@ int main(void) {
 	// Setup the Mux select line
 	gpio_init(MCU1_PIN_MUX_SELECT);
 	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
-	gpio_set_pulls(MCU1_PIN_MUX_SELECT, true, true); // enable pull down to default to data lines
+	gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to control lines
 
 	// TODO Reestablish uart comms with mcu2
 	// pio_uart_init(MCU1_PIN_PIO_COMMS_D0, MCU1_PIN_PIO_COMMS_D1);
@@ -183,11 +185,14 @@ int main(void) {
 		gpio_set_dir(i, false); // set to input
 	}
 
-	gpio_init(MCU1_PIN_MUX_SELECT);
-	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+	// gpio_init(MCU1_PIN_MUX_SELECT);
+	// gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
 
 	// MUX to control lines
 	gpio_put(MCU1_PIN_MUX_SELECT, false);
+
+	// MUX LOW  = CONTROL lines
+	// MUX HIGH = DATA lines
 
 	//invalid address
 	//00xxx = 0; cs0 & cs1 are both low; cs0 == 0 && cs1 == 0
@@ -280,15 +285,52 @@ int main(void) {
 
 	// 	last_csMask = (pins & cs_mask);
 	// }
-	while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
-	printf("Dreamcast started!\n");
-	// Setup the databus programs and run them
+	// while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
+
+	// printf("Dreamcast started!\n");
+	// // Setup the databus programs and run them
+	// setup_sega_pio_programs();
+	// busy_wait_ms(1200); // TODO this is likely not needed? 
+	// printf("Starting pio programs...\n");
+	// start_sega_pio_programs();
+	// printf("Starting main loop\n");
+
+	printf("Loading program\n");
 	setup_sega_pio_programs();
-	busy_wait_ms(1200); // TODO this is likely not needed? 
-	printf("Starting pio programs...\n");
 	start_sega_pio_programs();
-	printf("Starting main loop\n");
+	// uint offset = pio_add_program(pio1, &cs0_low_program);
+	// printf("Program at %d\n", offset);
+	// pio_sm_config c = cs0_low_program_get_default_config(offset);
+	// pio_gpio_init(pio1, 27);
+
+	// pio_sm_set_pindirs_with_mask(pio1, 0, 0x800001F, 0x8000000);
+
+	// sm_config_set_in_pins(&c, 0);
+	// sm_config_set_in_shift(&c, false, false, 32);
+	
+	// // Setup JMP pin on the MUX pin, we use it as a mutex to proceed with grabbing values
+	// sm_config_set_jmp_pin(&c, 27);
+
+	// // MUX toggle pin (gpio 27 on MUC1)
+	// // between data bus and control lines
+	// sm_config_set_sideset_pins(&c, 27);
+
+	// pio_sm_init(pio1, 0, offset, &c);
+	// pio_sm_set_enabled(pio1, 0, true);
+
+	printf("pio running\n");
+
+	uint32_t t = 0;
+	while(1) {
+		tight_loop_contents();
+		// busy wait
+		t++;
+		if (t > 10000000) {
+			printf(".");
+			t = 0;
+		}
+	}
 
 	PIO pio = pio1;
 	volatile uint32_t rawLineValues = 0;
@@ -351,8 +393,9 @@ int main(void) {
 
 		// Get the register index from the control line value
 		registerIndex = registerIndex_map[controlLineValue];
-		// debugRawValues[debugRawValueCount++] = rawLineValues;
-		printf("%x, ", rawLineValues);
+		debugRawValues[debugRawValueCount++] = rawLineValues;
+		// printf("%x|%x ", rawLineValues, gpio_get_all());
+		// gpio_put(MCU1_PIN_MUX_SELECT, true);
 		// TODO Get the register value using the register index
 		// Not sure if it's worth optimizing yet..., we fetch it in the respective if blocks
 
@@ -383,6 +426,14 @@ int main(void) {
 		didReadControlValue = false;
 		didHandleRW = false;
 		// printf("%x, ", rawLineValues);
+
+		if (debugRawValueCount >= debugAt) {
+			for(int i = 0; i < debugRawValueCount; i++) {
+				printf("%x, ", rawLineValues);
+			}
+			printf("\n");
+			debugRawValueCount = 0;
+		}
 
 		// if (debugRawValueCount >= debugAt) {
 		// 	printf("\nRaw values:\n");
