@@ -152,6 +152,26 @@ int registerIndexFromControlValue(uint32_t controlValue) {
 
 #define DEBUG_UART_BAUD_RATE 115200
 
+// Map values to commands, start with all values loaded to invalid (register count)
+uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
+
+__attribute__((used)) void processcsbus() {
+	volatile uint32_t pinStartValue = 0;
+	volatile uint8_t registerIndex = 0;
+
+	while(1) {
+		pinStartValue = sio_hw->gpio_in & 0x1F;//gpio_get_all();
+
+		while((sio_hw->gpio_in & 0x1F) == pinStartValue) {
+			// wait for a change
+			tight_loop_contents();
+		}
+
+		// Get the register index from the control line value
+		registerIndex = registerIndex_map[pinStartValue];
+	}
+}
+
 int main(void) {
 	current_mcu = MCU1;
 
@@ -235,8 +255,7 @@ int main(void) {
 
 	printf("Setting up register map...");
 
-	// Map values to commands, start with all values loaded to invalid (register count)
-	uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
+	
 
 	// This is used to quickly get the right register, read/write should be handled by whatever is doing the lookup
 	// Register Index = Bits = W, R, CS1, CS0, A2, A1, A0 (most->least)
@@ -333,124 +352,127 @@ int main(void) {
 	// 	}
 	// }
 
-	PIO pio = pio1;
-	volatile uint32_t rawLineValues = 0;
-	volatile uint32_t controlLineValue = 0;
-	volatile uint32_t lineData = 0;
-	volatile uint32_t isRead = 1; // 0 = write, 1 = read
-	volatile uint8_t registerIndex = 0;
+	// PIO pio = pio1;
+	// volatile uint32_t rawLineValues = 0;
+	// volatile uint32_t controlLineValue = 0;
+	// volatile uint32_t lineData = 0;
+	// volatile uint32_t isRead = 1; // 0 = write, 1 = read
+	// volatile uint8_t registerIndex = 0;
 
-	const uint32_t controlLineMask = 0x1F;
-	const uint32_t readLineMask =    0x10000;
-	const uint32_t writeLineMask =   0x20000;
+	// const uint32_t controlLineMask = 0x1F;
+	// const uint32_t readLineMask =    0x10000;
+	// const uint32_t writeLineMask =   0x20000;
 
-	volatile uint32_t rwValue = 0;
-	volatile uint32_t lastRWValue = 0;
+	// volatile uint32_t rwValue = 0;
+	// volatile uint32_t lastRWValue = 0;
 
-	// DEBUG
-	volatile uint32_t debugAt = 8;
-	volatile uint32_t debugValues[100] = {0};
-	volatile uint32_t debugRawValues[100] = {0};
-	volatile uint32_t debugValueCount = 0;
-	volatile uint32_t debugRawValueCount = 0;
-	volatile bool hasPrintedDebug = false;
+	// // DEBUG
+	// volatile uint32_t debugAt = 8;
+	// volatile uint32_t debugValues[100] = {0};
+	// volatile uint32_t debugRawValues[100] = {0};
+	// volatile uint32_t debugValueCount = 0;
+	// volatile uint32_t debugRawValueCount = 0;
+	// volatile bool hasPrintedDebug = false;
 
-	volatile bool didReadControlValue = false;
-	volatile bool didHandleRW = false;
+	// volatile bool didReadControlValue = false;
+	// volatile bool didHandleRW = false;
 
-	while(1) {
+	// while(1) {
 		
-		// check for valid value
-		do {
-			rawLineValues = sio_hw->gpio_in & controlLineMask;
-		} while(validControlLineValues[rawLineValues] == 0);
+	// 	// check for valid value
+	// 	do {
+	// 		rawLineValues = sio_hw->gpio_in & controlLineMask;
+	// 	} while(validControlLineValues[rawLineValues] == 0);
 
-		// printf("%x | %x\n", rawLineValues, registerIndex_map[rawLineValues]);
-		debugRawValues[debugRawValueCount++] = rawLineValues;
+	// 	// printf("%x | %x\n", rawLineValues, registerIndex_map[rawLineValues]);
+	// 	debugRawValues[debugRawValueCount++] = rawLineValues;
 
-		do {
-			rawLineValues = sio_hw->gpio_in & controlLineMask;
-		} while(validControlLineValues[rawLineValues] == 1);
-	}
+	// 	do {
+	// 		rawLineValues = sio_hw->gpio_in & controlLineMask;
+	// 	} while(validControlLineValues[rawLineValues] == 1);
+	// }
 
-	// Main Loop
-	while(1) {
+
+	processcsbus();
+	busy_wait_ms(1200);
+	// // Main Loop
+	// while(1) {
 		
-		// Tight loop pull control line values from csx programs 
-		while(!didReadControlValue) {
-			if(!pio_sm_is_rx_fifo_empty(pio, sega_cs0_low_sm)) {
-				rawLineValues = pio_sm_get(pio, sega_cs0_low_sm);
+	// 	// Tight loop pull control line values from csx programs 
+	// 	while(!didReadControlValue) {
+	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_cs0_low_sm)) {
+	// 			rawLineValues = pio_sm_get(pio, sega_cs0_low_sm);
 
-				// Not sure if this is right, it was auto generated...
-				// controlLineValue = rawLineValues & controlLineMask;
-				// break;
+	// 			// Not sure if this is right, it was auto generated...
+	// 			// controlLineValue = rawLineValues & controlLineMask;
+	// 			// break;
 
-				// if (didReadControlValue) {
-				// 	didReadSecondControlValue = true;
-				// }
+	// 			// if (didReadControlValue) {
+	// 			// 	didReadSecondControlValue = true;
+	// 			// }
 
-				didReadControlValue = true;
-			}
+	// 			didReadControlValue = true;
+	// 		}
 
-			if(!pio_sm_is_rx_fifo_empty(pio, sega_cs1_low_sm)) {
-				rawLineValues = pio_sm_get(pio, sega_cs1_low_sm);
+	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_cs1_low_sm)) {
+	// 			rawLineValues = pio_sm_get(pio, sega_cs1_low_sm);
 
-				// Not sure if this is right, it was auto generated...
-				// controlLineValue = rawLineValues & controlLineMask;
-				// break;
+	// 			// Not sure if this is right, it was auto generated...
+	// 			// controlLineValue = rawLineValues & controlLineMask;
+	// 			// break;
 
-				// if (didReadControlValue) {
-				// 	didReadSecondControlValue = true;
-				// }
+	// 			// if (didReadControlValue) {
+	// 			// 	didReadSecondControlValue = true;
+	// 			// }
 
-				didReadControlValue = true;
-			}
-		}
+	// 			didReadControlValue = true;
+	// 		}
+	// 	}
 
-		// Get the register index from the control line value
-		registerIndex = registerIndex_map[controlLineValue];
-		debugRawValues[debugRawValueCount++] = rawLineValues;
-		printf("%x|%x ", rawLineValues, gpio_get_all());
-		// gpio_put(MCU1_PIN_MUX_SELECT, true);
-		// TODO Get the register value using the register index
-		// Not sure if it's worth optimizing yet..., we fetch it in the respective if blocks
+	// 	// Get the register index from the control line value
+	// 	registerIndex = registerIndex_map[controlLineValue];
+	// 	debugRawValues[debugRawValueCount++] = rawLineValues;
+	// 	printf("%x|%x ", rawLineValues, gpio_get_all());
+	// 	// gpio_put(MCU1_PIN_MUX_SELECT, true);
+	// 	// TODO Get the register value using the register index
+	// 	// Not sure if it's worth optimizing yet..., we fetch it in the respective if blocks
 
-		// Tight loop check rd and wr requests
-		while(!didHandleRW) {
-			if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_read_request_sm)) {
-				pio_sm_get(pio, sega_bus_read_request_sm);// consume, since this is just to get C code attention
+	// 	// Tight loop check rd and wr requests
+	// 	while(!didHandleRW) {
+	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_read_request_sm)) {
+	// 			pio_sm_get(pio, sega_bus_read_request_sm);// consume, since this is just to get C code attention
 				
-				// read register value into rwValue
-				rwValue = SPI_registers[registerIndex];
+	// 			// read register value into rwValue
+	// 			rwValue = SPI_registers[registerIndex];
 
-				// Send register data to bus_read_request 
-				pio_sm_put(pio, sega_bus_read_request_sm, rwValue);
+	// 			// Send register data to bus_read_request 
+	// 			pio_sm_put(pio, sega_bus_read_request_sm, rwValue);
 
-				didHandleRW = true;
-			}
+	// 			didHandleRW = true;
+	// 		}
 
-			if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_write_request_sm)) {
-				rwValue = pio_sm_get(pio, sega_bus_write_request_sm); // Contains data from the pins
+	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_write_request_sm)) {
+	// 			rwValue = pio_sm_get(pio, sega_bus_write_request_sm); // Contains data from the pins
 				
-				// write rwValue to register
-				SPI_registers[registerIndex] = rwValue;
+	// 			// write rwValue to register
+	// 			SPI_registers[registerIndex] = rwValue;
 
-				didHandleRW = true;
-			}
-		}
+	// 			didHandleRW = true;
+	// 		}
+	// 	}
 
-		didReadControlValue = false;
-		didHandleRW = false;
-		// printf("%x, ", rawLineValues);
+	// 	didReadControlValue = false;
+	// 	didHandleRW = false;
+	// 	// printf("%x, ", rawLineValues);
 
-		// if (debugRawValueCount >= debugAt) {
-		// 	for(int i = 0; i < debugRawValueCount; i++) {
-		// 		printf("%x, ", rawLineValues);
-		// 	}
-		// 	printf("\n");
-		// 	debugRawValueCount = 0;
-		// }
-	}
+	// 	// if (debugRawValueCount >= debugAt) {
+	// 	// 	for(int i = 0; i < debugRawValueCount; i++) {
+	// 	// 		printf("%x, ", rawLineValues);
+	// 	// 	}
+	// 	// 	printf("\n");
+	// 	// 	debugRawValueCount = 0;
+	// 	// }
+	// }
 
 	return 0;
 }
