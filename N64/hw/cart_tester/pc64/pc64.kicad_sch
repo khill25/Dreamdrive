@@ -3262,7 +3262,7 @@
   (symbol (lib_id "db-connectors:HDR1X3") (at 198.12 238.76 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 099e67ed-4875-4fa2-8d7e-1c3eec1a35bd)
-    (property "Reference" "CON1" (at 203.2 241.2999 0)
+    (property "Reference" "CON3" (at 203.2 241.2999 0)
       (effects (font (size 1.27 1.27)) (justify left))
     )
     (property "Value" "HDR1X3" (at 203.2 243.8399 0)
@@ -3280,13 +3280,16 @@
     (property "Description" "CONN HEADER 3 POS 2.54" (at 206.375 229.235 0)
       (effects (font (size 1.524 1.524)) hide)
     )
+    (property "LCSC" "C146243" (at 198.12 238.76 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
     (pin "1" (uuid 2d892f27-0ef9-4f6f-aefc-1128e785ef01))
     (pin "2" (uuid 596698df-cbe1-4df4-9305-714c9582d331))
     (pin "3" (uuid 4aec7e65-2c73-4faf-b05c-317b784d2def))
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "CON1") (unit 1)
+          (reference "CON3") (unit 1)
         )
       )
     )
@@ -3557,6 +3560,9 @@
     )
     (property "Description" "CONN HEADER 3 POS 2.54" (at 294.005 229.235 0)
       (effects (font (size 1.524 1.524)) hide)
+    )
+    (property "LCSC" "C146243" (at 285.75 238.76 0)
+      (effects (font (size 1.27 1.27)) hide)
     )
     (pin "1" (uuid 4418f180-1c07-4a82-98aa-f640d7e2a355))
     (pin "2" (uuid 6358ea05-b145-4a59-9391-68172d2ad43a))
@@ -3877,7 +3883,7 @@
   (symbol (lib_id "n64-cartridge:N64-Cartridge") (at 331.47 133.35 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 7be648b9-67e5-4101-a8ba-6e64de4815ef)
-    (property "Reference" "U1" (at 331.47 95.25 0)
+    (property "Reference" "U2" (at 331.47 95.25 0)
       (effects (font (size 1.524 1.524)))
     )
     (property "Value" "N64-Cartridge" (at 331.47 99.06 0)
@@ -3942,7 +3948,7 @@
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "U1") (unit 1)
+          (reference "U2") (unit 1)
         )
       )
     )

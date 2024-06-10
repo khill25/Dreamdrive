@@ -153,24 +153,9 @@ int registerIndexFromControlValue(uint32_t controlValue) {
 #define DEBUG_UART_BAUD_RATE 115200
 
 // Map values to commands, start with all values loaded to invalid (register count)
-uint8_t registerIndex_map[128] = {SPI_REGISTER_COUNT};
-
-__attribute__((used)) void processcsbus() {
-	volatile uint32_t pinStartValue = 0;
-	volatile uint8_t registerIndex = 0;
-
-	while(1) {
-		pinStartValue = sio_hw->gpio_in & 0x1F;//gpio_get_all();
-
-		while((sio_hw->gpio_in & 0x1F) == pinStartValue) {
-			// wait for a change
-			tight_loop_contents();
-		}
-
-		// Get the register index from the control line value
-		registerIndex = registerIndex_map[pinStartValue];
-	}
-}
+uint16_t* registerIndex_map[128] = {0};
+volatile uint16_t* selectedRegister = 0;
+volatile uint32_t register_index = SPI_REGISTER_COUNT;
 
 int main(void) {
 	current_mcu = MCU1;
@@ -255,224 +240,190 @@ int main(void) {
 
 	printf("Setting up register map...");
 
-	
-
 	// This is used to quickly get the right register, read/write should be handled by whatever is doing the lookup
 	// Register Index = Bits = W, R, CS1, CS0, A2, A1, A0 (most->least)
-	registerIndex_map[0x2E] = SPI_ALTERNATE_STATUS_REGISTER_INDEX; // read
-	registerIndex_map[0x4E] = SPI_DEVICE_CONTROL_REGISTER_INDEX; // write
+	registerIndex_map[0x2E] = &SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]; // read
+	registerIndex_map[0x4E] = &SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]; // write
 
-	registerIndex_map[0x30] = SPI_DATA_REGISTER_INDEX; // read
-	registerIndex_map[0x50] = SPI_DATA_REGISTER_INDEX; // write
+	registerIndex_map[0x30] = &SPI_registers[SPI_DATA_REGISTER_INDEX]; // read
+	registerIndex_map[0x50] = &SPI_registers[SPI_DATA_REGISTER_INDEX]; // write
 
-	registerIndex_map[0x51] = SPI_FEATURES_REGISTER_INDEX;
-	registerIndex_map[0x31] = SPI_ERROR_REGISTER_INDEX;
+	registerIndex_map[0x51] = &SPI_registers[SPI_FEATURES_REGISTER_INDEX]; // read
+	registerIndex_map[0x31] = &SPI_registers[SPI_ERROR_REGISTER_INDEX]; // write
 
-	registerIndex_map[0x32] = SPI_INTERRUPT_REASON_REGISTER_INDEX; // read only
+	registerIndex_map[0x32] = &SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]; // read only
 
-	registerIndex_map[0x33] = SPI_SECTOR_NUMBER_REGISTER_INDEX; // read only
+	registerIndex_map[0x33] = &SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]; // read only
 
-	registerIndex_map[0x34] = SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // read
-	registerIndex_map[0x54] = SPI_BYTE_COUNT_REGISTER_LOW_INDEX; // write
+	registerIndex_map[0x34] = &SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]; // read
+	registerIndex_map[0x54] = &SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]; // write
 
-	registerIndex_map[0x35] = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // read
-	registerIndex_map[0x55] = SPI_BYTE_COUNT_REGISTER_HIGH_INDEX; // write
+	registerIndex_map[0x35] = &SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]; // read
+	registerIndex_map[0x55] = &SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]; // write
 
-	registerIndex_map[0x56] = SPI_DRIVE_SELECT_REGISTER_INDEX; // write
-	registerIndex_map[0x36] = SPI_DRIVE_SELECT_REGISTER_INDEX; // read
+	registerIndex_map[0x56] = &SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]; // write
+	registerIndex_map[0x36] = &SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]; // read
 
-	registerIndex_map[0x37] = SPI_STATUS_REGISTER_INDEX; // read
-	registerIndex_map[0x57] = SPI_COMMAND_REGISTER_INDEX; // write
+	registerIndex_map[0x37] = &SPI_registers[SPI_STATUS_REGISTER_INDEX]; // read
+	registerIndex_map[0x57] = &SPI_registers[SPI_COMMAND_REGISTER_INDEX]; // write
 
-	volatile uint8_t validControlLineValues[32] = {0};
-	validControlLineValues[0xE] = 1;
-	validControlLineValues[0x10] = 1;
-	validControlLineValues[0x11] = 1;
-	validControlLineValues[0x12] = 1;
-	validControlLineValues[0x13] = 1;
-	validControlLineValues[0x14] = 1;
-	validControlLineValues[0x15] = 1;
-	validControlLineValues[0x16] = 1;
-	validControlLineValues[0x17] = 1;
-
+	// For the rest of the values, just use a dump register
 	for(int i = 0; i < 128; i++) {
 		if (registerIndex_map[i] == 0) {
-			registerIndex_map[i] = SPI_REGISTER_COUNT;
+			registerIndex_map[i] = &SPI_registers[SPI_REGISTER_COUNT]; // Use the SPI_REGISTER_COUNT as a dump register
 		}
 	}
-
-	printf("DONE!\n");
+	
+	printf("Dreamcast booting...\n");
 
 	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
 	// Wait for that to be finished before we start out programs
-	// while(1) {
-	// 	pins = gpio_get_all();
+	while(1) {
+		pins = gpio_get_all();
 
-	// 	// Was off and is now on
-	// 	if(last_csMask == 0 && ((pins & cs_mask) == cs_mask)) {
-	// 		break;
-	// 	}
+		// Was off and is now on
+		if(last_csMask == 0 && ((pins & cs_mask) == cs_mask)) {
+			break;
+		}
 
-	// 	last_csMask = (pins & cs_mask);
-	// }
+		last_csMask = (pins & cs_mask);
+	}
 
 	while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
-	printf("Dreamcast started!\n");
-	printf("Setting up databus pio programs...\n");
-	// Init all the pins used for control/data (0-15)
-	// for(int i = 0; i < 18; i++) {
-	// 	pio_gpio_init(pio1, i);
-	// }
-	// pio_gpio_init(pio1, 27);
-	
-	// init_cs0_low_program();
-	// init_cs1_low_program();
-	// init_bus_read_request_program();
-	// init_bus_write_request_program();
-
 	busy_wait_ms(1200); // TODO this is likely not needed? 
 
-	// pio_sm_set_enabled(pio1, 0, true);
-	// pio_sm_set_enabled(pio1, 1, true);
-	// pio_sm_set_enabled(pio1, 2, true);
-	// pio_sm_set_enabled(pio1, 3, true);
-
-	// printf("pio running\n");
-	// printf("Starting main loop\n");
-
-	// uint32_t t = 0;
-	// while(1) {
-	// 	tight_loop_contents();
-	// 	// busy wait
-	// 	t++;
-	// 	if (t > 10000000) {
-	// 		printf(".");
-	// 		t = 0;
-	// 	}
-	// }
-
-	// PIO pio = pio1;
+	volatile uint32_t readWriteLineValues = 0;
 	// volatile uint32_t rawLineValues = 0;
-	// volatile uint32_t controlLineValue = 0;
-	// volatile uint32_t lineData = 0;
-	// volatile uint32_t isRead = 1; // 0 = write, 1 = read
-	// volatile uint8_t registerIndex = 0;
+	selectedRegister = registerIndex_map[SPI_REGISTER_COUNT];
+	volatile uint8_t dreamcastWantsRead = 0;
+	// 00 (0x0) - nothing
+	// 01 (0x1) - read
+	// 10 (0x2) - write
+	// 11 (0x3) - nothing
 
-	// const uint32_t controlLineMask = 0x1F;
-	// const uint32_t readLineMask =    0x10000;
-	// const uint32_t writeLineMask =   0x20000;
-
-	// volatile uint32_t rwValue = 0;
-	// volatile uint32_t lastRWValue = 0;
-
-	// // DEBUG
-	// volatile uint32_t debugAt = 8;
-	// volatile uint32_t debugValues[100] = {0};
-	// volatile uint32_t debugRawValues[100] = {0};
-	// volatile uint32_t debugValueCount = 0;
-	// volatile uint32_t debugRawValueCount = 0;
-	// volatile bool hasPrintedDebug = false;
-
-	// volatile bool didReadControlValue = false;
-	// volatile bool didHandleRW = false;
-
-	// while(1) {
+	while(1) {
 		
-	// 	// check for valid value
-	// 	do {
-	// 		rawLineValues = sio_hw->gpio_in & controlLineMask;
-	// 	} while(validControlLineValues[rawLineValues] == 0);
+		// Worst case loop is 172ns
+		// Read/write are low for ~300ns
+		// This leaves us with 128ns (32cycles @ 4ns)
+		// TODO do we need to do anything with the register data???
 
-	// 	// printf("%x | %x\n", rawLineValues, registerIndex_map[rawLineValues]);
-	// 	debugRawValues[debugRawValueCount++] = rawLineValues;
+		// Signal is active low
+		// 1 and 2 are the only valid value. Either read OR write is low, but not both high or both low
+		do {
+			readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;						// 16ns (4 cycles)
+		} while(readWriteLineValues == 3 || readWriteLineValues == 0);							// 12ns (3 cycles)
 
-	// 	do {
-	// 		rawLineValues = sio_hw->gpio_in & controlLineMask;
-	// 	} while(validControlLineValues[rawLineValues] == 1);
-	// }
+		// bit shift in read/write values to the control line values
+		register_index = (sio_hw->gpio_in & 0x1F) | (readWriteLineValues << 5);  				// 24ns (6 cycles @ 4ns)
+		// get the pointer to the selected register
+		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 
+		// flip the mux to data lines
+		sio_hw->gpio_set = 1ul << MCU1_PIN_MUX_SELECT;											// 12ns (3 cycles)	
 
-	processcsbus();
-	busy_wait_ms(1200);
-	// // Main Loop
-	// while(1) {
-		
-	// 	// Tight loop pull control line values from csx programs 
-	// 	while(!didReadControlValue) {
-	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_cs0_low_sm)) {
-	// 			rawLineValues = pio_sm_get(pio, sega_cs0_low_sm);
+		// READ - SEND data to dreamcast
+		if (readWriteLineValues == 0x1) {														// 16ns (2-4 cycles)
+			// Set register values on lines
+			sio_hw->gpio_togl = (sio_hw->gpio_out ^ *selectedRegister) & ATA_REGISTER_PIN_MASK; // 32ns (8 cycles?)
 
-	// 			// Not sure if this is right, it was auto generated...
-	// 			// controlLineValue = rawLineValues & controlLineMask;
-	// 			// break;
+			// ... 136ns to put data on the lines
+			// read and write latches are low for 304ns
+			// this *SHOULD* work
 
-	// 			// if (didReadControlValue) {
-	// 			// 	didReadSecondControlValue = true;
-	// 			// }
+			// wait for latch?
+			while(gpio_get(MCU1_PIN_READ) == 0) { tight_loop_contents(); };						// 24ns (6 cycles)
 
-	// 			didReadControlValue = true;
-	// 		}
+		// WRITE - GET data from dreamcast into register
+		} else {
+			// Since the mux is flipped to data lines we want to read all 16 bits 
+			// Hope that for non-data registers that the upper 8 bits won't mess up when
+			// sending data back to the dreamcast
 
-	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_cs1_low_sm)) {
-	// 			rawLineValues = pio_sm_get(pio, sega_cs1_low_sm);
+			// Read all the data lines
+			*selectedRegister = sio_hw->gpio_in & ATA_REGISTER_PIN_MASK;						// 16ns (4 cycles?)
 
-	// 			// Not sure if this is right, it was auto generated...
-	// 			// controlLineValue = rawLineValues & controlLineMask;
-	// 			// break;
+			// .. process data while we wait for latch. 
+			// Use second core?
+			
+			// wait for latch?
+			while(gpio_get(MCU1_PIN_WRITE) == 0) { tight_loop_contents(); };					// 24ns (6 cycles)
+		}
 
-	// 			// if (didReadControlValue) {
-	// 			// 	didReadSecondControlValue = true;
-	// 			// }
+		// flip the mux back to control lines
+		sio_hw->gpio_clr = 1ul << MCU1_PIN_MUX_SELECT;											// 12ns (3 cycles)
 
-	// 			didReadControlValue = true;
-	// 		}
-	// 	}
+		// (this point takes about 172ns from the beginning of the do loop)
+		// This means that there is about 128ns extra time to do something before the next read/write cycle
+		// This is 32 cycles at 4ns per cycle
+	}
 
-	// 	// Get the register index from the control line value
-	// 	registerIndex = registerIndex_map[controlLineValue];
-	// 	debugRawValues[debugRawValueCount++] = rawLineValues;
-	// 	printf("%x|%x ", rawLineValues, gpio_get_all());
-	// 	// gpio_put(MCU1_PIN_MUX_SELECT, true);
-	// 	// TODO Get the register value using the register index
-	// 	// Not sure if it's worth optimizing yet..., we fetch it in the respective if blocks
-
-	// 	// Tight loop check rd and wr requests
-	// 	while(!didHandleRW) {
-	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_read_request_sm)) {
-	// 			pio_sm_get(pio, sega_bus_read_request_sm);// consume, since this is just to get C code attention
-				
-	// 			// read register value into rwValue
-	// 			rwValue = SPI_registers[registerIndex];
-
-	// 			// Send register data to bus_read_request 
-	// 			pio_sm_put(pio, sega_bus_read_request_sm, rwValue);
-
-	// 			didHandleRW = true;
-	// 		}
-
-	// 		if(!pio_sm_is_rx_fifo_empty(pio, sega_bus_write_request_sm)) {
-	// 			rwValue = pio_sm_get(pio, sega_bus_write_request_sm); // Contains data from the pins
-				
-	// 			// write rwValue to register
-	// 			SPI_registers[registerIndex] = rwValue;
-
-	// 			didHandleRW = true;
-	// 		}
-	// 	}
-
-	// 	didReadControlValue = false;
-	// 	didHandleRW = false;
-	// 	// printf("%x, ", rawLineValues);
-
-	// 	// if (debugRawValueCount >= debugAt) {
-	// 	// 	for(int i = 0; i < debugRawValueCount; i++) {
-	// 	// 		printf("%x, ", rawLineValues);
-	// 	// 	}
-	// 	// 	printf("\n");
-	// 	// 	debugRawValueCount = 0;
-	// 	// }
-	// }
-
+	
 	return 0;
+}
+
+void second_core_main() {
+	while(1) {
+		// Wait for data from core1 to be available
+		// ... TODO figure out how to do this
+
+		// register_index -> selected register 
+		// selectedRegister -> register pointer
+
+		// The command register is the only one that needs to be processed
+		// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
+		if(register_index == SPI_COMMAND_REGISTER_INDEX) {
+			switch (*selectedRegister) {
+				case ATA_CMD_NOP:{
+					// Command can be received when BSY bit is 1 
+					// and device should terminate the command currently in execution
+					break;
+				}
+				case ATA_CMD_SOFT_RESET: {
+					break;
+				}
+				case ATA_CMD_PACKET_COMMAND: {
+					// Process sega packet interface
+					// ...
+					break;
+				}
+				case ATA_CMD_IDENTIFY_DEVICE: {
+					break;
+				}
+				case ATA_CMD_EXECUTE_DEVICE_DIAGNOSTIC: {
+					break;
+				}
+				case ATA_CMD_SET_FEATURES: {
+					break;
+				}
+			}
+		}
+
+		/*
+		Switch case below....
+		Best Case: 5 cycles.
+		Worst Case: 33 cycles.
+		Average Case: Approximately 19 cycles.
+		--
+		Remove register cases that don't need to be processed
+		*/
+		// switch(register_index) {
+			// case SPI_COMMAND_REGISTER_INDEX: { break; }
+			// case SPI_ATA_IO_REGISTER_INDEX: { break; }
+			// case SPI_STATUS_REGISTER_INDEX: { break; } 
+			// case SPI_ALTERNATE_STATUS_REGISTER_INDEX: { break; }
+			// case SPI_DATA_REGISTER_INDEX: { break; }
+			// case SPI_DEVICE_CONTROL_REGISTER_INDEX: { break; }
+			// case SPI_DRIVE_SELECT_REGISTER_INDEX: { break; }  
+			// case SPI_INTERRUPT_REASON_REGISTER_INDEX: { break; }
+			// case SPI_SECTOR_COUNT_REGISTER_INDEX: { break; }
+			// case SPI_SECTOR_NUMBER_REGISTER_INDEX: { break; }
+			// case SPI_ERROR_REGISTER_INDEX: { break; }    
+			// case SPI_FEATURES_REGISTER_INDEX: { break; }
+			// case SPI_BYTE_COUNT_REGISTER_LOW_INDEX: { break; }
+			// case SPI_BYTE_COUNT_REGISTER_HIGH_INDEX: { break; }
+			// case SPI_REGISTER_COUNT: { break; }
+		// }
+	}
 }

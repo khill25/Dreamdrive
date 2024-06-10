@@ -61,3 +61,12 @@
 // UART comms to MCU2
 #define MCU1_PIN_PIO_COMMS_D0       (28) // RX
 #define MCU1_PIN_PIO_COMMS_D1       (29) // TX
+
+
+// Pins 16 and 17 are used for read and write
+#define READ_WRITE_PIN_MASK         (0x30000)
+
+// This is a 16 bit value for pins 0-15
+// The 16 bit value is only used when accessing the data register
+// All other registers are 8 bit
+#define ATA_REGISTER_PIN_MASK       (0xFFFF)

@@ -22,7 +22,7 @@ add_compile_options(
         # -save-temps
         # -Wno-unused-function # we have some for the docs that aren't called
         # -Wno-maybe-uninitialized
-        -O3
+        -O0
 )
 
 # Initialize the SDK
