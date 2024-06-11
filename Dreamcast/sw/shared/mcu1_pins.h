@@ -65,6 +65,10 @@
 
 // Pins 16 and 17 are used for read and write
 #define READ_WRITE_PIN_MASK         (0x30000)
+// Pins 3,4 and 16,17 are used for CS0, CS1, read and write
+#define READ_WRITE_CS_PIN_MASK      (0x30018)
+// Only pins 3,4 
+#define CS_PINS_MASK                (0x18)
 
 // This is a 16 bit value for pins 0-15
 // The 16 bit value is only used when accessing the data register

@@ -72,9 +72,11 @@ This table represents which registers are read or written based on the CS, Addre
 0|1|1|1|1|`Status Register`|`Command Register`|
 1|1|x|x|x|INVALID ADDRESS|INVALID ADDRESS|
 
-** There seems to be an error in the GM-ROM Protocol SPI Specifications PDF I was reading to create this doc. I have fixed this table with information based on findings from a logic analyzer and analyzing the iceGDROM verilog.
+** ~~There seems to be an error in the GM-ROM Protocol SPI Specifications PDF I was reading to create this doc. I have fixed this table with information based on findings from a logic analyzer and analyzing the iceGDROM verilog.It ~~
 
-***These pins are also know as: `CS1` = CS3FX, `CS0` = CS1FX, `READ` = DIOR, `WRITE` = DIOW
+*** It isn't wrong, it's just that the CS, Read, and Write lines are all active LOW
+
+****These pins are also know as: `CS1` = CS3FX, `CS0` = CS1FX, `READ` = DIOR, `WRITE` = DIOW
 
 ---
 

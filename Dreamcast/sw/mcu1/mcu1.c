@@ -7,6 +7,9 @@
 #include <stdio.h>
 
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/structs/systick.h"
+
 #include "mcu1_pins.h"
 #include "shared.h"
 #include "pio_uart/pio_uart.h"
@@ -18,9 +21,6 @@
 #include "f_util.h"
 
 #include "sega_packet_interface.h"
-
-#include "hardware/structs/systick.h"
-
 #include "sega_databus.pio.h"
 
 bool isMuxDataLines = true;
@@ -70,7 +70,7 @@ void sdcard_read_test() {
 
 }
 
-void printNameOfRegister(uint8_t regIndex) {
+void printNameOfRegister(uint32_t regIndex) {
 
 	switch(regIndex) {
 		case 0: printf("ATA_IO"); break;
@@ -88,7 +88,10 @@ void printNameOfRegister(uint8_t regIndex) {
 		case 12: printf("SECTOR_COUNT"); break;
 		case 13: printf("SECTOR_NUMBER"); break;
 		case 14: printf("INVALID"); break;
-		default: break;
+		default: {
+			printf("BAD INDEX: %x", regIndex); 
+			break;
+		}
 	}
 
 // /* 0 */    SPI_ATA_IO_REGISTER_INDEX = 0       ,
@@ -151,11 +154,19 @@ int registerIndexFromControlValue(uint32_t controlValue) {
 }
 
 #define DEBUG_UART_BAUD_RATE 115200
+#define CORE1_PROCESS_REGISTER_CMD 0x1
+#define CORE1_CHIRP_CMD 0x2
+
+void second_core_main();
 
 // Map values to commands, start with all values loaded to invalid (register count)
 uint16_t* registerIndex_map[128] = {0};
+volatile uint16_t* status_register = 0;
 volatile uint16_t* selectedRegister = 0;
 volatile uint32_t register_index = SPI_REGISTER_COUNT;
+
+// TODO probably need some kind of value to indicate to core1 that we don't need to process ata stuff
+// like if we are in DMA mode transfering data to the dreamcast
 
 int main(void) {
 	current_mcu = MCU1;
@@ -195,6 +206,8 @@ int main(void) {
 
 	// MUX to control lines
 	gpio_put(MCU1_PIN_MUX_SELECT, false);
+
+	multicore_launch_core1(second_core_main);
 
 	// MUX LOW  = CONTROL lines
 	// MUX HIGH = DATA lines
@@ -267,6 +280,9 @@ int main(void) {
 	registerIndex_map[0x37] = &SPI_registers[SPI_STATUS_REGISTER_INDEX]; // read
 	registerIndex_map[0x57] = &SPI_registers[SPI_COMMAND_REGISTER_INDEX]; // write
 
+	// Setup a pointer to the status register
+	status_register = &SPI_registers[SPI_STATUS_REGISTER_INDEX];
+
 	// For the rest of the values, just use a dump register
 	for(int i = 0; i < 128; i++) {
 		if (registerIndex_map[i] == 0) {
@@ -278,20 +294,21 @@ int main(void) {
 
 	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
 	// Wait for that to be finished before we start out programs
-	while(1) {
-		pins = gpio_get_all();
+	// while(1) {
+	// 	pins = gpio_get_all();
 
-		// Was off and is now on
-		if(last_csMask == 0 && ((pins & cs_mask) == cs_mask)) {
-			break;
-		}
+	// 	// Was off and is now on
+	// 	if(last_csMask == 0 && ((pins & cs_mask) == cs_mask)) {
+	// 		break;
+	// 	}
 
-		last_csMask = (pins & cs_mask);
-	}
+	// 	last_csMask = (pins & cs_mask);
+	// }
 
 	while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
-	busy_wait_ms(1200); // TODO this is likely not needed? 
+	printf("Dreamcast booted!\n");
+	busy_wait_ms(1000); // TODO this is likely not needed? 
 
 	volatile uint32_t readWriteLineValues = 0;
 	// volatile uint32_t rawLineValues = 0;
@@ -309,14 +326,21 @@ int main(void) {
 		// This leaves us with 128ns (32cycles @ 4ns)
 		// TODO do we need to do anything with the register data???
 
+		// Don't do anything until the control lines are ready
+		do {
+			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;								// 16ns (4 cycles)
+		} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
+
+		register_index = (sio_hw->gpio_in & 0x1F);
+
 		// Signal is active low
 		// 1 and 2 are the only valid value. Either read OR write is low, but not both high or both low
 		do {
 			readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;						// 16ns (4 cycles)
-		} while(readWriteLineValues == 3 || readWriteLineValues == 0);							// 12ns (3 cycles)
+		} while(readWriteLineValues == 0x30000 || readWriteLineValues == 0x00000);				// 12ns (3 cycles)
 
 		// bit shift in read/write values to the control line values
-		register_index = (sio_hw->gpio_in & 0x1F) | (readWriteLineValues << 5);  				// 24ns (6 cycles @ 4ns)
+		register_index = (sio_hw->gpio_in & 0x1F) | (readWriteLineValues >> 11);  				// 24ns (6 cycles @ 4ns)
 		// get the pointer to the selected register
 		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 
@@ -324,16 +348,25 @@ int main(void) {
 		sio_hw->gpio_set = 1ul << MCU1_PIN_MUX_SELECT;											// 12ns (3 cycles)	
 
 		// READ - SEND data to dreamcast
-		if (readWriteLineValues == 0x1) {														// 16ns (2-4 cycles)
+		if (readWriteLineValues == 0x10000) {													// 16ns (2-4 cycles)
+			
+			// Set pins to output
+			sio_hw->gpio_oe_set = ATA_REGISTER_PIN_MASK;										// 8ns (2 cycles)
+
 			// Set register values on lines
 			sio_hw->gpio_togl = (sio_hw->gpio_out ^ *selectedRegister) & ATA_REGISTER_PIN_MASK; // 32ns (8 cycles?)
-
+			
 			// ... 136ns to put data on the lines
 			// read and write latches are low for 304ns
 			// this *SHOULD* work
 
 			// wait for latch?
 			while(gpio_get(MCU1_PIN_READ) == 0) { tight_loop_contents(); };						// 24ns (6 cycles)
+
+			// Clear the data off the pins
+			sio_hw->gpio_clr = ATA_REGISTER_PIN_MASK;											// 8ns (2 cycles)
+			// Set pins back to input
+			sio_hw->gpio_oe_clr = ATA_REGISTER_PIN_MASK;										// 8ns (2 cycles)
 
 		// WRITE - GET data from dreamcast into register
 		} else {
@@ -346,6 +379,7 @@ int main(void) {
 
 			// .. process data while we wait for latch. 
 			// Use second core?
+			multicore_fifo_push_blocking(CORE1_PROCESS_REGISTER_CMD);							// 24ns (6 cycles)
 			
 			// wait for latch?
 			while(gpio_get(MCU1_PIN_WRITE) == 0) { tight_loop_contents(); };					// 24ns (6 cycles)
@@ -363,17 +397,87 @@ int main(void) {
 	return 0;
 }
 
-void second_core_main() {
-	while(1) {
-		// Wait for data from core1 to be available
-		// ... TODO figure out how to do this
+volatile uint32_t writtenRegisters[10000] = {0};
+volatile uint32_t writtenRegisterIndex = 0;
 
+uint32_t timetrack = 0;
+bool hasChirped = false;
+
+void second_core_main() {
+	printf("Core1 Online\n");
+	while(1) {
+		
+		if(time_us_32() - timetrack > 20000000 && !hasChirped) {
+			hasChirped = true;
+			timetrack = time_us_32();
+			printf("----------------------------------------\n");
+			printf("Num Writes: %d\n", writtenRegisterIndex);
+			printf("Written Registers:\n");
+			int goodWrites = 0;
+			for(int i = 0; i < writtenRegisterIndex; i++) {
+				if (writtenRegisters[i] == SPI_REGISTER_COUNT) {
+					continue;
+				}
+				goodWrites++;
+				printf("%d: ", i);
+				printNameOfRegister(writtenRegisters[i]);
+				printf("\n");
+			}
+			printf("Bad values: %d\n", writtenRegisterIndex - goodWrites);
+			printf("----------------------------------------\n");
+			printf("/n/n");
+			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+		}
+
+		// Wait for data from core1 to be available
+		if(!multicore_fifo_rvalid()) {
+			continue;
+		}
+
+		// Only proceed if the command is to process a register
+		if(multicore_fifo_pop_blocking() != CORE1_PROCESS_REGISTER_CMD) {
+			printf("core0 cmd\n");
+			continue;
+		}
+
+		// printf("core0 CORE1_PROCESS_REGISTER_CMD\n");
+		
 		// register_index -> selected register 
 		// selectedRegister -> register pointer
-
-		// The command register is the only one that needs to be processed
-		// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
+		// The command register is the only one that needs to be processed (for now)
 		if(register_index == SPI_COMMAND_REGISTER_INDEX) {
+			// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
+			// .. update status register
+			*status_register = 0x80; // BSY bit set
+			printf("cmd: %x\n", *selectedRegister);
+
+			// .. for debugging maybe print out all the registers
+			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+
 			switch (*selectedRegister) {
 				case ATA_CMD_NOP:{
 					// Command can be received when BSY bit is 1 
@@ -398,7 +502,10 @@ void second_core_main() {
 					break;
 				}
 			}
+			//...... un
 		}
+
+		writtenRegisters[writtenRegisterIndex++] = register_index;
 
 		/*
 		Switch case below....
