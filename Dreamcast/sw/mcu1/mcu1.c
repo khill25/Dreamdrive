@@ -331,7 +331,7 @@ int main(void) {
 			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;								// 16ns (4 cycles)
 		} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
 
-		register_index = (sio_hw->gpio_in & 0x1F);
+		register_index = (sio_hw->gpio_in & 0x1F);												// 16ns (4 cycles)
 
 		// Signal is active low
 		// 1 and 2 are the only valid value. Either read OR write is low, but not both high or both low
@@ -340,7 +340,8 @@ int main(void) {
 		} while(readWriteLineValues == 0x30000 || readWriteLineValues == 0x00000);				// 12ns (3 cycles)
 
 		// bit shift in read/write values to the control line values
-		register_index = (sio_hw->gpio_in & 0x1F) | (readWriteLineValues >> 11);  				// 24ns (6 cycles @ 4ns)
+		register_index = register_index | (readWriteLineValues >> 11);  						// 12ns (3 cycles)
+		
 		// get the pointer to the selected register
 		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 
