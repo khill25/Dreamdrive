@@ -1,0 +1,9 @@
+{
+    "stm32-for-vscode.openOCDPath": "/opt/homebrew/bin/openocd",
+    "files.associations": {
+        "sega_packet_interface.h": "c",
+        "mcu1_pins.h": "c",
+        "sega_databus.pio.h": "c",
+        "interconnect_mux.pio.h": "c"
+    }
+}

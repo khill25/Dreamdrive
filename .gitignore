@@ -1,1 +1,6 @@
 Dreamcast/hw/Dreamdrivecast/Dreamdrivecast-backups/
+Dreamcast/sw/esp32/dreamdrivecast/build
+N64/sw/cart_tester/build
+N64/hw/picocart64_v1_lite/picocart64_v1_lite-backups
+N64/hw/picocart64_v2/picocart64_v2-backups
+N64/hw/cart_tester/pc64/pc64-backups

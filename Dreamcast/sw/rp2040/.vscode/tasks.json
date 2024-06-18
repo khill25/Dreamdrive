@@ -1,0 +1,28 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Compile",
+			"options": {
+				"statusbar": {
+					"label" : "$(beaker) Compile Binary"
+				}
+			},
+			"type": "shell",
+			"command": "cd ./build && make",
+			"problemMatcher": "$gcc",
+			"presentation": {
+				"echo": false,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": true
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}

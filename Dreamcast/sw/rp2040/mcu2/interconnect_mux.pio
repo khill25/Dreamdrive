@@ -1,0 +1,59 @@
+;
+; SPDX-License-Identifier: BSD-2-Clause
+;
+; Copyright (c) 2022 Kaili Hill
+;
+; IRQ low is pin 26
+; IRQ high is pin 27
+; Read/Write is pin 24
+
+; In from other mcu, out to 16bit bus
+; .program interconnect_low
+;     wait 1 gpio 26
+;     mov osr, pins
+;     out pins, 8
+;     wait 0 gpio 26
+; .wrap
+
+; ; In from other mcu (high byte) out to 16bit bus
+; .program interconnect_high
+;     wait 1 gpio 27
+;     mov osr, pins
+;     out pins, 8
+;     wait 0 gpio 27
+; .wrap
+
+; .program interconnect_read_from_dreamcast
+; ; wait for low byte line and read in all 16 bits from dreamcast
+;     wait 1 gpio 27
+;     in pins, 16
+;     mov osr, isr
+;     out pins, 8 ; send 8 bits back to mcu
+;     wait 0 gpio 27
+
+; ; wait for high byte line and then shift the other 8 bits back to the mcu
+;     wait 1 gpio 27
+;     out pins, 8
+;     wait 0 gpio 27
+; .wrap
+
+.program interconnect_read_from_dreamcast
+; wait for low byte line and read in all 16 bits from dreamcast
+    wait 1 gpio 27
+    in pins, 16
+    push
+    wait 0 gpio 27
+.wrap
+
+.program write_to_dreamcast
+    wait 1 gpio 26
+    in pins, 8
+    push
+    wait 0 gpio 26
+    wait 1 gpio 26
+    in pins, 8
+    mov osr, isr
+    out pins, 16
+    wait 0 gpio 26
+.wrap
+

@@ -1,0 +1,22 @@
+{
+    "C_Cpp.intelliSenseEngine": "default",
+    "idf.adapterTargetName": "esp32s3",
+    "idf.customExtraPaths": "/Users/kaili/.espressif/tools/xtensa-esp-elf-gdb/14.2_20240403/xtensa-esp-elf-gdb/bin:/Users/kaili/.espressif/tools/riscv32-esp-elf-gdb/14.2_20240403/riscv32-esp-elf-gdb/bin:/Users/kaili/.espressif/tools/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin:/Users/kaili/.espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin:/Users/kaili/.espressif/tools/esp32ulp-elf/2.35_20220830/esp32ulp-elf/bin:/Users/kaili/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/bin:/Users/kaili/.espressif/tools/ninja/1.11.1:/Users/kaili/.espressif/tools/esp-rom-elfs/20230320",
+    "idf.customExtraVars": {
+        "OPENOCD_SCRIPTS": "/Users/kaili/.espressif/tools/openocd-esp32/v0.12.0-esp32-20240318/openocd-esp32/share/openocd/scripts",
+        "ESP_ROM_ELF_DIR": "/Users/kaili/.espressif/tools/esp-rom-elfs/20230320/"
+    },
+    "idf.espIdfPath": "/Users/kaili/esp/v5.2.2/esp-idf",
+    "idf.openOcdConfigs": [
+        "board/esp32s3-builtin.cfg"
+    ],
+    "idf.port": "/dev/cu.usbmodem1101",
+    "idf.pythonBinPath": "/Users/kaili/.espressif/python_env/idf5.2_py3.11_env/bin/python",
+    "idf.toolsPath": "/Users/kaili/.espressif",
+    "idf.flashType": "JTAG",
+    "files.associations": {
+        "gpio.h": "c",
+        "gpio_reg.h": "c",
+        "*.tcc": "c"
+    }
+}

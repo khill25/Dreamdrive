@@ -1,0 +1,5 @@
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/elf2uf2/CMakeFiles/elf2uf2.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/elf2uf2/CMakeFiles/edit_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/elf2uf2/CMakeFiles/rebuild_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/elf2uf2/boot_uf2_headers/CMakeFiles/edit_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/elf2uf2/boot_uf2_headers/CMakeFiles/rebuild_cache.dir
