@@ -35,9 +35,9 @@ pico_sdk_init()
 # add_subdirectory(lib/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
 # Add shared code
-# add_subdirectory(shared)
-# add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
+add_subdirectory(shared)
+add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
 # Add applications
-# add_subdirectory(mcu1)
+add_subdirectory(mcu1)
 add_subdirectory(mcu2)

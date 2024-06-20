@@ -182,6 +182,84 @@ cyw43_driver_picow_cyw43_bus_pio_spi_pio_h/fast:
 .PHONY : cyw43_driver_picow_cyw43_bus_pio_spi_pio_h/fast
 
 #=============================================================================
+# Target rules for targets named dreamdrivecast_shared_pio_uart_pio_h
+
+# Build rule for target.
+dreamdrivecast_shared_pio_uart_pio_h: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 dreamdrivecast_shared_pio_uart_pio_h
+.PHONY : dreamdrivecast_shared_pio_uart_pio_h
+
+# fast build rule for target.
+dreamdrivecast_shared_pio_uart_pio_h/fast:
+	$(MAKE) $(MAKESILENT) -f shared/CMakeFiles/dreamdrivecast_shared_pio_uart_pio_h.dir/build.make shared/CMakeFiles/dreamdrivecast_shared_pio_uart_pio_h.dir/build
+.PHONY : dreamdrivecast_shared_pio_uart_pio_h/fast
+
+#=============================================================================
+# Target rules for targets named dreamdrivecast_shared_sega_databus_pio_h
+
+# Build rule for target.
+dreamdrivecast_shared_sega_databus_pio_h: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 dreamdrivecast_shared_sega_databus_pio_h
+.PHONY : dreamdrivecast_shared_sega_databus_pio_h
+
+# fast build rule for target.
+dreamdrivecast_shared_sega_databus_pio_h/fast:
+	$(MAKE) $(MAKESILENT) -f shared/CMakeFiles/dreamdrivecast_shared_sega_databus_pio_h.dir/build.make shared/CMakeFiles/dreamdrivecast_shared_sega_databus_pio_h.dir/build
+.PHONY : dreamdrivecast_shared_sega_databus_pio_h/fast
+
+#=============================================================================
+# Target rules for targets named FatFs_SPI_rp2040_sdio_pio_h
+
+# Build rule for target.
+FatFs_SPI_rp2040_sdio_pio_h: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 FatFs_SPI_rp2040_sdio_pio_h
+.PHONY : FatFs_SPI_rp2040_sdio_pio_h
+
+# fast build rule for target.
+FatFs_SPI_rp2040_sdio_pio_h/fast:
+	$(MAKE) $(MAKESILENT) -f mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src/CMakeFiles/FatFs_SPI_rp2040_sdio_pio_h.dir/build.make mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src/CMakeFiles/FatFs_SPI_rp2040_sdio_pio_h.dir/build
+.PHONY : FatFs_SPI_rp2040_sdio_pio_h/fast
+
+#=============================================================================
+# Target rules for targets named dreamdrivecast_mcu1
+
+# Build rule for target.
+dreamdrivecast_mcu1: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 dreamdrivecast_mcu1
+.PHONY : dreamdrivecast_mcu1
+
+# fast build rule for target.
+dreamdrivecast_mcu1/fast:
+	$(MAKE) $(MAKESILENT) -f mcu1/CMakeFiles/dreamdrivecast_mcu1.dir/build.make mcu1/CMakeFiles/dreamdrivecast_mcu1.dir/build
+.PHONY : dreamdrivecast_mcu1/fast
+
+#=============================================================================
+# Target rules for targets named dreamdrivecast_mcu1_mcu_databus_pio_h
+
+# Build rule for target.
+dreamdrivecast_mcu1_mcu_databus_pio_h: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 dreamdrivecast_mcu1_mcu_databus_pio_h
+.PHONY : dreamdrivecast_mcu1_mcu_databus_pio_h
+
+# fast build rule for target.
+dreamdrivecast_mcu1_mcu_databus_pio_h/fast:
+	$(MAKE) $(MAKESILENT) -f mcu1/CMakeFiles/dreamdrivecast_mcu1_mcu_databus_pio_h.dir/build.make mcu1/CMakeFiles/dreamdrivecast_mcu1_mcu_databus_pio_h.dir/build
+.PHONY : dreamdrivecast_mcu1_mcu_databus_pio_h/fast
+
+#=============================================================================
+# Target rules for targets named ELF2UF2Build
+
+# Build rule for target.
+ELF2UF2Build: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ELF2UF2Build
+.PHONY : ELF2UF2Build
+
+# fast build rule for target.
+ELF2UF2Build/fast:
+	$(MAKE) $(MAKESILENT) -f mcu1/CMakeFiles/ELF2UF2Build.dir/build.make mcu1/CMakeFiles/ELF2UF2Build.dir/build
+.PHONY : ELF2UF2Build/fast
+
+#=============================================================================
 # Target rules for targets named dreamdrivecast_mcu2
 
 # Build rule for target.
@@ -207,19 +285,6 @@ dreamdrivecast_mcu2_interconnect_mux_pio_h/fast:
 	$(MAKE) $(MAKESILENT) -f mcu2/CMakeFiles/dreamdrivecast_mcu2_interconnect_mux_pio_h.dir/build.make mcu2/CMakeFiles/dreamdrivecast_mcu2_interconnect_mux_pio_h.dir/build
 .PHONY : dreamdrivecast_mcu2_interconnect_mux_pio_h/fast
 
-#=============================================================================
-# Target rules for targets named ELF2UF2Build
-
-# Build rule for target.
-ELF2UF2Build: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ELF2UF2Build
-.PHONY : ELF2UF2Build
-
-# fast build rule for target.
-ELF2UF2Build/fast:
-	$(MAKE) $(MAKESILENT) -f mcu2/CMakeFiles/ELF2UF2Build.dir/build.make mcu2/CMakeFiles/ELF2UF2Build.dir/build
-.PHONY : ELF2UF2Build/fast
-
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -229,12 +294,17 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... ELF2UF2Build"
+	@echo "... FatFs_SPI_rp2040_sdio_pio_h"
 	@echo "... PioasmBuild"
 	@echo "... bs2_default_bin"
 	@echo "... bs2_default_padded_checksummed_asm"
 	@echo "... cyw43_driver_picow_cyw43_bus_pio_spi_pio_h"
+	@echo "... dreamdrivecast_mcu1_mcu_databus_pio_h"
 	@echo "... dreamdrivecast_mcu2_interconnect_mux_pio_h"
+	@echo "... dreamdrivecast_shared_pio_uart_pio_h"
+	@echo "... dreamdrivecast_shared_sega_databus_pio_h"
 	@echo "... bs2_default"
+	@echo "... dreamdrivecast_mcu1"
 	@echo "... dreamdrivecast_mcu2"
 .PHONY : help
 

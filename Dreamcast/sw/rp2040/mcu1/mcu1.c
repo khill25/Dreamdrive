@@ -23,6 +23,8 @@
 #include "sega_packet_interface.h"
 #include "sega_databus.pio.h"
 
+#include "mcu_databus.pio.h"
+
 bool isMuxDataLines = true;
 
 /*
@@ -165,11 +167,57 @@ volatile uint16_t* status_register = 0;
 volatile uint16_t* selectedRegister = 0;
 volatile uint32_t register_index = SPI_REGISTER_COUNT;
 
-volatile uint16_t writtenRegisters[10000] = {0};
+volatile uint32_t writtenRegisters[10000] = {0};
 volatile uint32_t writtenRegisterIndex = 0;
 
 // TODO probably need some kind of value to indicate to core1 that we don't need to process ata stuff
 // like if we are in DMA mode transfering data to the dreamcast
+
+#define MCU1_DATABUS_READ_SM (0)
+#define MCU1_DATABUS_WRITE_SM (1)
+
+void setup_mcu_databus_read() {
+	uint sm = MCU1_DATABUS_READ_SM;
+	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
+	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
+
+	// We want to input on pins 0-7
+	sm_config_set_in_pins(&c, 0);
+	sm_config_set_set_pins(&c, MCU1_PIN_MUX_READ_STOBE_PIN, 1);
+
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x8000000, 0x80000FF);
+
+	pio_sm_init(pio0, sm, offset, &c);
+}
+
+void setup_mcu_databus_write() {
+	uint sm = MCU1_DATABUS_WRITE_SM;
+	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
+	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
+
+	sm_config_set_out_pins(&c, 0, 8);
+	sm_config_set_set_pins(&c, MCU1_PIN_MUX_WRITE_STOBE_PIN, 1);
+	// We want to output on pins 0-7 on the set pin
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x40000FF, 0x40000FF);
+
+	pio_sm_init(pio0, sm, offset, &c);
+}
+
+void setup_mcu_databus() {
+	for(int i = 0; i < 8; i++) {
+		pio_gpio_init(pio0, i);
+	}
+
+	pio_gpio_init(pio0, MCU1_PIN_MUX_READ_STOBE_PIN);
+	pio_gpio_init(pio0, MCU1_PIN_MUX_WRITE_STOBE_PIN);
+
+	setup_mcu_databus_read();
+	setup_mcu_databus_write();
+
+// Turn both programs on
+	pio_sm_set_enabled(pio0, 0, true);
+	// pio_sm_set_enabled(pio0, 1, true);
+}
 
 int main(void) {
 	current_mcu = MCU1;
@@ -186,9 +234,9 @@ int main(void) {
 	printf("Clock of %uMhz was set: %u\n", freq_khz / 1000, clockWasSet);
 
 	// Setup the Mux select line
-	gpio_init(MCU1_PIN_MUX_SELECT);
-	gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
-	gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to control lines
+	// gpio_init(MCU1_PIN_MUX_SELECT);
+	// gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
+	// gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to control lines
 
 	// TODO Reestablish uart comms with mcu2
 	// pio_uart_init(MCU1_PIN_PIO_COMMS_D0, MCU1_PIN_PIO_COMMS_D1);
@@ -198,16 +246,23 @@ int main(void) {
 
 	printf("MCU1- Init pins...\n");
 
-	// init the pins, 0-15 = data, 16 = read, 17 = write, 18 = interrupt, 19 = DMACK, 20 = DMARQ
-	for (int i = 0; i <= 20; i++) {
+	// init the control pins (7 pins)
+	for (int i = 8; i < 15; i++) {
 		gpio_init(i);
 		gpio_set_dir(i, false); // set to input
 	}
 
-	gpio_set_pulls(MCU1_PIN_INTRQ, true, false); // enable pull up
+	gpio_init(MCU1_PIN_IORDY);
+	gpio_set_dir(MCU1_PIN_IORDY, true);
 
-	// MUX to control lines
-	gpio_put(MCU1_PIN_MUX_SELECT, false);
+	gpio_init(MCU1_PIN_MUX_READ_STOBE_PIN);
+	gpio_set_dir(MCU1_PIN_MUX_READ_STOBE_PIN, true);
+
+	gpio_init(MCU1_PIN_MUX_WRITE_STOBE_PIN);
+	gpio_set_dir(MCU1_PIN_MUX_WRITE_STOBE_PIN, true);
+
+	// Init the pio programs to read/write mcu databus
+	setup_mcu_databus();
 
 	multicore_launch_core1(second_core_main);
 
@@ -240,18 +295,6 @@ int main(void) {
 	 *
 	 * 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xF?[0xF isn't mentioned in the table???]
 	*/
-
-	const uint32_t read_mask = 0x00010000; // pin 16
-	const uint32_t write_mask = 0x00020000; // pin 17
-	const uint32_t cs_mask = 0x00000018; // pin 3 and 4
-	const uint32_t control_pin_mask = 0x1F;
-	volatile bool last_rd = 0;
-	volatile bool last_wr = 0;
-	volatile bool last_csMask = 0;
-	volatile bool rd = 0;
-	volatile bool wr = 0;
-	int numReadValues = 0;
-	bool csIsReady = false;
 	volatile uint32_t pins = 0;
 
 	printf("Setting up register map...");
@@ -310,7 +353,30 @@ int main(void) {
 	// 	last_csMask = (pins & cs_mask);
 	// }
 
-	while(!gpio_get(3)); // loop until the cs lines are active (really only useful when powering the board on before the console)
+	// volatile uint32_t write_pin_strobe_on = 1 << MCU1_PIN_MUX_WRITE_STOBE_PIN;
+	// volatile uint32_t write_pin_strobe_off = 1 << MCU1_PIN_MUX_WRITE_STOBE_PIN;
+
+	// while(1) {
+	// 	// gpio_put(MCU1_PIN_MUX_READ_STOBE_PIN, 1);
+	// 	// gpio_put(MCU1_PIN_MUX_READ_STOBE_PIN, 0);
+	// 	// gpio_put(MCU1_PIN_MUX_READ_STOBE_PIN, 1);
+	// 	// gpio_put(MCU1_PIN_MUX_READ_STOBE_PIN, 0);
+	// 	// busy_wait_us(1);
+
+	// 	// gpio_put(MCU1_PIN_MUX_WRITE_STOBE_PIN, 1);
+	// 	// gpio_put(MCU1_PIN_MUX_WRITE_STOBE_PIN, 0);
+	// 	// gpio_put(MCU1_PIN_MUX_WRITE_STOBE_PIN, 1);
+	// 	// gpio_put(MCU1_PIN_MUX_WRITE_STOBE_PIN, 0);
+	// 	// busy_wait_us(1);
+
+	// 	// sio_hw->gpio_set = write_pin_strobe_on;
+	// 	// sio_hw->gpio_clr = write_pin_strobe_off;
+	// 	// sio_hw->gpio_set = write_pin_strobe_on;
+	// 	// sio_hw->gpio_clr = write_pin_strobe_off;
+	// 	// busy_wait_us(1);
+	// }
+
+	while(!gpio_get(MCU1_PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
 	printf("Dreamcast booted!\n");
 	busy_wait_ms(1000); // TODO this is likely not needed? 
@@ -324,6 +390,8 @@ int main(void) {
 	// 10 (0x2) - write
 	// 11 (0x3) - nothing
 
+	gpio_put(MCU1_PIN_IORDY, 0);
+
 	while(1) {
 		
 		// Worst case loop is 172ns
@@ -336,66 +404,45 @@ int main(void) {
 			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;								// 16ns (4 cycles)
 		} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
 
-		register_index = (sio_hw->gpio_in & 0x1F);												// 16ns (4 cycles)
+		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK);									// 16ns (4 cycles)
 
 		// Signal is active low
 		// 1 and 2 are the only valid value. Either read OR write is low, but not both high or both low
 		do {
 			readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;						// 16ns (4 cycles)
-		} while(readWriteLineValues == 0x30000 || readWriteLineValues == 0x00000);				// 12ns (3 cycles)
+		} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);	// 12ns (3 cycles)
 
 		// bit shift in read/write values to the control line values
-		register_index = (sio_hw->gpio_in & 0x1F) | (readWriteLineValues >> 11);  						// 12ns (3 cycles)
+		register_index = (register_index | readWriteLineValues) >> 8;  	// 12ns (3 cycles)
 
 		// get the pointer to the selected register
 		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 		writtenRegisters[writtenRegisterIndex++] = register_index;
-	
-		// flip the mux to data lines
-		sio_hw->gpio_set = 1ul << MCU1_PIN_MUX_SELECT;											// 12ns (3 cycles)	
 
 		// READ - SEND data to dreamcast
-		if (readWriteLineValues == 0x20000) {													// 16ns (2-4 cycles)
+		if (readWriteLineValues == 0x4000) {					
+			// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, *selectedRegister); // send register data to dreamcsat
 			
-			// Set pins to output
-			sio_hw->gpio_oe_set = ATA_REGISTER_PIN_MASK;										// 8ns (2 cycles)
-
-			// Set register values on lines
-			//sio_hw->gpio_togl = (sio_hw->gpio_out ^ *selectedRegister) & ATA_REGISTER_PIN_MASK; // 32ns (8 cycles?)
-			gpio_put_masked(0xFFFF, *selectedRegister);											// 16ns (4 cycles)
-			
-			// ... 136ns to put data on the lines
-			// read and write latches are low for 304ns
-			// this *SHOULD* work
-			// multicore_fifo_push_blocking(register_index);									// 24ns (6 cycles)
-
+			gpio_put(MCU1_PIN_IORDY, 1);
 			// wait for latch?
 			while(gpio_get(MCU1_PIN_READ) == 0) { tight_loop_contents(); };						// 24ns (6 cycles)
 
-			// Clear the data off the pins
-			sio_hw->gpio_clr = ATA_REGISTER_PIN_MASK;											// 8ns (2 cycles)
-			// Set pins back to input
-			sio_hw->gpio_oe_clr = ATA_REGISTER_PIN_MASK;										// 8ns (2 cycles)
+			gpio_put(MCU1_PIN_IORDY, 0);
 
 		// WRITE - GET data from dreamcast into register
 		} else {
-			// Since the mux is flipped to data lines we want to read all 16 bits 
-			// Hope that for non-data registers that the upper 8 bits won't mess up when
-			// sending data back to the dreamcast
-
-			// Read all the data lines
-			*selectedRegister = (uint16_t)(sio_hw->gpio_in & ATA_REGISTER_PIN_MASK);			// 16ns (4 cycles?)
-
-			// .. process data while we wait for latch. 
-			// Use second core
-			//multicore_fifo_push_blocking(register_index);										// 24ns (6 cycles)
+			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_SM, 0); // Signal ready to read data
+			pins = pio_sm_get_blocking(pio0, MCU1_DATABUS_READ_SM); // read 16bits
+			writtenRegisters[writtenRegisterIndex++] = pins;
 			
+			multicore_fifo_push_blocking(register_index);										// 24ns (6 cycles)
+
+			gpio_put(MCU1_PIN_IORDY, 1);
 			// wait for latch?
 			while(gpio_get(MCU1_PIN_WRITE) == 0) { tight_loop_contents(); };					// 24ns (6 cycles)
-		}
 
-		// flip the mux back to control lines
-		sio_hw->gpio_clr = 1ul << MCU1_PIN_MUX_SELECT;											// 12ns (3 cycles)
+			gpio_put(MCU1_PIN_IORDY, 0);
+		}
 
 		// (this point takes about 172ns from the beginning of the do loop)
 		// This means that there is about 128ns extra time to do something before the next read/write cycle
@@ -422,7 +469,7 @@ void second_core_main() {
 			printf("Num Writes: %d\n", writtenRegisterIndex);
 			printf("Written Registers:\n");
 			int goodWrites = 0;
-			if (writtenRegisterIndex < 20) {
+			// if (writtenRegisterIndex < 20) {
 				for(int i = 0; i < writtenRegisterIndex; i++) {
 					int codedRegisterIndex = registerIndexFromControlValue(writtenRegisters[i]);
 					// if (codedRegisterIndex == SPI_REGISTER_COUNT) {
@@ -434,7 +481,7 @@ void second_core_main() {
 					printNameOfRegister(codedRegisterIndex);
 					printf("\n");
 				}
-			}
+			// }
 			// printf("Bad values: %d\n", writtenRegisterIndex - goodWrites);
 			printf("----------------------------------------\n");
 			printf("/n/n");

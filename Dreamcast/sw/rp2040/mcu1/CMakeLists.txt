@@ -5,6 +5,10 @@ add_executable(dreamdrivecast_mcu1
     # sdcard/simple.c
 )
 
+pico_generate_pio_header(dreamdrivecast_mcu1
+    ${CMAKE_CURRENT_LIST_DIR}/../shared/mcu_databus.pio
+)
+
 target_include_directories(dreamdrivecast_mcu1 PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}

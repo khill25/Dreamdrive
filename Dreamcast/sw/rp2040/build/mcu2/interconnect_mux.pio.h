@@ -13,21 +13,26 @@
 // -------------------------------- //
 
 #define interconnect_read_from_dreamcast_wrap_target 0
-#define interconnect_read_from_dreamcast_wrap 3
+#define interconnect_read_from_dreamcast_wrap 8
 
 static const uint16_t interconnect_read_from_dreamcast_program_instructions[] = {
             //     .wrap_target
     0x209b, //  0: wait   1 gpio, 27                 
     0x4010, //  1: in     pins, 16                   
-    0x8020, //  2: push   block                      
-    0x201b, //  3: wait   0 gpio, 27                 
+    0xa0e6, //  2: mov    osr, isr                   
+    0x6008, //  3: out    pins, 8                    
+    0x201b, //  4: wait   0 gpio, 27                 
+    0x8020, //  5: push   block                      
+    0x209b, //  6: wait   1 gpio, 27                 
+    0x6008, //  7: out    pins, 8                    
+    0x201b, //  8: wait   0 gpio, 27                 
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program interconnect_read_from_dreamcast_program = {
     .instructions = interconnect_read_from_dreamcast_program_instructions,
-    .length = 4,
+    .length = 9,
     .origin = -1,
 };
 
@@ -43,26 +48,25 @@ static inline pio_sm_config interconnect_read_from_dreamcast_program_get_default
 // ------------------ //
 
 #define write_to_dreamcast_wrap_target 0
-#define write_to_dreamcast_wrap 8
+#define write_to_dreamcast_wrap 7
 
 static const uint16_t write_to_dreamcast_program_instructions[] = {
             //     .wrap_target
     0x209a, //  0: wait   1 gpio, 26                 
     0x4008, //  1: in     pins, 8                    
-    0x8020, //  2: push   block                      
-    0x201a, //  3: wait   0 gpio, 26                 
-    0x209a, //  4: wait   1 gpio, 26                 
-    0x4008, //  5: in     pins, 8                    
-    0xa0e6, //  6: mov    osr, isr                   
-    0x6010, //  7: out    pins, 16                   
-    0x201a, //  8: wait   0 gpio, 26                 
+    0x201a, //  2: wait   0 gpio, 26                 
+    0x209a, //  3: wait   1 gpio, 26                 
+    0x4008, //  4: in     pins, 8                    
+    0xa0e6, //  5: mov    osr, isr                   
+    0x6010, //  6: out    pins, 16                   
+    0x201a, //  7: wait   0 gpio, 26                 
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program write_to_dreamcast_program = {
     .instructions = write_to_dreamcast_program_instructions,
-    .length = 9,
+    .length = 8,
     .origin = -1,
 };
 

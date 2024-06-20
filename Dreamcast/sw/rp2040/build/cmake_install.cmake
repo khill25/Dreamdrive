@@ -40,6 +40,9 @@ endif()
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
   include("/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pico-sdk/cmake_install.cmake")
+  include("/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/shared/cmake_install.cmake")
+  include("/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src/cmake_install.cmake")
+  include("/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/mcu1/cmake_install.cmake")
   include("/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/mcu2/cmake_install.cmake")
 
 endif()

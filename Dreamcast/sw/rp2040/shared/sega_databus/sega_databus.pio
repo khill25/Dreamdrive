@@ -72,17 +72,21 @@ wait_for_wr:
 	irq 5 ;; let the cs programs know they can start monitoring the pins again
 .wrap
 
+;; cs0 pin 11
+;; cs1 pin 12
+
 ; Control registers are CS1 Asserted (0) and CS0 Negated (1)
-.program control_register_read
+; .program control_register_read
 	; Psuedo code
 	; wait 1 CS1
 	; wait 0 CS1
 	; Read in address pins
 	; DMA figures out register
 	; read in data pins
-	; DMA writes data to register
-.wrap
+	; DMA writes data to
+	; wait 1 gpio 12
+; .wrap
 
-; Command registers are CS1 Negated (1) and CS0 Asserted (0)
-.program command_register_read
-.wrap
+; ; Command registers are CS1 Negated (1) and CS0 Asserted (0)
+; .program command_register_read
+; .wrap

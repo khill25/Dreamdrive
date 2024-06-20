@@ -41,19 +41,63 @@
 ; wait for low byte line and read in all 16 bits from dreamcast
     wait 1 gpio 27
     in pins, 16
+    mov osr, isr
+    out pins, 8 ; send 8 bits back to mcu
+    wait 0 gpio 27
+
     push
+
+    wait 1 gpio 27
+    out pins, 8 ; send 8 bits back to mcu
     wait 0 gpio 27
 .wrap
 
 .program write_to_dreamcast
     wait 1 gpio 26
     in pins, 8
-    push
     wait 0 gpio 26
+    
     wait 1 gpio 26
     in pins, 8
     mov osr, isr
     out pins, 16
     wait 0 gpio 26
 .wrap
+
+; .program mcu_databus_flipper
+;     ; wait 1 gpio 27
+;     ; mov osr, ~null
+;     ; out pindirs, 16 ; osr = 0x0000ffff
+;     ; wait 0 gpio 27
+;     ; wait 1 gpio 27
+;     ; mov osr, ~osr ; osr = 0xffff0000
+;     ; out pindirs, 32 ; osr = 0xffff0000
+;     ; wait 0 gpio 27
+
+;     wait 1 gpio 27
+;     mov osr, ~null
+;     out x, 16
+;     mov osr, ~osr
+;     wait 0 gpio 27
+;     wait 1 gpio 27
+;     mov osr, ~osr ; osr = 0xffff0000
+;     out pindirs, 32 ; osr = 0xffff0000
+;     wait 0 gpio 27
+; .wrap
+
+; .program mcu_databus_read_write
+;     wait 1 gpio 26
+;     jmp pin set_bus_write_to_dreamcast
+
+; set_bus_read_from_dreamcast:
+;     mov osr, ~null
+;     out x, 16
+;     mov osr, ~osr
+;     out pindirs, 32
+
+; set_bus_write_to_dreamcast:
+;     mov osr, ~null
+;     out pindirs, 16 ; osr = 0x0000ffff
+    
+; .wrap
 

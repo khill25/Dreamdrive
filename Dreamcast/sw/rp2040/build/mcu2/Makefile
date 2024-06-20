@@ -144,20 +144,6 @@ dreamdrivecast_mcu2_interconnect_mux_pio_h/fast:
 	cd /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build && $(MAKE) $(MAKESILENT) -f mcu2/CMakeFiles/dreamdrivecast_mcu2_interconnect_mux_pio_h.dir/build.make mcu2/CMakeFiles/dreamdrivecast_mcu2_interconnect_mux_pio_h.dir/build
 .PHONY : dreamdrivecast_mcu2_interconnect_mux_pio_h/fast
 
-# Convenience name for target.
-mcu2/CMakeFiles/ELF2UF2Build.dir/rule:
-	cd /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 mcu2/CMakeFiles/ELF2UF2Build.dir/rule
-.PHONY : mcu2/CMakeFiles/ELF2UF2Build.dir/rule
-
-# Convenience name for target.
-ELF2UF2Build: mcu2/CMakeFiles/ELF2UF2Build.dir/rule
-.PHONY : ELF2UF2Build
-
-# fast build rule for target.
-ELF2UF2Build/fast:
-	cd /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build && $(MAKE) $(MAKESILENT) -f mcu2/CMakeFiles/ELF2UF2Build.dir/build.make mcu2/CMakeFiles/ELF2UF2Build.dir/build
-.PHONY : ELF2UF2Build/fast
-
 Users/kaili/Code/pico-sdk/lib/tinyusb/src/class/audio/audio_device.obj: Users/kaili/Code/pico-sdk/lib/tinyusb/src/class/audio/audio_device.c.obj
 .PHONY : Users/kaili/Code/pico-sdk/lib/tinyusb/src/class/audio/audio_device.obj
 
@@ -1694,7 +1680,6 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... ELF2UF2Build"
 	@echo "... dreamdrivecast_mcu2_interconnect_mux_pio_h"
 	@echo "... dreamdrivecast_mcu2"
 	@echo "... Users/kaili/Code/pico-sdk/lib/tinyusb/src/class/audio/audio_device.obj"
