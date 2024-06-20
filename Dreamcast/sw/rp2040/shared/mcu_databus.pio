@@ -1,0 +1,48 @@
+.program mcu_databus_write
+get_data:
+    pull ; wait for data from c
+send_first_byte:
+    out pins, 8 ; write out first byte
+    set pins, 1 [5] ; stobe to start write and give time to other mcu to read
+    set pins, 0 ; strobe to end write
+send_second_byte:
+    out pins, 8 ; write out second byte
+    set pins, 1 [5]; stobe to start write and give other mcu time to read
+    set pins, 0 ; end strobe
+.wrap
+
+.program mcu_databus_read
+wait_for_start_signal:
+    pull ; wait for ready signal
+get_first_byte:
+    set pins, 1 [7] ;; stobe and wait a few cycles for data to be ready
+    in pins, 8 ; read data
+    set pins, 0; end strobe
+get_second_byte:
+    set pins, 1 [7] ;strobe and wait a few cycles for data to be ready
+    in pins, 8 ; read data
+    set pins, 0 ; end strobe
+push_to_c:
+    push ; send data back to c code
+.wrap
+
+.program mcu_databus_flipper
+    ; wait 1 gpio 27
+    ; mov osr, ~null
+    ; out pindirs, 16 ; osr = 0x0000ffff
+    ; wait 0 gpio 27
+    ; wait 1 gpio 27
+    ; mov osr, ~osr ; osr = 0xffff0000
+    ; out pindirs, 32 ; osr = 0xffff0000
+    ; wait 0 gpio 27
+
+    wait 1 gpio 27
+    mov osr, ~null
+    out x, 16
+    mov osr, ~osr
+    wait 0 gpio 27
+    wait 1 gpio 27
+    mov osr, ~osr ; osr = 0xffff0000
+    out pindirs, 32 ; osr = 0xffff0000
+    wait 0 gpio 27
+.wrap
