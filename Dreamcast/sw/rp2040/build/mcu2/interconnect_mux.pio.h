@@ -88,39 +88,47 @@ static inline pio_sm_config write_to_dreamcast_program_get_default_config(uint o
 // ---------------------- //
 
 #define mcu_databus_read_write_wrap_target 0
-#define mcu_databus_read_write_wrap 21
+#define mcu_databus_read_write_wrap 29
 
 static const uint16_t mcu_databus_read_write_program_instructions[] = {
             //     .wrap_target
-    0x209a, //  0: wait   1 gpio, 26                 
-    0x00cd, //  1: jmp    pin, 13                    
-    0xa0eb, //  2: mov    osr, !null                 
-    0x6070, //  3: out    null, 16                   
-    0xa0ef, //  4: mov    osr, !osr                  
-    0x6080, //  5: out    pindirs, 32                
-    0x209b, //  6: wait   1 gpio, 27                 
-    0xa0e0, //  7: mov    osr, pins                  
-    0x8020, //  8: push   block                      
-    0x6008, //  9: out    pins, 8                    
-    0x201b, // 10: wait   0 gpio, 27                 
+    0xa0e3, //  0: mov    osr, null                  
+    0x6080, //  1: out    pindirs, 32                
+    0x209a, //  2: wait   1 gpio, 26                 
+    0x00d1, //  3: jmp    pin, 17                    
+    0xa0eb, //  4: mov    osr, !null                 
+    0x6070, //  5: out    null, 16                   
+    0xa0ef, //  6: mov    osr, !osr                  
+    0x6080, //  7: out    pindirs, 32                
+    0x201a, //  8: wait   0 gpio, 26                 
+    0x209a, //  9: wait   1 gpio, 26                 
+    0xa0e0, // 10: mov    osr, pins                  
     0x6008, // 11: out    pins, 8                    
-    0x0015, // 12: jmp    21                         
-    0xa0eb, // 13: mov    osr, !null                 
-    0x6090, // 14: out    pindirs, 16                
-    0x201b, // 15: wait   0 gpio, 27                 
-    0x209b, // 16: wait   1 gpio, 27                 
-    0x4008, // 17: in     pins, 8                    
-    0x201b, // 18: wait   0 gpio, 27                 
-    0x4008, // 19: in     pins, 8                    
-    0x6010, // 20: out    pins, 16                   
-    0x201a, // 21: wait   0 gpio, 26                 
+    0x201a, // 12: wait   0 gpio, 26                 
+    0x209a, // 13: wait   1 gpio, 26                 
+    0x6008, // 14: out    pins, 8                    
+    0x201a, // 15: wait   0 gpio, 26                 
+    0x0000, // 16: jmp    0                          
+    0xa0eb, // 17: mov    osr, !null                 
+    0x6090, // 18: out    pindirs, 16                
+    0x201a, // 19: wait   0 gpio, 26                 
+    0x209a, // 20: wait   1 gpio, 26                 
+    0x4008, // 21: in     pins, 8                    
+    0x201a, // 22: wait   0 gpio, 26                 
+    0x209a, // 23: wait   1 gpio, 26                 
+    0x4008, // 24: in     pins, 8                    
+    0x201a, // 25: wait   0 gpio, 26                 
+    0x209a, // 26: wait   1 gpio, 26                 
+    0xa0e6, // 27: mov    osr, isr                   
+    0x6010, // 28: out    pins, 16                   
+    0x201a, // 29: wait   0 gpio, 26                 
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program mcu_databus_read_write_program = {
     .instructions = mcu_databus_read_write_program_instructions,
-    .length = 22,
+    .length = 30,
     .origin = -1,
 };
 

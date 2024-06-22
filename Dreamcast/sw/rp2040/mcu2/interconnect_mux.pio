@@ -76,46 +76,91 @@
     wait 0 gpio 26
 .wrap
 
-.program mcu_databus_read_write
-wait_for_controller:
-    wait 1 gpio 26
-    jmp pin set_bus_write_to_dreamcast
+; .program mcu_databus_read_write
+; wait_for_controller:
+;     wait 1 gpio 26
+;     jmp pin set_bus_write_to_dreamcast ;; if 1 then write to dreamcast, else read
 
-set_bus_read_from_dreamcast:
+; set_bus_read_from_dreamcast:
+;     mov osr, ~null ; osr = 0xffffffff
+;     out null, 16 ; osr = 0x0000ffff
+;     mov osr, ~osr ; osr = 0xffff0000
+;     out pindirs, 32 ; pindirs output to mcu, input from dreamcast
+    
+;     ;; read in 16 bits from dreamcast and output first byte to mcu
+;     wait 1 gpio 27
+;     mov osr, pins
+;     ; push
+;     out pins, 8  [3]
+;     wait 0 gpio 27
+;     out pins, 8  [3]
+
+;     jmp wait_for_controller_finish ;; finish waiting for controller
+
+; set_bus_write_to_dreamcast:
+;     mov osr, ~null ; osr = 0xffffffff
+;     out pindirs, 16 ; osr = 0x0000ffff, pindirs output to dreamcast input from mcu
+;     wait 0 gpio 27
+
+;     ;; wait for rising edge
+;     wait 1 gpio 27
+;     in pins, 8
+
+;     ;; wait for falling edge, read in data then push out to dreamcast
+;     wait 0 gpio 27
+;     in pins, 8
+;     out pins, 16 ;; push out 16 bits to dreamcast 
+
+; ;; Wait for controller to let go of 26 so we can start loop again
+; wait_for_controller_finish:
+;     wait 0 gpio 26
+    
+; .wrap
+
+.program mcu_databus_read_write
+set_all_in:
+    mov osr, null
+    out pindirs, 32
+
+wait_for_mcu:
+    wait 1 gpio 26
+    jmp pin pindirs_write_to_dreamcast_read_from_mcu
+
+pindirs_read_from_dreamcast_write_to_mcu:
     mov osr, ~null ; osr = 0xffffffff
     out null, 16 ; osr = 0x0000ffff
     mov osr, ~osr ; osr = 0xffff0000
-    out pindirs, 32 ; pindirs output to mcu input from dreamcast
-    
-    ;; read in 16 bits from dreamcast and output first byte to mcu
-    wait 1 gpio 27
-    mov osr, pins
-    push
-    out pins, 8
-
-    ;; output second byte to mcu
-    wait 0 gpio 27
-    out pins, 8
-
-    jmp wait_for_controller_finish ;; finish waiting for controller
-
-set_bus_write_to_dreamcast:
-    mov osr, ~null ; osr = 0xffffffff
-    out pindirs, 16 ; osr = 0x0000ffff, pindirs output to dreamcast input from mcu
-    wait 0 gpio 27
-
-    ;; wait for rising edge
-    wait 1 gpio 27
-    in pins, 8
-
-    ;; wait for falling edge, read in data then push out to dreamcast
-    wait 0 gpio 27
-    in pins, 8
-    out pins, 16 ;; push out 16 bits to dreamcast 
-
-;; Wait for controller to let go of 26 so we can start loop again
-wait_for_controller_finish:
+    out pindirs, 32 ; pindirs output to mcu, input from dreamcast
     wait 0 gpio 26
     
+write_to_mcu_read_from_dreamcast:
+    wait 1 gpio 26
+    mov osr, pins
+    out pins, 8
+    wait 0 gpio 26
+    wait 1 gpio 26
+    out pins, 8
+    wait 0 gpio 26
+    jmp set_all_in
+
+pindirs_write_to_dreamcast_read_from_mcu:
+    mov osr, ~null ; osr = 0xffffffff
+    out pindirs, 16 ; osr = 0x0000ffff, pindirs output to dreamcast input from mcu
+    wait 0 gpio 26
+
+read_from_mcu_write_to_dreamcast:
+    wait 1 gpio 26 ;; stobe byte 1
+    in pins, 8
+    wait 0 gpio 26
+    
+    wait 1 gpio 26 ;; strobe byte 2
+    in pins, 8
+    wait 0 gpio 26
+
+    wait 1 gpio 26 ;; strobe to keep data on line until dreamcast has read it
+    mov osr, isr
+    out pins, 16
+    wait 0 gpio 26
 .wrap
+
 

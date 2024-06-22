@@ -78,7 +78,8 @@ void setup_read_write_combined_program() {
 	// Output pins are 0-15, but this is the low byte so start at pin 0
 	sm_config_set_out_pins(&c, 0, 24);
 	
-	pio_sm_set_pindirs_with_mask(pio0, sm, 0x0000FFFF, 0x00FFFFFF);
+	// Set all pins input
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x00000000, 0x00FFFFFF);
 
 	// SET JMP PIN!!!!!!!!!!!!!
 	sm_config_set_jmp_pin(&c, 27);
@@ -99,12 +100,6 @@ void setup_interconnect() {
 
 	setup_read_write_combined_program();
 	pio_sm_set_enabled(pio0, 0, true);
-
-	// setup_interconnect_read_from_dreamcast();
-	// setup_send_to_dreamcast();
-
-	// pio_sm_set_enabled(pio0, 0, true);
-	// pio_sm_set_enabled(pio0, 1, true);
 }
 
 // When interconnect is output(output to dreamcast), OUTPUT data from mcu TO BUS
@@ -153,7 +148,6 @@ int main(void) {
 	gpio_set_dir(INTERCONNECT_IRQ_HIGH_PIN, GPIO_IN);
 
 	setup_interconnect();
-	// swap_direction();
 	volatile uint32_t pins = 0;
 
 	while(1) {
@@ -169,7 +163,7 @@ int main(void) {
 			// printf("%x, %x\n", sio_hw->gpio_in, sio_hw->gpio_in >> 16);
 			// while(gpio_get(INTERCONNECT_IRQ_LOW_PIN)){ tight_loop_contents(); }
 		// }
-		pins = pio_sm_get_blocking(pio0, 1);
-		printf("%x\n", pins);
+		// pins = pio_sm_get_blocking(pio0, 0);
+		// printf("%x\n", pins);
 	}
 }
