@@ -176,6 +176,33 @@ volatile uint32_t writtenRegisterIndex = 0;
 #define MCU1_DATABUS_READ_SM (0)
 #define MCU1_DATABUS_WRITE_SM (1)
 
+// void setup_mcu_databus_read() {
+// 	uint sm = MCU1_DATABUS_READ_SM;
+// 	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
+// 	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
+
+// 	// We want to input on pins 0-7
+// 	sm_config_set_in_pins(&c, 0);
+// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_WRITE_PIN, 1);
+
+// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x8000000, 0x80000FF);
+
+// 	pio_sm_init(pio0, sm, offset, &c);
+// }
+
+// void setup_mcu_databus_write() {
+// 	uint sm = MCU1_DATABUS_WRITE_SM;
+// 	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
+// 	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
+
+// 	sm_config_set_out_pins(&c, 0, 8);
+// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 1);
+// 	// We want to output on pins 0-7 on the set pin
+// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x40000FF, 0x40000FF);
+
+// 	pio_sm_init(pio0, sm, offset, &c);
+// }
+
 void setup_mcu_databus_read() {
 	uint sm = MCU1_DATABUS_READ_SM;
 	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
@@ -183,7 +210,7 @@ void setup_mcu_databus_read() {
 
 	// We want to input on pins 0-7
 	sm_config_set_in_pins(&c, 0);
-	sm_config_set_set_pins(&c, MCU1_PIN_MUX_READ_STOBE_PIN, 1);
+	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
 
 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x8000000, 0x80000FF);
 
@@ -196,7 +223,7 @@ void setup_mcu_databus_write() {
 	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
 
 	sm_config_set_out_pins(&c, 0, 8);
-	sm_config_set_set_pins(&c, MCU1_PIN_MUX_WRITE_STOBE_PIN, 1);
+	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
 	// We want to output on pins 0-7 on the set pin
 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x40000FF, 0x40000FF);
 
@@ -208,11 +235,11 @@ void setup_mcu_databus() {
 		pio_gpio_init(pio0, i);
 	}
 
-	pio_gpio_init(pio0, MCU1_PIN_MUX_READ_STOBE_PIN);
-	pio_gpio_init(pio0, MCU1_PIN_MUX_WRITE_STOBE_PIN);
+	pio_gpio_init(pio0, MCU_DATABUS_DEVICE_SIGNAL_PIN);
+	pio_gpio_init(pio0, MCU_DATABUS_DEVICE_WRITE_PIN);
 
 	setup_mcu_databus_read();
-	setup_mcu_databus_write();
+	// setup_mcu_databus_write();
 
 // Turn both programs on
 	pio_sm_set_enabled(pio0, 0, true);
@@ -232,18 +259,6 @@ int main(void) {
 	stdio_uart_init_full(uart0, DEBUG_UART_BAUD_RATE, 28, -1);
 
 	printf("Clock of %uMhz was set: %u\n", freq_khz / 1000, clockWasSet);
-
-	// Setup the Mux select line
-	// gpio_init(MCU1_PIN_MUX_SELECT);
-	// gpio_set_dir(MCU1_PIN_MUX_SELECT, true);
-	// gpio_set_pulls(MCU1_PIN_MUX_SELECT, false, true); // enable pull down to default to control lines
-
-	// TODO Reestablish uart comms with mcu2
-	// pio_uart_init(MCU1_PIN_PIO_COMMS_D0, MCU1_PIN_PIO_COMMS_D1);
-
-	// TODO Revist how these pio programs are being used and if we still want them
-	// setup_sega_pio_programs();
-
 	printf("MCU1- Init pins...\n");
 
 	// init the control pins (7 pins)
@@ -255,46 +270,11 @@ int main(void) {
 	gpio_init(MCU1_PIN_IORDY);
 	gpio_set_dir(MCU1_PIN_IORDY, true);
 
-	gpio_init(MCU1_PIN_MUX_READ_STOBE_PIN);
-	gpio_set_dir(MCU1_PIN_MUX_READ_STOBE_PIN, true);
-
-	gpio_init(MCU1_PIN_MUX_WRITE_STOBE_PIN);
-	gpio_set_dir(MCU1_PIN_MUX_WRITE_STOBE_PIN, true);
-
 	// Init the pio programs to read/write mcu databus
 	setup_mcu_databus();
 
 	multicore_launch_core1(second_core_main);
 
-	// MUX LOW  = CONTROL lines
-	// MUX HIGH = DATA lines
-
-	//invalid address
-	//00xxx = 0; cs0 & cs1 are both low; cs0 == 0 && cs1 == 0
-	//!!!READ and WRITE are also active low!!!!
-
-	//Data bus high impedance
-	//11xxx = 0x18
-	//010xx = 0x8
-	//0110x = 0xC
-	const uint32_t databus_high_imped0 = 0x8;
-	const uint32_t databus_high_imped1 = 0xC;
-	/* INVALID VALUES
-	 * cs1, cs0, a2, a1, a0 | CS0-Assert, CS1-Assert, a2-0 : when looking at the table in the pdf,
-	 		you can use the values as is without swapping them because an "A" in the table is 0v
-	 *
-	 * For completness and sanity:
-	 * 11xxx = 11000, 11001, 11010, 11011, 11100, 11101, 11110, 11111
-	 * 010xx = 01000, 01001, 01010, 01011
-	 * 0110x = 01100, 01101
-	 *
-	 * Hex:
-	 * 11xxx = 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F
-	 * 010xx = 0x8, 0x9, 0xA, 0xB
-	 * 0110x = 0xC, 0xD
-	 *
-	 * 0x8, 0x9, 0xA, 0xB, 0xC, 0xD, 0xF?[0xF isn't mentioned in the table???]
-	*/
 	volatile uint32_t pins = 0;
 
 	printf("Setting up register map...");

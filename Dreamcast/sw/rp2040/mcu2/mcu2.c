@@ -67,6 +67,27 @@ void setup_send_to_dreamcast() {
 	pio_sm_init(pio0, sm, offset, &c);
 }
 
+void setup_read_write_combined_program() {
+	uint sm = 0;
+	uint offset = pio_add_program(pio0, &mcu_databus_read_write_program);
+	pio_sm_config c = mcu_databus_read_write_program_get_default_config(offset);
+
+	// Input pins start at pin 0
+	sm_config_set_in_pins(&c, 0);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 24);
+	
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x0000FFFF, 0x00FFFFFF);
+
+	// SET JMP PIN!!!!!!!!!!!!!
+	sm_config_set_jmp_pin(&c, 27);
+	
+	sm_config_set_in_shift(&c, false, false, 8);
+
+	pio_sm_init(pio0, sm, offset, &c);
+}
+
 void setup_interconnect() {
 
 	// init all the pins used by pio
@@ -74,25 +95,33 @@ void setup_interconnect() {
 		pio_gpio_init(pio0, i);
 	}
 
-	setup_interconnect_read_from_dreamcast();
-	setup_send_to_dreamcast();
+	pio_gpio_init(pio0, 27);
+
+	setup_read_write_combined_program();
+	pio_sm_set_enabled(pio0, 0, true);
+
+	// setup_interconnect_read_from_dreamcast();
+	// setup_send_to_dreamcast();
+
+	// pio_sm_set_enabled(pio0, 0, true);
+	// pio_sm_set_enabled(pio0, 1, true);
 }
 
 // When interconnect is output(output to dreamcast), OUTPUT data from mcu TO BUS
 // When interconnect is input (input from dreamcast), OUTPUT data from bus TO MCU
 volatile bool read_from_dreamcast = false;
 
-static inline void swap_direction() {
-	// if (read_from_dreamcast) {
-	// 	pio1->ctrl = 0x33; // read from dreamcast
-	// } else {
-	// 	pio1->ctrl = 0x44; // send to dreamcast
-	// }
-	// pio_restart_sm_mask(pio1, 0x3);
+// static inline void swap_direction() {
+// 	// if (read_from_dreamcast) {
+// 	// 	pio1->ctrl = 0x33; // read from dreamcast
+// 	// } else {
+// 	// 	pio1->ctrl = 0x44; // send to dreamcast
+// 	// }
+// 	// pio_restart_sm_mask(pio1, 0x3);
 
-	pio_sm_set_enabled(pio0, 0, true);
-	pio_sm_set_enabled(pio0, 1, true);
-}
+// 	pio_sm_set_enabled(pio0, 0, true);
+// 	pio_sm_set_enabled(pio0, 1, true);
+// }
 
 int main(void) {
 	stdio_init_all();
@@ -124,7 +153,7 @@ int main(void) {
 	gpio_set_dir(INTERCONNECT_IRQ_HIGH_PIN, GPIO_IN);
 
 	setup_interconnect();
-	swap_direction();
+	// swap_direction();
 	volatile uint32_t pins = 0;
 
 	while(1) {

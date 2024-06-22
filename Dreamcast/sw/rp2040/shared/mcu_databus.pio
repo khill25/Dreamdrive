@@ -3,7 +3,7 @@ get_data:
     pull ; wait for data from c
 send_first_byte:
     out pins, 8 ; write out first byte
-    set pins, 1 [5] ; stobe to start write and give time to other mcu to read
+    set pins, 1 [15] ; stobe to start write and give time to other mcu to read
     set pins, 0 ; strobe to end write
 send_second_byte:
     out pins, 8 ; write out second byte
@@ -15,7 +15,7 @@ send_second_byte:
 wait_for_start_signal:
     pull ; wait for ready signal
 get_first_byte:
-    set pins, 1 [7] ;; stobe and wait a few cycles for data to be ready
+    set pins, 1 [15] ;; stobe and wait a few cycles for data to be ready
     in pins, 8 ; read data
     set pins, 0; end strobe
 get_second_byte:
@@ -26,23 +26,37 @@ push_to_c:
     push ; send data back to c code
 .wrap
 
-.program mcu_databus_flipper
-    ; wait 1 gpio 27
-    ; mov osr, ~null
-    ; out pindirs, 16 ; osr = 0x0000ffff
-    ; wait 0 gpio 27
-    ; wait 1 gpio 27
-    ; mov osr, ~osr ; osr = 0xffff0000
-    ; out pindirs, 32 ; osr = 0xffff0000
-    ; wait 0 gpio 27
+; .program mcu_databus_write
+;     pull
+;     set pins, 0b11 [7] ;; drive pin 27, 26 high
+;     set pins, 0b01 [1] ;; drive pin 27 low
+;     ;; device should be ready to read
+    
+;     ;; set out first byte and tell device to read
+;     out pins, 8
+;     set pins, 0b11 [3]
 
-    wait 1 gpio 27
-    mov osr, ~null
-    out x, 16
-    mov osr, ~osr
-    wait 0 gpio 27
-    wait 1 gpio 27
-    mov osr, ~osr ; osr = 0xffff0000
-    out pindirs, 32 ; osr = 0xffff0000
-    wait 0 gpio 27
-.wrap
+;     ;; send second byte by ticking "clock" pin low
+;     ;; and let device send data out to dreamcast 
+;     out pins, 8
+;     set pins, 0b01 [3]
+
+;     ;; let program wait for next command
+;     set pins, 0b00 
+
+; .wrap
+
+; .program mcu_databus_read
+;     pull ;; wait for ready signal from C
+;     set pins, 0b01 [7] ;; tell device to send data
+    
+;     set pins, 0b11 [3] ;; give device a few cycles to grab data and put it on the lines
+;     in pins, 8 ;; read first byte
+    
+;     set pins, 0b01 [3] ;; tell device to send second byte
+;     in pins, 8 ;; read first byte
+
+;     set pins, 0b00 ;; let device know we are done
+
+;     push ;; send data back to C
+; .wrap

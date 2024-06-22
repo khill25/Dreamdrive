@@ -57,10 +57,12 @@
 #define MCU1_PIN_SD_D2              (25)
 #define MCU1_PIN_SD_D3              (26)
 
-// Mux select, LOW = D0-4, HIGH = Control lines
-// #define MCU1_PIN_MUX_SELECT         (27)
-#define MCU1_PIN_MUX_READ_STOBE_PIN (27) // read from dreamcast
-#define MCU1_PIN_MUX_WRITE_STOBE_PIN (26) // write to dreamcast
+// gpio 26 is used to tell other rp2040 that we want to 
+// read/write to the dreamcast
+// gpio 27 is used in conjuction with 26 when we are strobing
+// data in and out of the pins
+#define MCU_DATABUS_DEVICE_SIGNAL_PIN (26)
+#define MCU_DATABUS_DEVICE_WRITE_PIN  (27)
 
 // UART comms to MCU2
 #define MCU1_PIN_PIO_COMMS_D0       (28) // RX
