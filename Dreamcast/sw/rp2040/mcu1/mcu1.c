@@ -175,7 +175,6 @@ volatile uint32_t writtenRegisterIndex = 0;
 
 #define MCU1_DATABUS_READ_SM (0)
 #define MCU1_DATABUS_WRITE_SM (1)
-#define MCU1_DATABUS_READ_WRITE_SM (0)
 
 // void setup_mcu_databus_read() {
 // 	uint sm = MCU1_DATABUS_READ_SM;
@@ -204,46 +203,46 @@ volatile uint32_t writtenRegisterIndex = 0;
 // 	pio_sm_init(pio0, sm, offset, &c);
 // }
 
-// void setup_mcu_databus_read() {
-// 	uint sm = MCU1_DATABUS_READ_SM;
-// 	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
-// 	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
+void setup_mcu_databus_read() {
+	uint sm = MCU1_DATABUS_READ_SM;
+	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
+	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
 
-// 	// We want to input on pins 0-7
-// 	sm_config_set_in_pins(&c, 0);
-// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
-
-// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x8000000, 0x80000FF);
-
-// 	pio_sm_init(pio0, sm, offset, &c);
-// }
-
-// void setup_mcu_databus_write() {
-// 	uint sm = MCU1_DATABUS_WRITE_SM;
-// 	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
-// 	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
-
-// 	sm_config_set_out_pins(&c, 0, 8);
-// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
-// 	// We want to output on pins 0-7 on the set pin
-// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x40000FF, 0x40000FF);
-
-// 	pio_sm_init(pio0, sm, offset, &c);
-// }
-
-void setup_mcu_databus_read_write() {
-	uint sm = MCU1_DATABUS_READ_WRITE_SM;
-	uint offset = pio_add_program(pio0, &mcu_databus_read_write_program);
-	pio_sm_config c = mcu_databus_read_write_program_get_default_config(offset);
-
+	// We want to input on pins 0-7
 	sm_config_set_in_pins(&c, 0);
-	sm_config_set_out_pins(&c, 0, 8);
-	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
-	// Set to all input 
+	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 1);
+
 	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
 
 	pio_sm_init(pio0, sm, offset, &c);
 }
+
+void setup_mcu_databus_write() {
+	uint sm = MCU1_DATABUS_WRITE_SM;
+	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
+	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
+
+	sm_config_set_out_pins(&c, 0, 8);
+	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_WRITE_PIN, 1);
+	// We want to output on pins 0-7 on the set pin
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
+
+	pio_sm_init(pio0, sm, offset, &c);
+}
+
+// void setup_mcu_databus_read_write() {
+// 	uint sm = MCU1_DATABUS_READ_WRITE_SM;
+// 	uint offset = pio_add_program(pio0, &mcu_databus_read_write_program);
+// 	pio_sm_config c = mcu_databus_read_write_program_get_default_config(offset);
+
+// 	sm_config_set_in_pins(&c, 0);
+// 	sm_config_set_out_pins(&c, 0, 8);
+// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
+// 	// Set to all input 
+// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
+
+// 	pio_sm_init(pio0, sm, offset, &c);
+// }
 
 
 void setup_mcu_databus() {
@@ -254,9 +253,11 @@ void setup_mcu_databus() {
 	pio_gpio_init(pio0, MCU_DATABUS_DEVICE_SIGNAL_PIN);
 	pio_gpio_init(pio0, MCU_DATABUS_DEVICE_WRITE_PIN);
 
-	setup_mcu_databus_read_write();
+	setup_mcu_databus_read();
+	setup_mcu_databus_write();
 
 	pio_sm_set_enabled(pio0, 0, true);
+	pio_sm_set_enabled(pio0, 1, true);
 }
 
 int main(void) {
@@ -282,6 +283,12 @@ int main(void) {
 
 	gpio_init(MCU1_PIN_IORDY);
 	gpio_set_dir(MCU1_PIN_IORDY, true);
+
+	gpio_init(MCU_DATABUS_DEVICE_SIGNAL_PIN);
+	gpio_set_dir(MCU_DATABUS_DEVICE_SIGNAL_PIN, true);
+
+	gpio_init(MCU_DATABUS_DEVICE_WRITE_PIN);
+	gpio_set_dir(MCU_DATABUS_DEVICE_WRITE_PIN, true);
 
 	// Init the pio programs to read/write mcu databus
 	setup_mcu_databus();
@@ -346,6 +353,19 @@ int main(void) {
 	// 	last_csMask = (pins & cs_mask);
 	// }
 
+	// volatile uint32_t testValue = 0;
+	// while(1) {
+	// 	// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, 1); // signal pio we are writing to the bus	
+	// 	// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, testValue); // send register data to dreamcsat
+
+	// 	// busy_wait_us(10);
+
+	// 	pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_SM, 0); // Signal pio we are reading bus
+	// 	testValue = pio_sm_get_blocking(pio0, MCU1_DATABUS_READ_SM); // read 16bits
+
+	// 	busy_wait_us(10);
+	// }
+
 	while(!gpio_get(MCU1_PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
 	printf("Dreamcast booted!\n");
@@ -389,10 +409,10 @@ int main(void) {
 		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 		writtenRegisters[writtenRegisterIndex++] = register_index;
 
-		// READ - SEND data to dreamcast
+		// Write data to dreamcast
 		if (readWriteLineValues == 0x4000) {				
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_WRITE_SM, 1); // signal pio we are writing to the bus	
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_WRITE_SM, *selectedRegister); // send register data to dreamcsat
+			pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, 1); // signal pio we are writing to the bus	
+			pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, *selectedRegister); // send register data to dreamcsat
 			
 			gpio_put(MCU1_PIN_IORDY, 1);
 			// wait for latch?
@@ -400,10 +420,10 @@ int main(void) {
 
 			gpio_put(MCU1_PIN_IORDY, 0);
 
-		// WRITE - GET data from dreamcast into register
+		// Read data from dreamcast into register
 		} else {
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_WRITE_SM, 0); // Signal pio we are reading bus
-			pins = pio_sm_get_blocking(pio0, MCU1_DATABUS_READ_WRITE_SM); // read 16bits
+			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_SM, 0); // Signal pio we are reading bus
+			pins = pio_sm_get_blocking(pio0, MCU1_DATABUS_READ_SM); // read 16bits
 			writtenRegisters[writtenRegisterIndex++] = pins;
 			
 			multicore_fifo_push_blocking(register_index);										// 24ns (6 cycles)

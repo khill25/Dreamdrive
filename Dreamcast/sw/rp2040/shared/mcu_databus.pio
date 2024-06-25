@@ -1,117 +1,89 @@
 .program mcu_databus_write
+    mov osr, null ; osr = 0x00000000
+    out pindirs, 8 ; pindirs input
+wait_for_start_signal:
+    pull ; wait for start signal
+    mov osr, ~null ; osr = 0xffffffff
+    out pindirs, 8 ; osr = 0x0000ffff, pindirs output
+    
+    set pins, 1 [3] ;
+    set pins, 0 [1]
+
 get_data:
-    pull ; wait for data from c
+    pull
 send_first_byte:
     out pins, 8 ; write out first byte
-    set pins, 1 [15] ; stobe to start write and give time to other mcu to read
-    set pins, 0 ; strobe to end write
+    set pins, 1 [3] ; stobe to start write and give time to other mcu to read
+    set pins, 0 [1]; strobe to end write
 send_second_byte:
     out pins, 8 ; write out second byte
-    set pins, 1 [5]; stobe to start write and give other mcu time to read
-    set pins, 0 ; end strobe
+    set pins, 1 [3]; stobe to start write and give other mcu time to read
+    set pins, 0 [1]; end strobe
 .wrap
 
 .program mcu_databus_read
 wait_for_start_signal:
     pull ; wait for ready signal
+    mov osr, null ; osr = 0x00000000
+    out pindirs, 8 ; pindirs input
+
+    set pins, 1 [7] ; strobe to let other mcu know we are ready
+    set pins, 0 [1] ; end strobe
 get_first_byte:
-    set pins, 1 [15] ;; stobe and wait a few cycles for data to be ready
+    set pins, 1 [3] ;; stobe and wait a few cycles for data to be ready
     in pins, 8 ; read data
-    set pins, 0; end strobe
+    set pins, 0 [1]; end strobe
 get_second_byte:
-    set pins, 1 [7] ;strobe and wait a few cycles for data to be ready
+    set pins, 1 [3] ;strobe and wait a few cycles for data to be ready
     in pins, 8 ; read data
-    set pins, 0 ; end strobe
+    set pins, 0 [1] ; end strobe
 push_to_c:
     push ; send data back to c code
 .wrap
 
 ; .program mcu_databus_read_write
-; wait_for_c:
-;     pull
-;     mov x, osr
-;     jmp x--, write_bus
-
-; read_bus:
-;     mov osr, null ; osr = 0x00000000
-;     out pindirs, 8 ; pindirs input
-;     set pins, 0b01 [7] ; tell other mcu to send data
-; get_first_byte:
-;     set pins, 0b10 [2]
-;     in pins, 8; read data
-; get_second_byte:
-;     set pins, 0b00
-;     in pins, 8; read data
-; push_to_c:
-;     push ; send data back to c code
-;     jmp wait_for_c
-
-; write_bus:
-; ;; flip pins to output
-;     mov osr, ~null ; osr = 0xffffffff
-;     out pindirs, 8 ; osr = 0x0000ffff, pindirs output
-; ; wait for data from c
-;     pull 
-;     set pins, 0b11; tell other mcu we are ready and writing
-; send_first_byte:
-;     set pins, 0b00 [1]
-;     out pins, 8 [3] ; write out first byte
-;     set pins, 0b10 [1]
-;     set pins, 0b00 ; strobe to end write
-; send_second_byte:
-;     out pins, 8 ; write out second byte
-;     set pins, 1 [5]; stobe to start write and give other mcu time to read
-;     set pins, 0 ; end strobe
-
-; ;; Set the pins back to input so we aren't driving the bus at the same time as the mux
 ; set_pins_to_input:
 ;     mov osr, null ; osr = 0x00000000
 ;     out pindirs, 8 ; pindirs input
+
+; wait_for_c:
+;     pull
+;     mov x, osr
+;     jmp x--, set_pins_to_output
+
+; ;; read 16 bits
+; read_bus:
+;     set pins, 0b01
+;     in pins, 8
+;     set pins, 0b00
+;     set pins, 0b01
+;     in pins, 8
+;     set pins, 0b00
+;     push
+;     jmp wait_for_c
+
+; set_pins_to_output:
+;     mov osr, ~null ; osr = 0xffffffff
+;     out pindirs, 8 ; osr = 0x0000ffff, pindirs output
+
+;     ;; push 16 bits
+; write_bus:
+;     pull
+;     ;; give mcu enough time to change pindirs to read from 8bit bus
+;     set pins, 0b11  [4] ;; tell mcu to read from 8bit bus
+;     set pins, 0b10      ;; signal we are going to start the write strobes
+
+;     set pins, 0b01  ;; signal we are going to send data 
+;     out pins, 8     [1]
+;     set pins, 0b00
+
+;     set pins, 0b01  
+;     out pins, 8     [1]
+;     set pins, 0b00
+;     set pins, 0b01
+;     wait 1 gpio 14
+;     set pins, 0b00
 ; .wrap
-
-.program mcu_databus_read_write
-set_pins_to_input:
-    mov osr, null ; osr = 0x00000000
-    out pindirs, 8 ; pindirs input
-
-wait_for_c:
-    pull
-    mov x, osr
-    jmp x--, set_pins_to_output
-
-;; read 16 bits
-read_bus:
-    set pins, 0b01
-    in pins, 8
-    set pins, 0b00
-    set pins, 0b01
-    in pins, 8
-    set pins, 0b00
-    push
-    jmp wait_for_c
-
-set_pins_to_output:
-    mov osr, ~null ; osr = 0xffffffff
-    out pindirs, 8 ; osr = 0x0000ffff, pindirs output
-
-    ;; push 16 bits
-write_bus:
-    pull
-    ;; give mcu enough time to change pindirs to read from 8bit bus
-    set pins, 0b11  [4] ;; tell mcu to read from 8bit bus
-    set pins, 0b10      ;; signal we are going to start the write strobes
-
-    set pins, 0b01  ;; signal we are going to send data 
-    out pins, 8     [1]
-    set pins, 0b00
-
-    set pins, 0b01  
-    out pins, 8     [1]
-    set pins, 0b00
-    set pins, 0b01
-    wait 1 gpio 14
-    set pins, 0b00
-.wrap
 
 ; .program mcu_databus_write
 ;     pull
