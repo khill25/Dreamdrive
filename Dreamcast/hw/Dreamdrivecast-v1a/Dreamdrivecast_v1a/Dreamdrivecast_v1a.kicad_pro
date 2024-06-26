@@ -34,9 +34,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.8,
+          "drill": 0.0,
           "height": 1.6,
-          "width": 1.6
+          "width": 2.18
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -56,17 +56,7 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [
-        "lib_footprint_issues|101320600|73594400|97db2638-f5cd-4880-afe4-1753f96c9083|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_issues|125780800|73594400|8c355e44-ccd5-4ea1-9874-4be38c57ba93|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_issues|141985237|156739511|61701420-1b97-4b47-ba5e-d24390f91fa3|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_issues|73957058|153898600|c430643f-f7f3-45af-8c19-cf9d4fa42232|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_issues|78994000|161163000|f59cc6bc-968a-4f76-aae6-674f226461da|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_mismatch|116332000|108458000|389d71a7-606f-4dde-9771-198c501bb34d|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_mismatch|116332000|140970000|93f7f49a-0484-4e8c-9cb3-3f1a0f2c9ad3|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_mismatch|146379637|137031730|d01bc46c-dfc0-4303-91d8-ff2b876e1e4f|00000000-0000-0000-0000-000000000000",
-        "lib_footprint_mismatch|90297000|130429000|39518580-52a6-4024-9481-07e3ee738bbf|00000000-0000-0000-0000-000000000000"
-      ],
+      "drc_exclusions": [],
       "meta": {
         "version": 2
       },
@@ -437,7 +427,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "Dreamdrivecast_v1aa.kicad_pro",
+    "filename": "Dreamdrivecast_v1a.kicad_pro",
     "version": 1
   },
   "net_settings": {
