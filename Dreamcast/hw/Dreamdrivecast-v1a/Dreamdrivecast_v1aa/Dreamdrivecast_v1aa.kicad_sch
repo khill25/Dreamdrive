@@ -1747,6 +1747,71 @@
         )
       )
     )
+    (symbol "Device:D_Schottky" (pin_numbers hide) (pin_names (offset 1.016) hide) (in_bom yes) (on_board yes)
+      (property "Reference" "D" (at 0 2.54 0)
+        (effects (font (size 1.27 1.27)))
+      )
+      (property "Value" "D_Schottky" (at 0 -2.54 0)
+        (effects (font (size 1.27 1.27)))
+      )
+      (property "Footprint" "" (at 0 0 0)
+        (effects (font (size 1.27 1.27)) hide)
+      )
+      (property "Datasheet" "~" (at 0 0 0)
+        (effects (font (size 1.27 1.27)) hide)
+      )
+      (property "ki_keywords" "diode Schottky" (at 0 0 0)
+        (effects (font (size 1.27 1.27)) hide)
+      )
+      (property "ki_description" "Schottky diode" (at 0 0 0)
+        (effects (font (size 1.27 1.27)) hide)
+      )
+      (property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*" (at 0 0 0)
+        (effects (font (size 1.27 1.27)) hide)
+      )
+      (symbol "D_Schottky_0_1"
+        (polyline
+          (pts
+            (xy 1.27 0)
+            (xy -1.27 0)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy 1.27 1.27)
+            (xy 1.27 -1.27)
+            (xy -1.27 0)
+            (xy 1.27 1.27)
+          )
+          (stroke (width 0.254) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -1.905 0.635)
+            (xy -1.905 1.27)
+            (xy -1.27 1.27)
+            (xy -1.27 -1.27)
+            (xy -0.635 -1.27)
+            (xy -0.635 -0.635)
+          )
+          (stroke (width 0.254) (type default))
+          (fill (type none))
+        )
+      )
+      (symbol "D_Schottky_1_1"
+        (pin passive line (at -3.81 0 0) (length 2.54)
+          (name "K" (effects (font (size 1.27 1.27))))
+          (number "1" (effects (font (size 1.27 1.27))))
+        )
+        (pin passive line (at 3.81 0 180) (length 2.54)
+          (name "A" (effects (font (size 1.27 1.27))))
+          (number "2" (effects (font (size 1.27 1.27))))
+        )
+      )
+    )
     (symbol "Device:Polyfuse_Small" (pin_numbers hide) (pin_names (offset 0)) (in_bom yes) (on_board yes)
       (property "Reference" "F" (at -1.905 0 90)
         (effects (font (size 1.27 1.27)))
@@ -3363,6 +3428,9 @@
   (junction (at 90.17 106.68) (diameter 0) (color 0 0 0 0)
     (uuid ec3c0a53-fe9e-4b67-9f52-156c6a36f153)
   )
+  (junction (at 83.82 162.56) (diameter 0) (color 0 0 0 0)
+    (uuid ed74f367-b19a-44e5-9a6f-b5842c831fe3)
+  )
   (junction (at 138.43 453.39) (diameter 0) (color 0 0 0 0)
     (uuid eebd02a0-47a1-4f5e-bde3-237626d4567a)
   )
@@ -3374,9 +3442,6 @@
   )
   (junction (at 142.24 215.9) (diameter 0) (color 0 0 0 0)
     (uuid f2f7e00d-9b4f-4c72-9498-5c8c7cad843d)
-  )
-  (junction (at 121.92 335.28) (diameter 0) (color 0 0 0 0)
-    (uuid f6c46385-1bf5-4d0a-89d4-6bf6fe10331d)
   )
   (junction (at 120.65 453.39) (diameter 0) (color 0 0 0 0)
     (uuid f7a57352-2672-4e27-bd8e-760c51fc6c36)
@@ -3435,10 +3500,6 @@
   (polyline (pts (xy 29.21 36.83) (xy 63.5 36.83))
     (stroke (width 0) (type default))
     (uuid 0624c2a9-3df6-4089-bc31-afaf909092d8)
-  )
-  (polyline (pts (xy 106.68 325.12) (xy 106.68 342.9))
-    (stroke (width 0) (type default))
-    (uuid 063f4a1a-268e-401c-871c-c7dc389cc251)
   )
 
   (wire (pts (xy 161.29 259.08) (xy 167.64 259.08))
@@ -3841,6 +3902,10 @@
     (stroke (width 0) (type default))
     (uuid 37e46f18-7254-4560-a2c2-82c6e954d0ec)
   )
+  (wire (pts (xy 91.44 162.56) (xy 95.25 162.56))
+    (stroke (width 0) (type default))
+    (uuid 3863b548-eb09-4a23-b05c-2c10ffd2ea62)
+  )
   (wire (pts (xy 100.33 410.21) (xy 104.14 410.21))
     (stroke (width 0) (type default))
     (uuid 3951b5f3-346d-4654-b15d-8fc8082525b9)
@@ -3897,10 +3962,6 @@
   (wire (pts (xy 100.33 491.49) (xy 104.14 491.49))
     (stroke (width 0) (type default))
     (uuid 3f11bd36-61f3-4a36-9e86-ccec5495fe42)
-  )
-  (wire (pts (xy 114.3 335.28) (xy 121.92 335.28))
-    (stroke (width 0) (type default))
-    (uuid 3f1618fd-130f-4222-8508-be69afd3924b)
   )
   (wire (pts (xy 262.89 144.78) (xy 266.7 144.78))
     (stroke (width 0) (type default))
@@ -4443,11 +4504,6 @@
     (stroke (width 0) (type default))
     (uuid 84e3f57a-e798-4651-acac-0e881905ca21)
   )
-  (polyline (pts (xy 137.16 342.9) (xy 137.16 325.12))
-    (stroke (width 0) (type default))
-    (uuid 851b3dad-dc36-4beb-8fe6-b4442a4465cb)
-  )
-
   (wire (pts (xy 138.43 473.71) (xy 138.43 476.25))
     (stroke (width 0) (type default))
     (uuid 857ce4c0-6121-4750-bb15-2f7c7da837bf)
@@ -4494,11 +4550,6 @@
     (stroke (width 0) (type default))
     (uuid 8ba63ab7-1844-4ed2-9ba5-42df3869998e)
   )
-  (polyline (pts (xy 106.68 342.9) (xy 125.73 342.9))
-    (stroke (width 0) (type default))
-    (uuid 8c5c349a-9dd5-4eb4-96d5-102315b39385)
-  )
-
   (wire (pts (xy 161.29 111.76) (xy 165.1 111.76))
     (stroke (width 0) (type default))
     (uuid 8d173458-db72-41db-94bf-ebb136f4e33e)
@@ -4528,11 +4579,6 @@
     (stroke (width 0) (type default))
     (uuid 90b51fcc-edd7-45a6-8a56-772084641362)
   )
-  (polyline (pts (xy 125.73 342.9) (xy 137.16 342.9))
-    (stroke (width 0) (type default))
-    (uuid 91569d02-08d9-4764-93cd-4c06df553f88)
-  )
-
   (wire (pts (xy 261.62 241.3) (xy 270.51 241.3))
     (stroke (width 0) (type default))
     (uuid 91968e0e-741d-43bb-9071-68d8ec7210da)
@@ -4590,6 +4636,10 @@
   (wire (pts (xy 116.84 415.29) (xy 120.65 415.29))
     (stroke (width 0) (type default))
     (uuid 97cb042a-40b7-468d-a457-974addf3cd2c)
+  )
+  (wire (pts (xy 81.28 162.56) (xy 83.82 162.56))
+    (stroke (width 0) (type default))
+    (uuid 98b3ad9e-12af-46bd-97d3-2624510fbdb9)
   )
   (wire (pts (xy 100.33 412.75) (xy 104.14 412.75))
     (stroke (width 0) (type default))
@@ -5010,10 +5060,6 @@
     (stroke (width 0) (type default))
     (uuid c302bc1c-2e6f-4b4c-b8bd-85d53713e644)
   )
-  (wire (pts (xy 121.92 335.28) (xy 129.54 335.28))
-    (stroke (width 0) (type default))
-    (uuid c3f46ef0-7dc1-4f1e-b6c4-f4e89fc8c9a4)
-  )
   (wire (pts (xy 138.43 450.85) (xy 138.43 453.39))
     (stroke (width 0) (type default))
     (uuid c4b7a914-1e6c-43b1-aea8-aeec48cac0c1)
@@ -5070,6 +5116,10 @@
   (wire (pts (xy 100.33 494.03) (xy 104.14 494.03))
     (stroke (width 0) (type default))
     (uuid c9665763-7459-4030-9ec6-ade674d43729)
+  )
+  (wire (pts (xy 90.17 166.37) (xy 83.82 166.37))
+    (stroke (width 0) (type default))
+    (uuid c9cf4775-7f42-486a-b8bb-25f6bd842613)
   )
   (wire (pts (xy 100.33 405.13) (xy 104.14 405.13))
     (stroke (width 0) (type default))
@@ -5273,6 +5323,10 @@
     (stroke (width 0) (type default))
     (uuid e158e1aa-2388-4155-918c-3b8b6e6e4c7e)
   )
+  (wire (pts (xy 90.17 172.72) (xy 90.17 166.37))
+    (stroke (width 0) (type default))
+    (uuid e1f5ed98-d130-4032-89b8-b96a3e2454d6)
+  )
   (wire (pts (xy 100.33 488.95) (xy 104.14 488.95))
     (stroke (width 0) (type default))
     (uuid e266cdec-4bb9-4f00-9ea0-955e76f629d9)
@@ -5280,10 +5334,6 @@
   (wire (pts (xy 161.29 106.68) (xy 165.1 106.68))
     (stroke (width 0) (type default))
     (uuid e2d1c6a7-94c1-4d4f-99a4-73161940daeb)
-  )
-  (wire (pts (xy 129.54 335.28) (xy 129.54 332.74))
-    (stroke (width 0) (type default))
-    (uuid e2d38d5d-ee20-4d29-a53e-4ad7ea970d9f)
   )
   (wire (pts (xy 261.62 274.32) (xy 274.32 274.32))
     (stroke (width 0) (type default))
@@ -5308,6 +5358,10 @@
   (wire (pts (xy 158.75 400.05) (xy 154.94 400.05))
     (stroke (width 0) (type default))
     (uuid e5fcab31-0ce8-4268-a961-6bcdc9d548cb)
+  )
+  (wire (pts (xy 83.82 166.37) (xy 83.82 162.56))
+    (stroke (width 0) (type default))
+    (uuid e66d8fa3-baba-449f-bf2e-b53874a9de38)
   )
   (wire (pts (xy 241.3 279.4) (xy 233.68 279.4))
     (stroke (width 0) (type default))
@@ -5403,10 +5457,6 @@
   (wire (pts (xy 161.29 254) (xy 167.64 254))
     (stroke (width 0) (type default))
     (uuid f23a1244-4a93-40c2-82e0-b27797e2a3c8)
-  )
-  (wire (pts (xy 114.3 332.74) (xy 114.3 335.28))
-    (stroke (width 0) (type default))
-    (uuid f45c0011-8c61-4679-8327-419627c309f3)
   )
   (wire (pts (xy 116.84 147.32) (xy 129.54 147.32))
     (stroke (width 0) (type default))
@@ -5667,10 +5717,6 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 8b999332-35a7-4125-b3f3-715a0dcdb6fd)
   )
-  (text "3.3V Linear Regulator\n$0.14 - SOT-223\nGood to 1A" (at 114.681 341.884 0)
-    (effects (font (size 1.27 1.27)) (justify left bottom))
-    (uuid 8f0a199e-d1ec-465e-8cb4-8f35047b8f2a)
-  )
   (text "MCU1 - Controller" (at 33.02 29.21 0)
     (effects (font (size 5.27 5.27) (thickness 1.054) bold) (justify left bottom))
     (uuid 97e286c8-8652-4cba-b5ad-bae60cf48741)
@@ -5869,10 +5915,6 @@
   (label "D9" (at 167.64 261.62 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid 27c78729-448e-4afb-a0a8-868bfb34f29f)
-  )
-  (label "VBUS" (at 40.64 417.83 180) (fields_autoplaced)
-    (effects (font (size 1.27 1.27)) (justify right bottom))
-    (uuid 27f371e4-431e-4661-9865-0321cf9a349b)
   )
   (label "DMACK" (at 158.75 412.75 0) (fields_autoplaced)
     (effects (font (size 1.524 1.524)) (justify left bottom))
@@ -6731,11 +6773,11 @@
       (effects (font (size 1.27 1.27)) hide)
     )
   )
-  (global_label "5V" (shape input) (at 114.3 327.66 180) (fields_autoplaced)
+  (global_label "VBUS" (shape input) (at 81.28 162.56 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
-    (uuid 4bd61771-7adb-426a-b08a-9ae4cc45bb30)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at -204.47 636.27 0)
-      (effects (font (size 1.27 1.27)) hide)
+    (uuid 57731d0a-fcbc-428e-b9ad-f4500313774a)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 73.3962 162.56 0)
+      (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
   (global_label "Dreamcast_12V" (shape input) (at 29.21 488.95 270) (fields_autoplaced)
@@ -6752,6 +6794,13 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
+  (global_label "5V" (shape input) (at 95.25 162.56 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid 5e986fd1-6c2c-4ab9-b078-df65e05a87a1)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 414.02 -146.05 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+  )
   (global_label "GND" (shape input) (at 57.15 55.88 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left))
     (uuid 62741da1-af61-4130-a532-a4a02af5aff2)
@@ -6764,13 +6813,6 @@
     (uuid 63356388-ef30-4ece-b9bc-bb0633d0eecd)
     (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 181.6923 231.14 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-  )
-  (global_label "5V" (shape input) (at 60.96 102.87 0) (fields_autoplaced)
-    (effects (font (size 1.27 1.27)) (justify left))
-    (uuid 6420d2ea-8ff0-4c39-954c-00ed3c0b37f0)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 379.73 -205.74 0)
-      (effects (font (size 1.27 1.27)) hide)
     )
   )
   (global_label "RP1_SD2" (shape input) (at 59.69 77.47 0) (fields_autoplaced)
@@ -6829,13 +6871,6 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
-  (global_label "5V" (shape input) (at 60.96 278.13 0) (fields_autoplaced)
-    (effects (font (size 1.27 1.27)) (justify left))
-    (uuid 862229e7-1232-4221-b5d3-45fdf1457eca)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 379.73 -30.48 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-  )
   (global_label "RP1_SD2" (shape input) (at 97.79 73.66 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid 87042f5c-326a-4619-a776-866d8fa84a51)
@@ -6876,13 +6911,6 @@
     (uuid 9554135f-145e-47c4-a93b-77d6ef532408)
     (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 67.3318 62.23 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-  )
-  (global_label "3.3V" (shape input) (at 129.54 327.66 0) (fields_autoplaced)
-    (effects (font (size 1.27 1.27)) (justify left))
-    (uuid 9566f23b-dd05-4888-8da8-37d5e545d124)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at -208.28 8.89 0)
-      (effects (font (size 1.27 1.27)) hide)
     )
   )
   (global_label "GND" (shape input) (at 50.8 351.79 270) (fields_autoplaced)
@@ -6990,6 +7018,13 @@
       (effects (font (size 1.27 1.27)) (justify left) hide)
     )
   )
+  (global_label "VBUS" (shape input) (at 55.88 102.87 0) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify left))
+    (uuid b97c9c01-78ad-496b-bffe-bf6e1efa4c8e)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 63.7638 102.87 0)
+      (effects (font (size 1.27 1.27)) (justify left) hide)
+    )
+  )
   (global_label "GND" (shape input) (at 233.68 300.99 180) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid bc0bdb3f-5ca6-414a-ba77-fb2eec7eb20c)
@@ -7023,13 +7058,6 @@
     (uuid c1cb3d2c-9bb3-4b16-a07e-5a9e2f2b5da1)
     (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 63.5 151.0477 90)
       (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-  )
-  (global_label "GND" (shape input) (at 114.3 335.28 180) (fields_autoplaced)
-    (effects (font (size 1.27 1.27)) (justify right))
-    (uuid c1feeca4-77e2-4446-a43d-524344dbc3d6)
-    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 438.15 0 0)
-      (effects (font (size 1.27 1.27)) hide)
     )
   )
   (global_label "RP2_SD3" (shape input) (at 59.69 255.27 0) (fields_autoplaced)
@@ -7072,6 +7100,13 @@
     (uuid e19affdc-29c9-4012-ac91-cf9530258a27)
     (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 71.2023 123.19 0)
       (effects (font (size 1.27 1.27)) (justify left) hide)
+    )
+  )
+  (global_label "VBUS" (shape input) (at 85.09 172.72 180) (fields_autoplaced)
+    (effects (font (size 1.27 1.27)) (justify right))
+    (uuid e3aee4e2-ea2e-4995-a24b-1e5a3dd4aeb7)
+    (property "Intersheetrefs" "${INTERSHEET_REFS}" (at 77.2062 172.72 0)
+      (effects (font (size 1.27 1.27)) (justify right) hide)
     )
   )
   (global_label "RP2_USB_D+" (shape input) (at 166.37 228.6 0) (fields_autoplaced)
@@ -7171,7 +7206,7 @@
           (reference "C3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C27") (unit 1)
         )
@@ -7210,7 +7245,7 @@
           (reference "C1002") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C15") (unit 1)
         )
@@ -7218,85 +7253,6 @@
       (project "Reference_RP2040"
         (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
           (reference "C1002") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "Regulator_Linear:AZ1117-3.3") (at 121.92 327.66 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no)
-    (uuid 0852ae0d-6cfa-4f34-906b-bff9bd0aa73e)
-    (property "Reference" "U1002" (at 109.22 337.82 0)
-      (effects (font (size 1.27 1.27)))
-    )
-    (property "Value" "AMS1117-3.3" (at 121.92 323.8246 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-223" (at 121.92 321.31 0)
-      (effects (font (size 1.27 1.27) italic) hide)
-    )
-    (property "Datasheet" "https://datasheet.lcsc.com/lcsc/2304140030_Advanced-Monolithic-Systems-AMS1117-3-3_C6186.pdf" (at 121.92 327.66 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "LCSC" "C6186" (at 121.92 327.66 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid 0c89259d-093a-426c-9806-01f93ea97e54))
-    (pin "2" (uuid fcb5a3d2-cf90-4f17-9a1a-04eb44090df0))
-    (pin "3" (uuid 60a62228-735c-4b93-bb9e-37d7be03249c))
-    (instances
-      (project "pc64"
-        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "U1002") (unit 1)
-        )
-      )
-      (project "Dreamdrivecast_v1a"
-        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
-          (reference "U5") (unit 1)
-        )
-      )
-      (project "Reference_RP2040"
-        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-          (reference "U1002") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "Device:C_Small") (at 114.3 330.2 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
-    (uuid 08c91d1f-fa9a-49c8-9948-d40621d34301)
-    (property "Reference" "C1001" (at 116.84 328.9362 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Value" "1uF" (at 116.84 331.4762 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Footprint" "Capacitor_SMD:C_0402_1005Metric" (at 114.3 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Datasheet" "~" (at 114.3 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "LCSC" "C52923" (at 114.3 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid 53c9e860-bb96-48e4-85b3-a5b88e86ae69))
-    (pin "2" (uuid b8dfd54f-480e-4c29-804e-5f4fbd5fab62))
-    (instances
-      (project "pc64"
-        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "C1001") (unit 1)
-        )
-      )
-      (project "Dreamdrivecast_v1a"
-        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
-          (reference "C29") (unit 1)
-        )
-      )
-      (project "Reference_RP2040"
-        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-          (reference "C1001") (unit 1)
         )
       )
     )
@@ -7331,7 +7287,7 @@
           (reference "C10") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C20") (unit 1)
         )
@@ -7425,7 +7381,7 @@
           (reference "U4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "MCU1") (unit 1)
         )
@@ -7519,7 +7475,7 @@
           (reference "U4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "MCU2") (unit 1)
         )
@@ -7558,7 +7514,7 @@
           (reference "RP_SW1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "RP_SW3") (unit 1)
         )
@@ -7600,7 +7556,7 @@
           (reference "C11") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C6") (unit 1)
         )
@@ -7631,19 +7587,19 @@
     (property "LCSC" "C3021103" (at 50.8 339.09 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid 500e7b38-b3d5-4cf2-a005-cca1af260a14))
-    (pin "2" (uuid 5c51112e-b240-41f5-bdcb-082a1cc77cc8))
-    (pin "3" (uuid 03e4604c-c7cf-41e5-8707-1a2d5314b0ce))
-    (pin "4" (uuid 7807a7d2-6bca-4541-9972-133db586b7a9))
-    (pin "5" (uuid 49ff2f31-0984-434d-a4e3-fc7716833803))
-    (pin "6" (uuid 37e5b736-c44a-4c8b-ae69-67097aa06e9b))
+    (pin "1" (uuid 3436ac9a-ac70-4ffb-9473-ebb7c6ff9d69))
+    (pin "2" (uuid c1e2bc1d-97ef-4470-b1e4-3a2e88df5954))
+    (pin "3" (uuid 8156a98f-ae98-42bc-bbc9-ae3b0ff5b542))
+    (pin "4" (uuid 73b68685-51e1-4d7e-948c-28617251a9a2))
+    (pin "5" (uuid 07067602-b6c1-4fb4-91a3-2ad41feb2b65))
+    (pin "6" (uuid 81be0c54-92bb-4077-8a65-9bee970fdccd))
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
           (reference "U1001") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "U6") (unit 1)
         )
@@ -7682,7 +7638,7 @@
           (reference "R2") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R5") (unit 1)
         )
@@ -7717,7 +7673,7 @@
           (reference "SWCLK1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "SWCLK2") (unit 1)
         )
@@ -7759,7 +7715,7 @@
           (reference "C14") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C24") (unit 1)
         )
@@ -7801,7 +7757,7 @@
           (reference "C8") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C4") (unit 1)
         )
@@ -7843,7 +7799,7 @@
           (reference "C13") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C8") (unit 1)
         )
@@ -7885,7 +7841,7 @@
           (reference "C9") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C11") (unit 1)
         )
@@ -7920,7 +7876,7 @@
           (reference "SWD1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "SWD2") (unit 1)
         )
@@ -7963,7 +7919,7 @@
           (reference "U1001") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "U3") (unit 1)
         )
@@ -8002,7 +7958,7 @@
           (reference "R1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R4") (unit 1)
         )
@@ -8010,6 +7966,45 @@
       (project "Reference_RP2040"
         (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
           (reference "R1") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "Device:Polyfuse_Small") (at 87.63 172.72 270) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no)
+    (uuid 35e2f31e-0e6c-4a31-96d9-cfbe81e08cb0)
+    (property "Reference" "F1" (at 87.63 170.18 90)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Value" "1.1A" (at 87.63 169.8244 90)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Footprint" "Fuse:Fuse_1206_3216Metric" (at 82.55 173.99 0)
+      (effects (font (size 1.27 1.27)) (justify left) hide)
+    )
+    (property "Datasheet" "~" (at 87.63 172.72 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "LCSC" "C2760273" (at 87.63 172.72 90)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid 54197441-4d12-4e81-9bea-f0446ef92858))
+    (pin "2" (uuid 4f8254c6-350e-44d5-8c75-f4f269a810a0))
+    (instances
+      (project "pc64"
+        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
+          (reference "F1") (unit 1)
+        )
+      )
+      (project "Dreamdrivecast_v1aa"
+        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
+          (reference "F1") (unit 1)
+        )
+      )
+      (project "Reference_RP2040"
+        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
+          (reference "F1") (unit 1)
         )
       )
     )
@@ -8046,7 +8041,7 @@
     (pin "8" (uuid 4617daef-ed07-41b7-b5f1-fd7a993614fc))
     (pin "9" (uuid bebdff0f-ae6f-4eb6-933a-71cac5e59581))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J2") (unit 1)
         )
@@ -8072,15 +8067,15 @@
     (property "LCSC" "C25905" (at 58.42 283.21 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid 91a96488-399d-4159-bb9f-5621259c651a))
-    (pin "2" (uuid d11dbdcd-9fac-4fe0-8367-2dec3dadcbcb))
+    (pin "1" (uuid 20c11f35-6919-457a-bfc7-fa0bdafdaa26))
+    (pin "2" (uuid aa741a0c-d5ca-47af-829e-a84892edaf71))
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
           (reference "R1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R10") (unit 1)
         )
@@ -8122,7 +8117,7 @@
           (reference "R3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R7") (unit 1)
         )
@@ -8164,7 +8159,7 @@
           (reference "C16") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C7") (unit 1)
         )
@@ -8203,7 +8198,7 @@
           (reference "C1001") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C14") (unit 1)
         )
@@ -8211,45 +8206,6 @@
       (project "Reference_RP2040"
         (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
           (reference "C1001") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "Device:C_Small") (at 129.54 330.2 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
-    (uuid 44215251-f3f7-4e03-953b-d67595243283)
-    (property "Reference" "C1002" (at 132.08 328.9362 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Value" "1uF" (at 132.08 331.4762 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Footprint" "Capacitor_SMD:C_0402_1005Metric" (at 129.54 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Datasheet" "~" (at 129.54 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "LCSC" "C52923" (at 129.54 330.2 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid b86b090a-a3eb-4593-a7e2-2997510d9e74))
-    (pin "2" (uuid 6aa66456-e438-4137-92c8-899a6d17ae25))
-    (instances
-      (project "pc64"
-        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "C1002") (unit 1)
-        )
-      )
-      (project "Dreamdrivecast_v1a"
-        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
-          (reference "C30") (unit 1)
-        )
-      )
-      (project "Reference_RP2040"
-        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-          (reference "C1002") (unit 1)
         )
       )
     )
@@ -8283,7 +8239,7 @@
           (reference "Y1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "Y2") (unit 1)
         )
@@ -8325,7 +8281,7 @@
           (reference "C16") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C22") (unit 1)
         )
@@ -8407,7 +8363,7 @@
     (pin "B8" (uuid cff740d4-257c-4676-8c70-580ee79856c9))
     (pin "B9" (uuid c9cc394f-7f66-4964-a931-04c82017098f))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "CN1") (unit 1)
         )
@@ -8433,15 +8389,15 @@
     (property "LCSC" "C25905" (at 58.42 285.75 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "1" (uuid f7e4b91a-2aba-42e3-8435-043c7740c0b5))
-    (pin "2" (uuid 1b307198-df02-4ab4-930c-276c07141495))
+    (pin "1" (uuid 74563109-3d2b-42ee-a2aa-463161e9bd62))
+    (pin "2" (uuid f4058330-7134-4e01-9faf-b54381c901e0))
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
           (reference "R2") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R11") (unit 1)
         )
@@ -8502,7 +8458,7 @@
     (pin "8" (uuid 07d2211b-b62c-4587-ab02-d2d9f889b060))
     (pin "9" (uuid f4ab8768-fd6f-4d4e-9714-dd9dee1ac6dd))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J4") (unit 1)
         )
@@ -8532,7 +8488,7 @@
           (reference "SWCLK1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "SWCLK1") (unit 1)
         )
@@ -8574,7 +8530,7 @@
           (reference "C13") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C23") (unit 1)
         )
@@ -8616,7 +8572,7 @@
           (reference "C15") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C10") (unit 1)
         )
@@ -8624,45 +8580,6 @@
       (project "Reference_RP2040"
         (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
           (reference "C15") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "Device:Polyfuse_Small") (at 58.42 102.87 270) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no)
-    (uuid 6baa1039-14ef-404b-a3bd-f15404e22607)
-    (property "Reference" "F1" (at 58.42 100.33 90)
-      (effects (font (size 1.27 1.27)))
-    )
-    (property "Value" "1.1A" (at 58.42 99.9744 90)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Footprint" "Fuse:Fuse_1206_3216Metric" (at 53.34 104.14 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Datasheet" "~" (at 58.42 102.87 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "LCSC" "C2760273" (at 58.42 102.87 90)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid 5a941594-d064-49c4-98cb-523c33820294))
-    (pin "2" (uuid 7179900f-bd8b-4aee-8b15-349405919528))
-    (instances
-      (project "pc64"
-        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "F1") (unit 1)
-        )
-      )
-      (project "Dreamdrivecast_v1a"
-        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
-          (reference "F1") (unit 1)
-        )
-      )
-      (project "Reference_RP2040"
-        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-          (reference "F1") (unit 1)
         )
       )
     )
@@ -8697,7 +8614,7 @@
           (reference "C9") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C26") (unit 1)
         )
@@ -8727,7 +8644,7 @@
     )
     (pin "1" (uuid ae56aa5e-5ea2-458b-af89-49e39d83c0b8))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "#PWR01") (unit 1)
         )
@@ -8764,7 +8681,7 @@
           (reference "C15") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C25") (unit 1)
         )
@@ -8815,7 +8732,7 @@
     (pin "8" (uuid 16ff6b2c-9342-48f3-a78c-592bed14fbaf))
     (pin "9" (uuid 3504ecb6-9ec3-4e7f-a60c-6b6c8a9831fd))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J8") (unit 1)
         )
@@ -8849,7 +8766,7 @@
           (reference "C3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C12") (unit 1)
         )
@@ -8880,7 +8797,7 @@
     (pin "1" (uuid 7f1fda73-a8b2-4adb-96dc-7c3b939ffb06))
     (pin "2" (uuid 85cba11d-bca2-4a20-bee7-b28797bdf31a))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "JP1") (unit 1)
         )
@@ -8910,7 +8827,7 @@
           (reference "SWD1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "SWD1") (unit 1)
         )
@@ -8955,7 +8872,7 @@
           (reference "U3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "U1") (unit 1)
         )
@@ -8994,7 +8911,7 @@
           (reference "RP_SW2") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "RP_SW4") (unit 1)
         )
@@ -9036,7 +8953,7 @@
           (reference "C6") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C2") (unit 1)
         )
@@ -9078,7 +8995,7 @@
           (reference "R3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R1") (unit 1)
         )
@@ -9117,7 +9034,7 @@
           (reference "R1001") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R9") (unit 1)
         )
@@ -9148,7 +9065,7 @@
     (pin "1" (uuid fb33f331-e92a-4235-b375-caec04cd2065))
     (pin "2" (uuid 5fc9dc78-1d45-47bf-b803-3130ec33be46))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "SW1") (unit 1)
         )
@@ -9182,7 +9099,7 @@
           (reference "C5") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C1") (unit 1)
         )
@@ -9190,45 +9107,6 @@
       (project "Reference_RP2040"
         (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
           (reference "C5") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "Device:Polyfuse_Small") (at 58.42 278.13 270) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no)
-    (uuid 9173c998-657e-49f4-8a6f-b6e7e10582ab)
-    (property "Reference" "F1" (at 58.42 275.59 90)
-      (effects (font (size 1.27 1.27)))
-    )
-    (property "Value" "1.1A" (at 58.42 275.2344 90)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Footprint" "Fuse:Fuse_1206_3216Metric" (at 53.34 279.4 0)
-      (effects (font (size 1.27 1.27)) (justify left) hide)
-    )
-    (property "Datasheet" "~" (at 58.42 278.13 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "LCSC" "C2760273" (at 58.42 278.13 90)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid c10ec04b-2dab-43d0-9f8e-383fed4de44c))
-    (pin "2" (uuid 6b157fb2-6d9e-4f4a-9694-91ffcc7e73e3))
-    (instances
-      (project "pc64"
-        (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
-          (reference "F1") (unit 1)
-        )
-      )
-      (project "Dreamdrivecast_v1a"
-        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
-          (reference "F2") (unit 1)
-        )
-      )
-      (project "Reference_RP2040"
-        (path "/e63e39d7-6ac0-4ffd-8aa3-1841a4541b55"
-          (reference "F1") (unit 1)
         )
       )
     )
@@ -9252,7 +9130,7 @@
     (pin "1" (uuid b9f64bd8-5bda-471b-872d-c8c5904228b2))
     (pin "2" (uuid b86cf398-e835-4726-aa98-db268aa573d8))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R6") (unit 1)
         )
@@ -9301,7 +9179,7 @@
           (reference "J1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J1") (unit 1)
         )
@@ -9343,7 +9221,7 @@
           (reference "R4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R8") (unit 1)
         )
@@ -9392,7 +9270,7 @@
     (pin "8" (uuid 8be3735e-5e2b-4804-af9f-c83880178721))
     (pin "9" (uuid 779e9a0e-e9ef-4695-8203-3598578e61f4))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J7") (unit 1)
         )
@@ -9429,7 +9307,7 @@
           (reference "C8") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C19") (unit 1)
         )
@@ -9471,7 +9349,7 @@
           (reference "C6") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C17") (unit 1)
         )
@@ -9513,7 +9391,7 @@
           (reference "C11") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C21") (unit 1)
         )
@@ -9547,7 +9425,7 @@
     (pin "4" (uuid b30951c1-3734-4244-8bcd-52d0942dcf78))
     (pin "5" (uuid 7af0cbcf-b49a-4d96-973c-83b5f371718c))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J3") (unit 1)
         )
@@ -9573,30 +9451,30 @@
     (property "LCSC" "C165948" (at 40.64 293.37 0)
       (effects (font (size 1.27 1.27)) hide)
     )
-    (pin "A1" (uuid 1e6565c5-985f-4798-a02e-a245922b93e4))
-    (pin "A12" (uuid 24f5ba98-7d5f-4ddc-bb14-7f8c131fbc88))
-    (pin "A4" (uuid 21cff66f-4867-4866-bc19-5016dd463124))
-    (pin "A5" (uuid 79ae89e6-e0eb-4666-a072-08fe1607316f))
-    (pin "A6" (uuid c57eabab-3f5a-480a-b715-d2089726f403))
-    (pin "A7" (uuid 5e9b6007-ed82-418e-a062-b80170972178))
-    (pin "A8" (uuid a045b089-cfed-4b2a-9a59-09a0a9c4d6e9))
-    (pin "A9" (uuid 6287a537-5a51-41f5-9d2c-68331817ac6b))
-    (pin "B1" (uuid 18e2962d-3af3-4c8f-9391-04aa68f54f43))
-    (pin "B12" (uuid 762f0470-da23-4944-af8c-8b415895b4fa))
-    (pin "B4" (uuid 0fd4de73-7ec0-4215-8e92-0123a441a268))
-    (pin "B5" (uuid cb4c7986-5f2d-4d8f-8a0e-938e0f19e010))
-    (pin "B6" (uuid 60352f3a-fd59-415e-875e-a5778d25a411))
-    (pin "B7" (uuid 5d74d1de-3642-40e3-979d-a6fe2cf9ff22))
-    (pin "B8" (uuid 2ca601de-1ccf-4208-a9a1-5a9e0c968ff0))
-    (pin "B9" (uuid 82083973-678a-4b85-aaea-c2c33b8796e3))
-    (pin "S1" (uuid f0e60012-1c1f-491b-a50c-ff4eaaa33cce))
+    (pin "A1" (uuid 8946acd2-47cd-4769-b2c7-e4d4bb399ff0))
+    (pin "A12" (uuid 03f33ac0-bb4e-4a41-820b-c38fede75473))
+    (pin "A4" (uuid 798781b5-eef1-4b1d-b41a-11ee34b3353e))
+    (pin "A5" (uuid 85ae15b3-232b-4aeb-b41e-421919361da6))
+    (pin "A6" (uuid 90c3467a-8ef0-4901-95e0-53f7b5f29bf3))
+    (pin "A7" (uuid e63a781f-1401-495d-ad27-4210a192a0b9))
+    (pin "A8" (uuid 178195b2-c40b-4820-aa74-3e3268fd9cb2))
+    (pin "A9" (uuid 305f0065-7304-432b-805e-ab41a2300d27))
+    (pin "B1" (uuid 183ffc2b-ea60-41e1-8da1-a91e6cd1f35f))
+    (pin "B12" (uuid 01b61d3c-ff39-49bd-955d-0f17fe43fa50))
+    (pin "B4" (uuid 1f579239-9880-4add-aa59-71e3e2fefa68))
+    (pin "B5" (uuid d72b8a0d-cef9-4e3e-b974-68868153bf41))
+    (pin "B6" (uuid ac46e0fc-9239-48a0-9059-5a9229fc8c1e))
+    (pin "B7" (uuid e585d6c7-27e9-4c8d-9efe-22ff88f6fbe8))
+    (pin "B8" (uuid 29dde658-ecce-431a-a2ce-dbd92edcbe89))
+    (pin "B9" (uuid 5916a987-d12f-4f48-8b10-f557e35cb1bd))
+    (pin "S1" (uuid 90488157-6fd5-402d-8943-919896f50b03))
     (instances
       (project "pc64"
         (path "/232dc377-d055-4aae-963b-b41eb2c539c2"
           (reference "J1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J5") (unit 1)
         )
@@ -9635,7 +9513,7 @@
           (reference "R1001") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R3") (unit 1)
         )
@@ -9674,7 +9552,7 @@
           (reference "C7") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C3") (unit 1)
         )
@@ -9731,9 +9609,35 @@
     (pin "8" (uuid 548018d7-fbf6-48e8-8cf9-00c5b9f2e69a))
     (pin "9" (uuid ce642481-0abb-412d-be0d-ad6c4916fdeb))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J9") (unit 1)
+        )
+      )
+    )
+  )
+
+  (symbol (lib_id "Device:D_Schottky") (at 87.63 162.56 180) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (uuid c9fa9979-dba3-467b-ba6d-004047b165ed)
+    (property "Reference" "D1" (at 87.9475 156.21 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Value" "D_Schottky" (at 87.9475 158.75 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "Diode_SMD:D_SOD-123F" (at 87.63 162.56 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "~" (at 87.63 162.56 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid 8a78a804-9a6b-4a57-a17b-fd1440e40ab2))
+    (pin "2" (uuid 1b3368f6-5dff-4ea4-bb1f-45905cfe709e))
+    (instances
+      (project "Dreamdrivecast_v1aa"
+        (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
+          (reference "D1") (unit 1)
         )
       )
     )
@@ -9765,7 +9669,7 @@
           (reference "C4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C13") (unit 1)
         )
@@ -9804,7 +9708,7 @@
           (reference "RP_SW1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "RP_SW1") (unit 1)
         )
@@ -9849,7 +9753,7 @@
           (reference "U3") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "U4") (unit 1)
         )
@@ -9888,7 +9792,7 @@
           (reference "C4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C28") (unit 1)
         )
@@ -9930,7 +9834,7 @@
           (reference "R4") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "R2") (unit 1)
         )
@@ -9971,7 +9875,7 @@
           (reference "Y1") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "Y1") (unit 1)
         )
@@ -10010,7 +9914,7 @@
           (reference "C7") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C18") (unit 1)
         )
@@ -10049,7 +9953,7 @@
           (reference "C5") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C16") (unit 1)
         )
@@ -10089,7 +9993,7 @@
           (reference "U1002") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "U2") (unit 1)
         )
@@ -10131,7 +10035,7 @@
           (reference "C14") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C9") (unit 1)
         )
@@ -10174,7 +10078,7 @@
     (pin "8" (uuid b1b47ae1-e0e1-4bb6-acbc-8432679bc4cc))
     (pin "9" (uuid 5d200af4-57d4-4ef8-9c24-3169bfe239de))
     (instances
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "J6") (unit 1)
         )
@@ -10208,7 +10112,7 @@
           (reference "RP_SW2") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "RP_SW2") (unit 1)
         )
@@ -10250,7 +10154,7 @@
           (reference "C10") (unit 1)
         )
       )
-      (project "Dreamdrivecast_v1a"
+      (project "Dreamdrivecast_v1aa"
         (path "/d7cd42b8-52fc-41c5-a320-4250a7e45bf2"
           (reference "C5") (unit 1)
         )
