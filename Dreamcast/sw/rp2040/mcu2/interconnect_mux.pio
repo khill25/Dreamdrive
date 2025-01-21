@@ -1,0 +1,53 @@
+;
+; SPDX-License-Identifier: BSD-2-Clause
+;
+; Copyright (c) 2022 Kaili Hill
+;
+
+.program read_from_dreamcast
+; wait for low byte line and read in all 16 bits from dreamcast
+    wait 1 gpio 24
+    ;; swap pins to to input from 16bit output to 8bit
+    mov osr, ~null ; osr = 0xffffffff // output
+    out pindirs, 16 ; pindirs output to mcu input from dreamcast
+    ;; read in data from the dreamcast
+    in pins, 16
+    mov osr, isr
+    ; mov osr, pins
+    wait 0 gpio 24 ;; wait for strobe end
+
+    wait 1 gpio 24
+    out pins, 8 ; send 8 bits back to mcu
+    wait 0 gpio 24
+
+    wait 1 gpio 24
+    out pins, 8 ; send 8 bits back to mcu
+    wait 0 gpio 24
+
+;; Set 'out' pins back to input
+    mov osr, null
+    out pindirs, 16
+.wrap
+
+.program write_to_dreamcast
+    wait 1 gpio 25
+
+    ;; swap pins to output to dreamcast
+    mov osr, ~null ; osr = 0xffffffff
+    out pindirs, 16 ; osr = 0x0000ffff, pindirs output to dreamcast input from mcu
+    wait 0 gpio 25
+
+    wait 1 gpio 25
+    in pins, 8
+    wait 0 gpio 25
+    
+    wait 1 gpio 25
+    in pins, 8
+    mov osr, isr
+    out pins, 16
+    wait 0 gpio 25
+
+;; set 'out' pins back to input
+    mov osr, null ; osr = 0x00000000
+    out pindirs, 8 ; pindirs input
+.wrap

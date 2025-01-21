@@ -1,0 +1,92 @@
+.program cs0_low
+.side_set 1 opt
+.wrap_target
+wait_for_cs:
+	wait 1 gpio 3
+	wait 0 gpio 3
+	jmp pin, wait_for_cs
+
+read_control_lines:
+	in pins, 5
+	push 	side 1 ;; push data and also set mux to data pins
+	irq 4
+	wait 1 irq 5 ;; wait for a read/write program to let us know the data is ready
+.wrap
+
+;;;;; Sanity check side set debug version
+; .program cs0_low
+; .side_set 1 opt
+; .wrap_target
+; wait_for_cs:
+; 	nop side 1
+; 	nop [7]
+	
+; 	nop side 0
+; 	nop [7]
+	
+; .wrap
+
+.program cs1_low
+.side_set 1 opt
+.wrap_target
+wait_for_cs:
+	wait 1 gpio 4
+	wait 0 gpio 4
+	jmp pin, wait_for_cs
+
+read_control_lines:
+	in pins, 5
+	push 	side 1 ;; push data and also set mux to data pins
+	irq 4	
+	wait 1 irq 5 ;; wait for a read/write program to let us know the data is ready
+.wrap
+
+.program bus_read_request
+.side_set 1 opt
+.wrap_target
+wait_for_rd:
+	wait 1 irq 4 ;; wait for a cs program to detect an edge
+	wait 0 gpio 16
+
+	push ;; alert c we are ready for data
+	pull ;; get the data
+	out pins, 16
+	
+	wait 1 gpio 16
+	nop 	side 0 ;; flip the mux
+	irq 5 ;; let the cs programs know they can start monitoring the pins again
+.wrap
+
+.program bus_write_request
+.side_set 1 opt
+.wrap_target
+wait_for_wr:
+	wait 1 irq 4 ;; wait for a cs program to detect an edge
+	wait 0 gpio 17
+
+	in pins, 16
+	push
+
+	wait 1 gpio 17
+	nop 	side 0 ;; flip the mux
+	irq 5 ;; let the cs programs know they can start monitoring the pins again
+.wrap
+
+;; cs0 pin 11
+;; cs1 pin 12
+
+; Control registers are CS1 Asserted (0) and CS0 Negated (1)
+; .program control_register_read
+	; Psuedo code
+	; wait 1 CS1
+	; wait 0 CS1
+	; Read in address pins
+	; DMA figures out register
+	; read in data pins
+	; DMA writes data to
+	; wait 1 gpio 12
+; .wrap
+
+; ; Command registers are CS1 Negated (1) and CS0 Asserted (0)
+; .program command_register_read
+; .wrap

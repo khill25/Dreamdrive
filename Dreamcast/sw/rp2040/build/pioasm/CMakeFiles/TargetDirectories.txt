@@ -1,0 +1,3 @@
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/pioasm.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/edit_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/rebuild_cache.dir

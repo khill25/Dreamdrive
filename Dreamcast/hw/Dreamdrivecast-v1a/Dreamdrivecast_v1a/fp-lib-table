@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "riser")(type "KiCad")(uri "/Users/kaili/Code/Dreamdrive/Dreamcast/hw/Dreamdrivecast-v1a/Dreamdrivecast_v1a")(options "")(descr ""))
+)
