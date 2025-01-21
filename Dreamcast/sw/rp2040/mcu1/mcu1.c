@@ -25,48 +25,7 @@
 
 #include "mcu_databus.pio.h"
 
-bool isMuxDataLines = true;
-
-/*
- * Using 8line mux 2:1 (Common A, ControlLine B, Data C)
- * (A) gpio0-?
- * (B) A0, A1, A2, CS0, CS1 ()
- * (C) D0-D?
- *
- * 6 gpio SD Card
- * 16 Databus/muxed
- * 1 Mux select
- * ===== 23 pins
- * 5: rd, wr, intrq, dmack, dmarq
- * ===== 28 pins
- * X(whatever is left) for comms to mcu2
- *
- * These need to be available and not muxed?
- * rd
- * wr
- * intrq
- * dmack (host drives signal when signalling for more dma data)
- * dmarq (device drives signal when dma available)
- *
- * What sets of pins are used at the same time?
- * (20) d0-d15, marq, mack, intrq(?), rd, wr
- * (5)  a0-a2, cs0, cs2
- */
-
-/*
-May need to do something faster than waiting for mcu2 to send a packet every time it samples pins
-
-MCU2 captures all the signal lines state changes
-	* asserts one of the MCU control lines
-	* MCU1 interrupts on that control line
-	* That means to sample the pins
-	* Store that result in a buffer
-	* Once the control lines specify it's COMMAND_REGISTER time, MCU2 asserts control line like usual
-		* but then sends all the data it received (so all the control line samples)
-		* and MCU1 can line up the control lines with it's sampled (parallel) buffer
-
-BSY must be set within 400ns of the command register being written
- */
+uint8_t current_transfer_mode = SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT;
 
 void sdcard_read_test() {
 
@@ -130,7 +89,9 @@ int registerIndexFromControlValue(uint32_t controlValue) {
     case 0x31:
         return SPI_FEATURES_REGISTER_INDEX;
     case 0x32:
-        return SPI_INTERRUPT_REASON_REGISTER_INDEX;
+		return SPI_SECTOR_COUNT_REGISTER_INDEX;
+	case 0x52:
+		return SPI_INTERRUPT_REASON_REGISTER_INDEX;
     case 0x33:
         return SPI_SECTOR_NUMBER_REGISTER_INDEX;
     case 0x34:
@@ -170,49 +131,35 @@ volatile uint32_t register_index = SPI_REGISTER_COUNT;
 volatile uint32_t writtenRegisters[10000] = {0};
 volatile uint32_t writtenRegisterIndex = 0;
 
+static inline uint16_t swap8(uint16_t value)
+{
+	// 0x1122 => 0x2211
+	return (value << 8) | (value >> 8);
+}
+
+static inline uint32_t swap16(uint32_t value)
+{
+	// 0x11223344 => 0x33441122
+	return (value << 16) | (value >> 16);
+}
 // TODO probably need some kind of value to indicate to core1 that we don't need to process ata stuff
 // like if we are in DMA mode transfering data to the dreamcast
 
 #define MCU1_DATABUS_READ_SM (0)
 #define MCU1_DATABUS_WRITE_SM (1)
 
-// void setup_mcu_databus_read() {
-// 	uint sm = MCU1_DATABUS_READ_SM;
-// 	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
-// 	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
-
-// 	// We want to input on pins 0-7
-// 	sm_config_set_in_pins(&c, 0);
-// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_WRITE_PIN, 1);
-
-// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x8000000, 0x80000FF);
-
-// 	pio_sm_init(pio0, sm, offset, &c);
-// }
-
-// void setup_mcu_databus_write() {
-// 	uint sm = MCU1_DATABUS_WRITE_SM;
-// 	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
-// 	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
-
-// 	sm_config_set_out_pins(&c, 0, 8);
-// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 1);
-// 	// We want to output on pins 0-7 on the set pin
-// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0x40000FF, 0x40000FF);
-
-// 	pio_sm_init(pio0, sm, offset, &c);
-// }
-
 void setup_mcu_databus_read() {
 	uint sm = MCU1_DATABUS_READ_SM;
 	uint offset = pio_add_program(pio0, &mcu_databus_read_program);
 	pio_sm_config c = mcu_databus_read_program_get_default_config(offset);
 
-	// We want to input on pins 0-7
-	sm_config_set_in_pins(&c, 0);
+	// We want to input on pins 8-15
+	sm_config_set_in_pins(&c, MCU1_DATABUS_D0);
 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 1);
 
-	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
+	sm_config_set_in_shift(&c, false, false, 8);
+
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x30000, 0x3FF00);
 
 	pio_sm_init(pio0, sm, offset, &c);
 }
@@ -222,31 +169,16 @@ void setup_mcu_databus_write() {
 	uint offset = pio_add_program(pio0, &mcu_databus_write_program);
 	pio_sm_config c = mcu_databus_write_program_get_default_config(offset);
 
-	sm_config_set_out_pins(&c, 0, 8);
+	sm_config_set_out_pins(&c, MCU1_DATABUS_D0, 8);
 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_WRITE_PIN, 1);
-	// We want to output on pins 0-7 on the set pin
-	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
+	// We want to output on pins 8-15 on the set pin
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x30000, 0x3FF00);
 
 	pio_sm_init(pio0, sm, offset, &c);
 }
 
-// void setup_mcu_databus_read_write() {
-// 	uint sm = MCU1_DATABUS_READ_WRITE_SM;
-// 	uint offset = pio_add_program(pio0, &mcu_databus_read_write_program);
-// 	pio_sm_config c = mcu_databus_read_write_program_get_default_config(offset);
-
-// 	sm_config_set_in_pins(&c, 0);
-// 	sm_config_set_out_pins(&c, 0, 8);
-// 	sm_config_set_set_pins(&c, MCU_DATABUS_DEVICE_SIGNAL_PIN, 2);
-// 	// Set to all input 
-// 	pio_sm_set_pindirs_with_mask(pio0, sm, 0xC000000, 0xC0000FF);
-
-// 	pio_sm_init(pio0, sm, offset, &c);
-// }
-
-
 void setup_mcu_databus() {
-	for(int i = 0; i < 8; i++) {
+	for(int i = 8; i < 16; i++) {
 		pio_gpio_init(pio0, i);
 	}
 
@@ -276,7 +208,7 @@ int main(void) {
 	printf("MCU1- Init pins...\n");
 
 	// init the control pins (7 pins)
-	for (int i = 8; i < 15; i++) {
+	for (int i = 0; i < 7; i++) {
 		gpio_init(i);
 		gpio_set_dir(i, false); // set to input
 	}
@@ -324,6 +256,9 @@ int main(void) {
 
 	registerIndex_map[0x57] = &SPI_registers[SPI_STATUS_REGISTER_INDEX]; // read
 	registerIndex_map[0x37] = &SPI_registers[SPI_COMMAND_REGISTER_INDEX]; // write
+
+	// misc registers, these aren't in the gdrom doc but ARE ata registers
+	registerIndex_map[0x32] = &SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]; // write
 
 	// Setup a pointer to the status register
 	status_register = &SPI_registers[SPI_STATUS_REGISTER_INDEX];
@@ -403,16 +338,20 @@ int main(void) {
 		} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);	// 12ns (3 cycles)
 
 		// bit shift in read/write values to the control line values
-		register_index = (register_index | readWriteLineValues) >> 8;  	// 12ns (3 cycles)
+		register_index = (register_index | readWriteLineValues);  	// 12ns (3 cycles)
 
 		// get the pointer to the selected register
 		selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
 		writtenRegisters[writtenRegisterIndex++] = register_index;
 
 		// Write data to dreamcast
-		if (readWriteLineValues == 0x4000) {				
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, 1); // signal pio we are writing to the bus	
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, *selectedRegister); // send register data to dreamcsat
+		if (readWriteLineValues == READ_PIN_MASK) {				
+			// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, 1); // signal pio we are writing to the bus	
+			pio0->txf[MCU1_DATABUS_WRITE_SM] = 1;
+			// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, *selectedRegister); // send register data to dreamcsat
+			pio0->txf[MCU1_DATABUS_WRITE_SM] = swap8(*selectedRegister);
+
+			writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAA;
 			
 			gpio_put(MCU1_PIN_IORDY, 1);
 			// wait for latch?
@@ -422,9 +361,13 @@ int main(void) {
 
 		// Read data from dreamcast into register
 		} else {
-			pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_SM, 0); // Signal pio we are reading bus
+			// pio_sm_put_blocking(pio0, MCU1_DATABUS_READ_SM, 0); // Signal pio we are reading bus
+			pio0->txf[MCU1_DATABUS_READ_SM] = 0;
 			pins = pio_sm_get_blocking(pio0, MCU1_DATABUS_READ_SM); // read 16bits
-			writtenRegisters[writtenRegisterIndex++] = pins;
+			*selectedRegister = pins; // save the read value to the register
+			
+			// debug
+			writtenRegisters[writtenRegisterIndex++] = pins;//((uint16_t)pins);
 			
 			multicore_fifo_push_blocking(register_index);										// 24ns (6 cycles)
 
@@ -471,25 +414,38 @@ void second_core_main() {
 					printf("%x = ", writtenRegisters[i]);
 					printNameOfRegister(codedRegisterIndex);
 					printf("\n");
+
+					// Dont print more than 100 in case the dreamcast gets stuck polling the alt status register
+					if(i > 100) {
+						break;
+					}
 				}
 			// }
 			// printf("Bad values: %d\n", writtenRegisterIndex - goodWrites);
 			printf("----------------------------------------\n");
 			printf("/n/n");
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
-			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
-			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
-			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
-			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
-			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
-			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
-			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
-			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
-			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
-			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
-			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			// printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			// printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			// printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			// printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			// printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			// printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			// printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			// printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			// printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			// printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			// printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			// printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+			for(int i = 0; i < SPI_REGISTER_COUNT; i++) {
+				printNameOfRegister(i);
+				printf(" = %x\n", SPI_registers[i]);
+			}
+
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
 		}
 
 		// Wait for data from core1 to be available

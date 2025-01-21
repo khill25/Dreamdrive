@@ -206,11 +206,11 @@ void __no_inline_not_in_flash_func(n64_pi_run)(void)
 
 
 			// Patch bus speed here if needed 
-			// next_word = 0xFF40; // Slowest speed
+			next_word = 0xFF40; // Slowest speed
 			// next_word = 0x8040; // boots @ 266MHz
 			// next_word = 0x4040; // boots @ 266
 			// next_word = 0x3040; // boots @ 266 
-			next_word = 0x2040; // Should boot with rp2040's @ 360MHz (qspi at 90MHz)
+			// next_word = 0x2040; // Should boot with rp2040's @ 360MHz (qspi at 90MHz)
 			// next_word = 0x1B40; 
 			
 			//0x1B40 boots@266/4 with dmaValue

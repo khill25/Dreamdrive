@@ -18,9 +18,8 @@
 #define INTERCONNECT_BUS_DIRECTION_MASK (0x1000000) // pin 24
 #define INTERCONNECT_IRQ_LOW_MASK		(0x4000000) // pin 26
 #define INTERCONNECT_IRQ_HIGH_MASK 		(0x8000000) // pin 27
-#define INTERCONNECT_IRQ_LOW_PIN		(26)
-#define INTERCONNECT_IRQ_HIGH_PIN		(27)
-#define INTERCONNECT_DIRECTION_PIN		(24)
+#define INTERCONNECT_IRQ_LOW_PIN		(24)
+#define INTERCONNECT_IRQ_HIGH_PIN		(25)
 
 #define INTERCONNECT_BUS_OUTPUT_LOW_SM 		(0)
 #define INTERCONNECT_BUS_OUTPUT_HIGH_SM 	(1)
@@ -140,10 +139,6 @@ int main(void) {
 	// const int freq_khz = 336000;
 	// vreg_set_voltage(VREG_VOLTAGE_1_25);
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
-
-	// Setup control line pins to be input
-	gpio_init(INTERCONNECT_DIRECTION_PIN);
-	gpio_set_dir(INTERCONNECT_DIRECTION_PIN, GPIO_IN);
 
 	gpio_init(INTERCONNECT_IRQ_LOW_PIN);
 	gpio_set_dir(INTERCONNECT_IRQ_LOW_PIN, GPIO_IN);

@@ -1,3 +1,8 @@
+# Notes
+Changes have been made to the pico-sdk to speed up copy to ram in order to meet the boot timing when powered on from the n64.
+`crt0.S` should be copied to `pico-sdk/source/rp2_common/pico_standard_link/crt0.S` Remember to back up the original before making any changes.
+
+
 To build and flash:
 
 ```bash
