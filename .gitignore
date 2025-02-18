@@ -30,3 +30,9 @@ N64/sw/build
 ~pc64.kicad_pcb.lck
 ~pc64.kicad_sch.lck
 N64/hw/cart_tester/pc64/production/backups
+Dreamcast/hw/Dreamdrivecast-rp2350/Dreamdrivecast-rp2350/Dreamdrivecast-rp2350-backups
+Dreamcast/hw/Dreamdrivecast-v1b/Dreamdrivecast-v1b/_autosave*
+~_autosave*
+~*.lck
+Dreamcast/hw/Dreamdrivecast-v1b/Dreamdrivecast-v1b/Dreamdrivecast-v1b-backups
+Dreamcast/hw/Dreamdrivecast-v1b/Dreamdrivecast-v1b/production

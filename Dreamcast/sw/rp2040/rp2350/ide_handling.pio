@@ -1,0 +1,41 @@
+;;; Code that Copilot came up with.
+;;; I think that it works in theroy, but I haven't tested it yet.
+;;; It probably also needs to have it's pins changed for the rp2350 version board
+
+; .program ata_cs_handler
+
+;; Configure pin mapping in C:
+;; JMP_PIN = CS1 (pin 9)
+;; IN_BASE = CS0 (pin 8)
+
+; .wrap_target
+; start:
+;     ; Load CS0 into X
+;     mov x, pins        
+;     ; Check if CS0 is 0
+;     jmp !x check_cs1_high    ; CS0 is 0
+;     ; CS0 is 1, CS1 must be 0
+;     jmp pin invalid          ; If CS1 is 1, invalid
+;     jmp valid               ; CS0=1, CS1=0 valid
+; check_cs1_high:
+;     ; CS0 is 0, CS1 must be 1
+;     jmp pin valid           ; If CS1 is 1, valid
+; invalid:
+;     nop               
+;     jmp start
+; valid:
+;     in pins, 7              ; Read control signals
+;     push
+; .wrap
+
+; % c-sdk {
+; static inline void ata_cs_handler_init(PIO pio, uint sm, uint offset) {
+;     pio_sm_config c = ata_cs_handler_program_get_default_config(offset);
+    
+;     sm_config_set_in_pins(&c, 8);     // CS0 on pin 8
+;     sm_config_set_jmp_pin(&c, 9);     // CS1 on pin 9 for JMP PIN
+    
+;     pio_sm_init(pio, sm, offset, &c);
+;     pio_sm_set_enabled(pio, sm, true);
+; }
+; %}

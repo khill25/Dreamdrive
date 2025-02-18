@@ -70,5 +70,5 @@ endif()
 
 set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1/include;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1/include-fixed;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/arm-none-eabi/include")
 set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
-set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1/thumb/v6-m/nofp;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/arm-none-eabi/lib/thumb/v6-m/nofp;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/arm-none-eabi/lib")
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1/thumb/v8-m.main+fp/softfp;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/arm-none-eabi/lib/thumb/v8-m.main+fp/softfp;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc/arm-none-eabi/12.3.1;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/lib/gcc;/Applications/ArmGNUToolchain/12.3.rel1/arm-none-eabi/arm-none-eabi/lib")
 set(CMAKE_C_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES "")

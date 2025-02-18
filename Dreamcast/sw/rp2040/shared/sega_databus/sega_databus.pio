@@ -90,3 +90,28 @@ wait_for_wr:
 ; ; Command registers are CS1 Negated (1) and CS0 Asserted (0)
 ; .program command_register_read
 ; .wrap
+
+;; Read from the dreamcast, this is the WRITE line low command. Which is confusing because we are 
+;; a device interacting with the host and thus READ and WRITE are reversed from the our perspective
+.program mcu1_read_from_dreamcast
+.wrap_target
+wait_for_rd:
+	pull                    ;; wait for data from C
+	mov osr, null           ;; set all bits to 0 for input
+	out pindirs, 16         ;; set pins 0-15 as inputs
+	in pins, 16             ;; read 16 bits from pins
+	push                    ;; send data back to C
+.wrap
+
+.program mcu1_write_to_dreamcast
+.wrap_target
+wait_for_wr:
+	pull 					;; wait for data from C
+	mov x, osr 				;; move the data into a scratch register since we need to use osr to swap pin directions
+	mov osr, ~null          ;; set all bits to 1 for output
+	out pindirs, 16         ;; set pins 0-15 as outputs
+	mov osr, x              ;; grab data out of the scratch register
+	out pins, 16            ;; send data to pins
+	;; TODO: Do we need to set the pins to input after sending data?
+.wrap
+

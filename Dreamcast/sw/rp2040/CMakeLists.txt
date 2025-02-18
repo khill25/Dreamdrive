@@ -1,7 +1,10 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.5)
 
 # Build as release but with debug symbols
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
+# set(PICO_PLATFORM rp2350)
+set(PICO_PLATFORM rp2350)
+set(PICO_SKIP_TOOLS 1)
 
 # Pull in SDK (must be before project)
 include(pico_sdk_import.cmake)
@@ -22,6 +25,7 @@ add_compile_options(
         # -save-temps
         # -Wno-unused-function # we have some for the docs that aren't called
         # -Wno-maybe-uninitialized
+        -Wunused-but-set-variable
         -O0
 )
 
@@ -36,8 +40,9 @@ pico_sdk_init()
 
 # Add shared code
 add_subdirectory(shared)
-add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
+# add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
 # Add applications
-add_subdirectory(mcu1)
-add_subdirectory(mcu2)
+add_subdirectory(rp2350)
+# add_subdirectory(mcu1)
+# add_subdirectory(mcu2)

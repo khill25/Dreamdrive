@@ -1,3 +1,7 @@
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/pioasm.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/edit_cache.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/rebuild_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/list_install_components.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/install.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/install/local.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pioasm/CMakeFiles/install/strip.dir
