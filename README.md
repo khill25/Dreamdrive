@@ -1,6 +1,8 @@
 # Dreamdrive
 Rom cart and console accessories produced by Dreamcraft Industries.
 
+# Dreamdumper64
+New Dreamdumper64 hardware files have been checked in! Navigate to `N64/hw/cart_tester/pc64` for the latest kicad project files.
+
 # Dreamcast
-Check out the `Dreamcast/main` branch for up to date files for the Dreamcast ODE.
-Currently using PCBWay to build and assembly my PCBs. The latest version of the Dreamdrivecast uses rp2040's vs RPi Pico boards, so a lot more components and routing were to be done.
+Dreamcast code/files have been uploaded to the main branch. They are still WIP.
