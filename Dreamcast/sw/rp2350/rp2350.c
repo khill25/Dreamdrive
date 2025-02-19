@@ -208,6 +208,10 @@ int main(void) {
 	gpio_set_dir(PIN_DOPEN, true);
 	gpio_pull_down(PIN_DOPEN);
 
+	gpio_init(PIN_INTRQ);
+	gpio_set_dir(PIN_INTRQ, true);
+	gpio_put(PIN_INTRQ, 0);
+
 	// Setup and start the ide databus programs
 	printf("Setting up PIO ide databus programs...\n");
 	printf("\tiniting gpio for pio...");
@@ -238,8 +242,8 @@ int main(void) {
 	registerIndex_map[0x50] = &SPI_registers[SPI_DATA_REGISTER_INDEX]; // read
 	registerIndex_map[0x30] = &SPI_registers[SPI_DATA_REGISTER_INDEX]; // write
 
-	registerIndex_map[0x31] = &SPI_registers[SPI_FEATURES_REGISTER_INDEX]; // read
-	registerIndex_map[0x51] = &SPI_registers[SPI_ERROR_REGISTER_INDEX]; // write
+	registerIndex_map[0x31] = &SPI_registers[SPI_FEATURES_REGISTER_INDEX]; // write
+	registerIndex_map[0x51] = &SPI_registers[SPI_ERROR_REGISTER_INDEX]; // read
 
 	registerIndex_map[0x52] = &SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]; // read only
 	registerIndex_map[0x53] = &SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]; // read only
@@ -262,8 +266,9 @@ int main(void) {
 	// Setup a pointer to the status register
 	status_register = &SPI_registers[SPI_STATUS_REGISTER_INDEX];
 
-	SPI_registers[SPI_STATUS_REGISTER_INDEX] = 0x40; // set drive ready
+	SPI_registers[SPI_STATUS_REGISTER_INDEX] = 0b01000000; // set drive ready bit
 	SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX] = 0xA0; // set drive select
+	SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x40; // 4 if apparently this is the code for a "data disc" and it occupies the top 4 bits of the byte
 
 	// For the rest of the values, just use a dump register
 	for(int i = 0; i < 128; i++) {
@@ -312,8 +317,8 @@ int main(void) {
 			writtenRegisters[writtenRegisterIndex++] = register_index;
 		}
 
-		// Dreamcast is asking for data (Dreamcast read, this is a write for us)
-		if ((register_index & READ_PIN_MASK) == READ_PIN_MASK) {
+		// Read from register send to Dreamcast
+		if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
 			pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
 
 			if(writtenRegisterIndex < 100) {
@@ -321,13 +326,15 @@ int main(void) {
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
 			}
 
+			multicore_fifo_push_blocking(register_index);
+
 			gpio_put(PIN_IORDY, 1);
 			// wait for latch?
 			while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
-			gpio_set_dir_in_masked(0xFF); // set all data pins to input
+
 			gpio_put(PIN_IORDY, 0);
 
-		// If we aren't sending data to the dreamcast, we are getting data FROM the dreamcast
+		// Write to Dreamcast from register
 		} else {
 			// Let pio know we are ready to read data
 			pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
@@ -338,109 +345,38 @@ int main(void) {
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
 			}
 
+			multicore_fifo_push_blocking(register_index);
+
 			gpio_put(PIN_IORDY, 1);
 			// wait for latch?
 			while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
-			gpio_set_dir_in_masked(0xFF); // set all data pins to input
+
 			gpio_put(PIN_IORDY, 0);
 		}
 	}
 
-	// while(1) {
-		
-	// 	// Worst case loop is 172ns
-	// 	// Read/write are low for ~300ns
-	// 	// This leaves us with 128ns (32cycles @ 4ns)
-	// 	// TODO do we need to do anything with the register data???
-
-	// 	// Don't do anything until the control lines are ready
-	// 	do {
-	// 		readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;								// 16ns (4 cycles)
-	// 	} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
-
-	// 	// Signal is active low
-	// 	// 1 and 2 are the only valid value. Either read OR write is low, but not both high or both low
-	// 	do {
-	// 		readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;						// 16ns (4 cycles)
-	// 	} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);	// 12ns (3 cycles)
-
-	// 	register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK);									// 16ns (4 cycles)
-	// 	// bit shift in read/write values to the control line values
-	// 	register_index = (register_index | readWriteLineValues);  								// 12ns (3 cycles)
-
-	// 	// get the pointer to the selected register
-	// 	selectedRegister = registerIndex_map[register_index]; 									// 24ns (6 cycles)
-	// 	writtenRegisters[writtenRegisterIndex++] = register_index;
-
-	// 	// printf("\t!%x", readWriteLineValues);
-
-	// 	// Write register data to dreamcast
-	// 	if (readWriteLineValues == READ_PIN_MASK) {				
-	// 		// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, 1); // signal pio we are writing to the bus	
-	// 		// pio0->txf[MCU1_DATABUS_WRITE_SM] = 1;
-	// 		// pio_sm_put_blocking(pio0, MCU1_DATABUS_WRITE_SM, *selectedRegister); // send register data to dreamcsat
-	// 		// pio0->txf[MCU1_DATABUS_WRITE_SM] = swap8(*selectedRegister);
-			
-	// 		// Put data on the lines
-	// 		// TODO: Write PIO program to write data
-	// 		// data0-7 = swap8(*selectedRegister);
-	// 		// Should we also send data on d8-d15? The registers are all 16 bits even if the ATA
-	// 		// registers are 8 bits
-
-	// 		gpio_set_dir_out_masked(0xFF); // set all data pins to output
-	// 		gpio_put_masked(0xFF, *selectedRegister); // set data pins to the value of the register
-
-	// 		// Debugging info to mark that we have sent data
-	// 		writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAA;
-			
-	// 		gpio_put(PIN_IORDY, 1);
-	// 		// wait for latch?
-	// 		while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };						// 24ns (6 cycles)
-			
-	// 		gpio_set_dir_in_masked(0xFF); // set all data pins to input
-
-	// 		gpio_put(PIN_IORDY, 0);
-
-	// 	// Read data from dreamcast into register
-	// 	} else {
-	// 		// TODO: Read data from d0-d15. 
-	// 		// TODO: Write PIO program to read data
-	// 		// Questions:
-	// 		// 1. Do we need to do any byte swapping?
-	// 		// 2 
-
-	// 		gpio_set_dir_in_masked(0xFF); // set all data pins to input
-	// 		pins = sio_hw->gpio_in & 0xFF; // read data pins
-
-	// 		*selectedRegister = pins; // save the read value to the register
-			
-	// 		// debug
-	// 		writtenRegisters[writtenRegisterIndex++] = pins;//((uint16_t)pins);
-			
-	// 		multicore_fifo_push_blocking(register_index);										// 24ns (6 cycles)
-
-	// 		gpio_put(PIN_IORDY, 1);
-	// 		// wait for latch?
-	// 		while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };					// 24ns (6 cycles)
-
-	// 		gpio_put(PIN_IORDY, 0);
-	// 	}
-
-	// 	// (this point takes about 172ns from the beginning of the do loop)
-	// 	// This means that there is about 128ns extra time to do something before the next read/write cycle
-	// 	// This is 32 cycles at 4ns per cycle
-
-	// }
-
-	
 	return 0;
 }
 uint32_t timetrack = 0;
 bool hasChirped = false;
 volatile uint32_t core0CData = 0;
+volatile uint16_t core0commandRegister = 0;
+volatile uint16_t* spi_packet_register = 0;
+
+#define DATA_MODE_IDLE 0
+#define DATA_MODE_SPI 1 // Sega SPI packet mode, processing their 12 byte packets
+static uint8_t currentMode = DATA_MODE_IDLE;
+volatile uint8_t spiPacketWordCount = 0;
+
+void process_packet_command() {
+
+}
 
 void second_core_main() {
 	printf("Core1 Online\n");
+
+	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
+
 	while(1) {
 		
 		if(time_us_32() - timetrack > 18000000 && !hasChirped) {
@@ -455,41 +391,22 @@ void second_core_main() {
 				printf("\n%x", writtenRegisters[i]);
 			}
 
-			// if (writtenRegisterIndex < 20) {
-				// for(int i = 0; i < writtenRegisterIndex; i++) {
-				// 	int codedRegisterIndex = registerIndexFromControlValue(writtenRegisters[i]);
-				// 	// if (codedRegisterIndex == SPI_REGISTER_COUNT) {
-				// 	// 	continue;
-				// 	// }
-				// 	// goodWrites++;
-				// 	printf("%d: ", i);
-				// 	printf("%x = ", writtenRegisters[i]);
-				// 	printNameOfRegister(codedRegisterIndex);
-				// 	printf("\n");
-
-				// 	// Dont print more than 100 in case the dreamcast gets stuck polling the alt status register
-				// 	if(i > 100) {
-				// 		break;
-				// 	}
-				// }
-			// }
-			// printf("Bad values: %d\n", writtenRegisterIndex - goodWrites);
 			printf("----------------------------------------\n");
 			printf("/n/n");
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-			// printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
-			// printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
-			// printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
-			// printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
-			// printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
-			// printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
-			// printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
-			// printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
-			// printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
-			// printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
-			// printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
-			// printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
-			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
 			for(int i = 0; i < SPI_REGISTER_COUNT; i++) {
 				printNameOfRegister(i);
@@ -505,59 +422,99 @@ void second_core_main() {
 			continue;
 		}
 
+		// Get data
 		core0CData = multicore_fifo_pop_blocking();
 
-		// writtenRegisters[writtenRegisterIndex++] = core0CData;
+		// Host has read the status register
+		if (core0CData == 0x4E) {
+			gpio_put(PIN_INTRQ, 0); // negate the interrupt line
+			continue;
+		}
+
+		if(currentMode == DATA_MODE_SPI) {
 		
+			spi_packet_register[spiPacketWordCount++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+
+			// This is the last word of the packet, process it
+			if (spiPacketWordCount >= 6) {
+
+				// DEBUG
+				printf("\nSPI Packet: ");
+				// for(int i = 0; i < 12; i++) {
+				// 	printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
+				// }
+				for(int i = 0; i < 6; i++) {
+					printf("%x ", spi_packet_register[i]);
+				}
+				printf("\n");
+
+				spiPacketWordCount = 0;
+				currentMode = DATA_MODE_IDLE;
+
+				*status_register = 0x50; // only drive ready bit set
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0b10; // status register contains completion status
+
+				// Set interrupt bit and assert line
+				gpio_put(PIN_INTRQ, 1);
+			}
+
+			// Keep looping as we are waiting for new data
+			continue;
+		}
 
 		// register_index -> selected register 
 		// selectedRegister -> register pointer
 		// The command register is the only one that needs to be processed (for now)
 		if(core0CData == 0x37) {
+
 			// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
 			// .. update status register
-			// *status_register = 0x80; // BSY bit set
+			*status_register = *status_register | 0x80; // BSY bit set
 
-			// printf("cmd: %x\n", *selectedRegister);
-			// // .. for debugging maybe print out all the registers
-			// printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
-			// printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
-			// printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
-			// printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
-			// printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
-			// printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
-			// printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
-			// printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
-			// printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
-			// printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
-			// printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
-			// printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			// We need to check the command register
+			core0commandRegister = SPI_registers[SPI_COMMAND_REGISTER_INDEX];
 
-			switch (*selectedRegister) {
-				case ATA_CMD_NOP:{
-					// Command can be received when BSY bit is 1 
-					// and device should terminate the command currently in execution
-					break;
+			// If this is the packet command, it's the most important case
+			if (core0commandRegister == ATA_CMD_PACKET_COMMAND) {
+				currentMode = DATA_MODE_SPI;
+
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0b01; // IO, CoD 
+				*status_register = 0x58; // set DRQ bit and clear the busy bit
+			
+			// Otherwise just do a switch case to process the command
+			} else {
+				switch (*selectedRegister) {
+					case ATA_CMD_NOP:{
+						// Command can be received when BSY bit is 1 
+						// and device should terminate the command currently in execution
+						break;
+					}
+					case ATA_CMD_SOFT_RESET: {
+						break;
+					}
+					// case ATA_CMD_PACKET_COMMAND: { // now handled in it's own if block
+					// 	// Process sega packet interface
+					// 	// ...
+					// 	break;
+					// }
+					case ATA_CMD_IDENTIFY_DEVICE: {
+						break;
+					}
+					case ATA_CMD_EXECUTE_DEVICE_DIAGNOSTIC: {
+						break;
+					}
+					case ATA_CMD_SET_FEATURES: {
+						printf("SET_FEATURES\n");
+						break;
+					}
+
+					
 				}
-				case ATA_CMD_SOFT_RESET: {
-					break;
-				}
-				case ATA_CMD_PACKET_COMMAND: {
-					// Process sega packet interface
-					// ...
-					break;
-				}
-				case ATA_CMD_IDENTIFY_DEVICE: {
-					break;
-				}
-				case ATA_CMD_EXECUTE_DEVICE_DIAGNOSTIC: {
-					break;
-				}
-				case ATA_CMD_SET_FEATURES: {
-					break;
-				}
+				// IMPORANT this is really important, if something changes status_register, this busy bit might not be needed
+				// for now, only clear it after commands that aren't packet command as they don't do anything.
+				// Clear BSY bit
+				*status_register = *status_register ^ 0x80; 
 			}
-			//...... un
 		}
 
 		/*
