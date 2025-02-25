@@ -59,7 +59,12 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        "footprint_type_mismatch|64706500|152400000|97db2638-f5cd-4880-afe4-1753f96c9083|00000000-0000-0000-0000-000000000000",
+        "lib_footprint_issues|63926500|152400000|97db2638-f5cd-4880-afe4-1753f96c9083|00000000-0000-0000-0000-000000000000",
+        "lib_footprint_mismatch|146500960|144479010|d01bc46c-dfc0-4303-91d8-ff2b876e1e4f|00000000-0000-0000-0000-000000000000",
+        "unconnected_items|144399000|132478780|de8653ec-d6f0-49b7-8cbf-354aa5146a12|5c03105b-3190-4436-87f5-a51620b41ac1"
+      ],
       "meta": {
         "version": 2
       },

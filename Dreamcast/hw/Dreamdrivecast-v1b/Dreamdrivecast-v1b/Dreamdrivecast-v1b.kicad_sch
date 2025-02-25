@@ -12922,7 +12922,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_Card:microSD_HC_Molex_104031-0811"
+		(property "Footprint" "sd_card_lib:TF-SMD_TF-PUSH"
 			(at 318.77 144.78 0)
 			(effects
 				(font

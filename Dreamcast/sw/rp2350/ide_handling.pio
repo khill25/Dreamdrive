@@ -25,6 +25,9 @@ wait_for_wr:
 
 	mov osr, x              ;; grab data out of the scratch register
 	out pins, 16            ;; send data to pins
+
+    ;; wait for c to tell us to go back to input
+    pull
 .wrap
 
 ;;; Code that Copilot came up with.

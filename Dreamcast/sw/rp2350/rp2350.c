@@ -18,11 +18,21 @@
 
 #include "ide_handling.pio.h"
 
+#include "gdrom.h"
+
 // #include "ff.h" /* Obtains integer types */
 // #include "diskio.h" /* Declarations of disk functions */
 // #include "f_util.h"
 
+// List of important coded control line values for the register map
+#define CODED_DATA_REGISTER_READ (0x50) // dreamcast is reading from the data register
+#define CODED_DATA_REGISTER_WRITE (0x30) // dreacast is writing to the data register
+#define CODED_STATUS_REGISTER_READ (0x57)
+#define CODED_COMMAND_REGISTER_WRITE (0x37)
+
 uint8_t current_transfer_mode = SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT;
+// Disk type is represented in the ice code but not sure what each value represents
+uint8_t gdrom_disk_type = 0xFF; // 0xFF = no disk, 0x80 = ?, 0x20 = CD?, 0x10 = GDROM?, 0x00 = ?
 
 void sdcard_read_test() {
 
@@ -117,6 +127,10 @@ int registerIndexFromControlValue(uint32_t controlValue) {
 #define CORE1_PROCESS_REGISTER_CMD 0x1
 #define CORE1_CHIRP_CMD 0x2
 
+// IRQ does seem to be asserted high which is in contrast to the CS0, CS1, RD, and WR signals.
+#define INTRQ_ASSERT 	(1)
+#define INTRQ_DEASSERT 	(0)
+
 void second_core_main();
 
 // Map values to commands, start with all values loaded to invalid (register count)
@@ -125,6 +139,8 @@ volatile uint16_t* status_register = 0;
 volatile uint16_t* selectedRegister = 0;
 volatile uint32_t register_index = SPI_REGISTER_COUNT;
 
+// volatile uint32_t readRegisters[200] = {0};
+// volatile uint32_t readRegisterIndex = 0;
 volatile uint32_t writtenRegisters[10000] = {0};
 volatile uint32_t writtenRegisterIndex = 0;
 
@@ -210,7 +226,10 @@ int main(void) {
 
 	gpio_init(PIN_INTRQ);
 	gpio_set_dir(PIN_INTRQ, true);
-	gpio_put(PIN_INTRQ, 0);
+	gpio_put(PIN_INTRQ, INTRQ_DEASSERT); // was 0
+
+	gpio_init(PIN_DMARQ);
+	gpio_set_dir(PIN_DMARQ, false); // input
 
 	// Setup and start the ide databus programs
 	printf("Setting up PIO ide databus programs...\n");
@@ -268,6 +287,7 @@ int main(void) {
 
 	SPI_registers[SPI_STATUS_REGISTER_INDEX] = 0b01000000; // set drive ready bit
 	SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX] = 0xA0; // set drive select
+	SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX] = 0b01;
 	SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x40; // 4 if apparently this is the code for a "data disc" and it occupies the top 4 bits of the byte
 
 	// For the rest of the values, just use a dump register
@@ -276,6 +296,8 @@ int main(void) {
 			registerIndex_map[i] = &SPI_registers[SPI_REGISTER_COUNT]; // Use the SPI_REGISTER_COUNT as a dump register
 		}
 	}
+
+	printf("DMARQ: %x\n", gpio_get(PIN_DMARQ));
 	
 	printf("Dreamcast booting...\n");
 
@@ -285,6 +307,9 @@ int main(void) {
 	while(!gpio_get(PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
 	printf("Dreamcast booted!\n");
+
+	printf("DMARQ: %x\n", gpio_get(PIN_DMARQ));
+
 	busy_wait_ms(1000); // TODO this is likely not needed? 
 
 	volatile uint32_t readWriteLineValues = 0;
@@ -313,7 +338,7 @@ int main(void) {
 		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
 		selectedRegister = registerIndex_map[register_index];
 
-		if(writtenRegisterIndex < 100) {
+		if(writtenRegisterIndex < 1000) {
 			writtenRegisters[writtenRegisterIndex++] = register_index;
 		}
 
@@ -321,7 +346,7 @@ int main(void) {
 		if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
 			pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
 
-			if(writtenRegisterIndex < 100) {
+			if(writtenRegisterIndex < 1000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
 			}
@@ -329,9 +354,12 @@ int main(void) {
 			multicore_fifo_push_blocking(register_index);
 
 			gpio_put(PIN_IORDY, 1);
-			// wait for latch?
+			// wait for latch
 			while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
-
+			
+			// Send a signal to pio to let it go back to input
+			pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
+			
 			gpio_put(PIN_IORDY, 0);
 
 		// Write to Dreamcast from register
@@ -340,7 +368,7 @@ int main(void) {
 			pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
 			*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
 
-			if(writtenRegisterIndex < 100) {
+			if(writtenRegisterIndex < 1000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
 			}
@@ -348,27 +376,231 @@ int main(void) {
 			multicore_fifo_push_blocking(register_index);
 
 			gpio_put(PIN_IORDY, 1);
-			// wait for latch?
+			// wait for latch
 			while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
-
 			gpio_put(PIN_IORDY, 0);
 		}
 	}
 
 	return 0;
 }
+
 uint32_t timetrack = 0;
 bool hasChirped = false;
 volatile uint32_t core0CData = 0;
 volatile uint16_t core0commandRegister = 0;
 volatile uint16_t* spi_packet_register = 0;
+volatile uint8_t spi_packet_word_count = 0;
 
 #define DATA_MODE_IDLE 0
 #define DATA_MODE_SPI 1 // Sega SPI packet mode, processing their 12 byte packets
-static uint8_t currentMode = DATA_MODE_IDLE;
-volatile uint8_t spiPacketWordCount = 0;
+static uint8_t ide_current_mode = DATA_MODE_IDLE;
+static uint8_t ide_current_transfer_mode = 0; // 0 = PIO, 1 = DMA
 
-void process_packet_command() {
+#define IO_MODE_IDLE 0
+#define IO_MODE_WRITE 1
+#define IO_MODE_READ 2
+static uint8_t current_io_mode = 0;
+static uint8_t current_io_packet_command = 0; // This is just the current SPI packet command we are processing, useful for sending canned responses vs actual data
+
+// Bake the offset into the starting and ending positions
+// static uint32_t io_current_offset = 0; // for something like reply_11 we might not want to send all of it, just a portion, so this is the offset 
+static uint32_t io_current_position = 0;
+static uint32_t io_ending_position = 0; // this is total byte count
+
+void process_packet() {
+	current_io_packet_command = SEGA_PACKET_CMD_REGISTER[0];
+	ide_current_mode = DATA_MODE_IDLE;
+
+	switch(current_io_packet_command) {
+		case 0x70:
+		case TEST_UNIT_SEGA_PACKET_CMD: {
+			*status_register = 0x50; // only drive ready bit set
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			SPI_registers[SPI_ERROR_REGISTER_INDEX] = 0x00; // no error
+
+			// Set interrupt bit and assert line
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+			break;
+		}
+		case REQ_STAT_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x11111111;
+			}
+			break;
+		}
+		case REQ_MODE_SEGA_PACKET_CMD: {
+			uint startingAddress = SEGA_PACKET_CMD_REGISTER[2];
+			uint length = SEGA_PACKET_CMD_REGISTER[4];
+
+			if (startingAddress == 18 && length == 8) {
+				uint halfLength = length/2; // Divide by two because we are sending 2 bytes at a time (16bit bus)
+				
+				// Setup the IO infos
+				current_io_mode = IO_MODE_WRITE;
+				io_current_position = startingAddress / 2;
+				io_ending_position = (startingAddress / 2) + (halfLength);
+				ide_current_transfer_mode = 0x0; // PIO
+				
+				// put first word in data register
+				SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(reply_11[io_current_position++]);
+
+				// Put the correct values in the registers
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+				SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
+				SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 8; // length is 8 bytes
+				*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+				// set irq
+				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+			} else if (startingAddress == 0 && length == 10) {
+				if(writtenRegisterIndex < 1000) {
+					writtenRegisters[writtenRegisterIndex++] = 0xDEADBEEF;
+				}
+
+			} else {
+				// finish packet by setting an error
+				if(writtenRegisterIndex < 1000) {
+					writtenRegisters[writtenRegisterIndex++] = 0xDEADDEAD;
+				}
+			}
+
+			break;
+		}
+		case SET_MODE_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x22222222;
+			}
+			break;
+		}
+		case REQ_ERROR_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x33333333;
+			}
+			break;
+		}
+		case GET_TOC_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x44444444;
+			}
+			break;
+		}
+		case REQ_SES_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x55555555;
+			}
+			break;
+		}
+		case CD_OPEN_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x66666666;
+			}
+			break;
+		}
+		case CD_PLAY_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x77777777;
+			}
+			break;
+		}
+		case CD_SEEK_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x88888888;
+			}
+			break;
+		}
+		case CD_SCAN_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x99999999;
+			}
+			break;
+		}
+		case CD_READ_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAA;
+			}
+			break;
+		}
+		case CD_READ2_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xBBBBBBBB;
+			}
+			break;
+		}
+		case GET_SCD_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xCCCCCCCC;
+			}
+			break;
+		}
+		default: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xDEDEDEDE;
+			}
+			break;
+		}
+	}
+}
+
+static inline void process_data_written() {
+	if(ide_current_mode == DATA_MODE_SPI) {
+		
+		spi_packet_register[spi_packet_word_count++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+
+		// This is the last word of the packet, process it
+		if (spi_packet_word_count >= 6) {
+			ide_current_mode = DATA_MODE_IDLE;
+			spi_packet_word_count = 0;
+
+			// DEBUG
+			// printf("\nSPI Packet: ");
+			// for(int i = 0; i < 6; i++) {
+			// 	printf("%x ", spi_packet_register[i]);
+			// }
+			// printf("\t");
+			// for(int i = 0; i < 12; i++) {
+			// 	printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
+			// }
+			// printf("\n");
+
+			process_packet();
+		}
+	} else {
+		if(writtenRegisterIndex < 1000) {
+			writtenRegisters[writtenRegisterIndex++] = 0xEEEEEEEE;
+		}
+	}
+}
+
+static inline void process_data_read() {
+	// TODO
+	// Dreamcast has read the data register. Put the next word in the register
+
+	if(current_io_packet_command == REQ_MODE_SEGA_PACKET_CMD) {
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(reply_11[io_current_position++]); // put next word in data register
+
+		if (io_current_position >= io_ending_position) {
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Maybe we need to negate the irq line for the dc to continue to read?
+			// OR we sent the data incorrectly.
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+			// if(writtenRegisterIndex < 1000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xFFFF0000;
+			// }
+		}
+	} else {
+		printf("\n!");
+	}
 
 }
 
@@ -389,6 +621,13 @@ void second_core_main() {
 
 			for(int i = 0; i < writtenRegisterIndex; i++) {
 				printf("\n%x", writtenRegisters[i]);
+
+				// TODO format this dump a little better, it's difficult to parse quickly
+				// if (writtenRegisters[i+1] == 0xAAAA) {
+
+				// } else if (writtenRegisters[i+1] == 0xBBBB) {
+
+				// } 
 			}
 
 			printf("----------------------------------------\n");
@@ -426,46 +665,28 @@ void second_core_main() {
 		core0CData = multicore_fifo_pop_blocking();
 
 		// Host has read the status register
-		if (core0CData == 0x4E) {
-			gpio_put(PIN_INTRQ, 0); // negate the interrupt line
+		if (core0CData == CODED_STATUS_REGISTER_READ) {
+			gpio_put(PIN_INTRQ, INTRQ_DEASSERT); // negate the interrupt line
 			continue;
 		}
 
-		if(currentMode == DATA_MODE_SPI) {
-		
-			spi_packet_register[spiPacketWordCount++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+		if (core0CData == CODED_DATA_REGISTER_WRITE) {
+			process_data_written();
+			continue;
+		}
 
-			// This is the last word of the packet, process it
-			if (spiPacketWordCount >= 6) {
-
-				// DEBUG
-				printf("\nSPI Packet: ");
-				// for(int i = 0; i < 12; i++) {
-				// 	printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
-				// }
-				for(int i = 0; i < 6; i++) {
-					printf("%x ", spi_packet_register[i]);
-				}
-				printf("\n");
-
-				spiPacketWordCount = 0;
-				currentMode = DATA_MODE_IDLE;
-
-				*status_register = 0x50; // only drive ready bit set
-				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0b10; // status register contains completion status
-
-				// Set interrupt bit and assert line
-				gpio_put(PIN_INTRQ, 1);
+		if (core0CData == CODED_DATA_REGISTER_READ) {
+			if (current_io_mode == IO_MODE_WRITE) {
+				process_data_read();
 			}
 
-			// Keep looping as we are waiting for new data
 			continue;
 		}
 
 		// register_index -> selected register 
 		// selectedRegister -> register pointer
 		// The command register is the only one that needs to be processed (for now)
-		if(core0CData == 0x37) {
+		if(core0CData == CODED_COMMAND_REGISTER_WRITE) {
 
 			// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
 			// .. update status register
@@ -476,7 +697,7 @@ void second_core_main() {
 
 			// If this is the packet command, it's the most important case
 			if (core0commandRegister == ATA_CMD_PACKET_COMMAND) {
-				currentMode = DATA_MODE_SPI;
+				ide_current_mode = DATA_MODE_SPI;
 
 				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0b01; // IO, CoD 
 				*status_register = 0x58; // set DRQ bit and clear the busy bit
@@ -487,6 +708,7 @@ void second_core_main() {
 					case ATA_CMD_NOP:{
 						// Command can be received when BSY bit is 1 
 						// and device should terminate the command currently in execution
+						// printf(".");
 						break;
 					}
 					case ATA_CMD_SOFT_RESET: {
