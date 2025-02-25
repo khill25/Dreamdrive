@@ -611,7 +611,7 @@ void second_core_main() {
 
 	while(1) {
 		
-		if(time_us_32() - timetrack > 18000000 && !hasChirped) {
+		if(time_us_32() - timetrack > 60000000/*18000000*/ && !hasChirped) {
 			hasChirped = true;
 			timetrack = time_us_32();
 			printf("----------------------------------------\n");
