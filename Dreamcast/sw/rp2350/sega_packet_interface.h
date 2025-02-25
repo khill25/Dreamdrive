@@ -408,7 +408,3 @@ Bit 3,
  * Byte 3, FAD for lead-out start (LSB)
  */
 // };
-
-void SPI_set_BSY(bool isBusy);
-void SPI_set_DRQ(bool isDataReady);
-void SPI_assert_INTRQ(bool valueHigh);

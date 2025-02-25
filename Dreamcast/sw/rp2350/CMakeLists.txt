@@ -49,14 +49,14 @@ pico_sdk_init()
 # add_subdirectory(lib/freertos-kernel/portable/ThirdParty/GCC/RP2040 FreeRTOS-Kernel)
 
 # Include 3rd party SDCard implementation
-# add_subdirectory(lib/no-OS-FatFS-SD-SPI-RPi-Pico/src)
+add_subdirectory(lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src)
 
 # Add applications
 add_executable(dreamdrivecast
     rp2350.c
     sega_packet_interface.c
     ${CMAKE_CURRENT_LIST_DIR}/utils/sd_utils.c
-    ${CMAKE_CURRENT_LIST_DIR}/utils/cd_utils.c
+    ${CMAKE_CURRENT_LIST_DIR}/utils/gdrom_utils.c
 )
 
 pico_generate_pio_header(dreamdrivecast
@@ -67,6 +67,8 @@ target_include_directories(dreamdrivecast PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/library
+    ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/ff15/source
+    ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include
 )
 
 # pull in common dependencies
@@ -77,7 +79,7 @@ target_link_libraries(dreamdrivecast
 
     # 3rd party libs
     # FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
-    # FatFs_SPI # SDCard and FatFS
+    FatFs_SPI # SDCard and FatFS
 )
 
 
