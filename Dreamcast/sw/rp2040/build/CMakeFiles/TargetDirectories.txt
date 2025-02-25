@@ -204,6 +204,8 @@
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pico-sdk/src/rp2_common/pico_stdlib/CMakeFiles/rebuild_cache.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pico-sdk/docs/CMakeFiles/edit_cache.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/pico-sdk/docs/CMakeFiles/rebuild_cache.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/shared/CMakeFiles/dreamdrivecast_shared_pio_uart_pio_h.dir
+/Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/shared/CMakeFiles/dreamdrivecast_shared_sega_databus_pio_h.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/shared/CMakeFiles/edit_cache.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/shared/CMakeFiles/rebuild_cache.dir
 /Users/kaili/Code/Dreamdrive/Dreamcast/sw/rp2040/build/rp2350/CMakeFiles/dreamdrivecast_rp2350.dir

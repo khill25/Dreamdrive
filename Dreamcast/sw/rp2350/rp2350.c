@@ -30,14 +30,6 @@
 #define CODED_STATUS_REGISTER_READ (0x57)
 #define CODED_COMMAND_REGISTER_WRITE (0x37)
 
-uint8_t current_transfer_mode = SPI_SECTOR_COUNT_TRANSFER_MODE_PIO_DEFAULT;
-// Disk type is represented in the ice code but not sure what each value represents
-uint8_t gdrom_disk_type = 0xFF; // 0xFF = no disk, 0x80 = ?, 0x20 = CD?, 0x10 = GDROM?, 0x00 = ?
-
-void sdcard_read_test() {
-
-}
-
 void printNameOfRegister(uint32_t regIndex) {
 
 	switch(regIndex) {
@@ -139,8 +131,6 @@ volatile uint16_t* status_register = 0;
 volatile uint16_t* selectedRegister = 0;
 volatile uint32_t register_index = SPI_REGISTER_COUNT;
 
-// volatile uint32_t readRegisters[200] = {0};
-// volatile uint32_t readRegisterIndex = 0;
 volatile uint32_t writtenRegisters[10000] = {0};
 volatile uint32_t writtenRegisterIndex = 0;
 
@@ -392,8 +382,8 @@ volatile uint16_t core0commandRegister = 0;
 volatile uint16_t* spi_packet_register = 0;
 volatile uint8_t spi_packet_word_count = 0;
 
-#define DATA_MODE_IDLE 0
-#define DATA_MODE_SPI 1 // Sega SPI packet mode, processing their 12 byte packets
+#define DATA_MODE_IDLE 		(0)
+#define DATA_MODE_SPI 		(1) // Sega SPI packet mode, processing their 12 byte packets
 static uint8_t ide_current_mode = DATA_MODE_IDLE;
 static uint8_t ide_current_transfer_mode = 0; // 0 = PIO, 1 = DMA
 
@@ -401,12 +391,15 @@ static uint8_t ide_current_transfer_mode = 0; // 0 = PIO, 1 = DMA
 #define IO_MODE_WRITE 1
 #define IO_MODE_READ 2
 static uint8_t current_io_mode = 0;
+// In other code bases, this is part of the state variable for data mode, but
+// knowing which packet command is being processed is fine for now.
+// There may be a point when we need to change to a better state machine.
+// But that will likely require rethinking the whole flow.
 static uint8_t current_io_packet_command = 0; // This is just the current SPI packet command we are processing, useful for sending canned responses vs actual data
 
 // Bake the offset into the starting and ending positions
-// static uint32_t io_current_offset = 0; // for something like reply_11 we might not want to send all of it, just a portion, so this is the offset 
 static uint32_t io_current_position = 0;
-static uint32_t io_ending_position = 0; // this is total byte count
+static uint32_t io_ending_position = 0; // IMPORTANT: this is not the ending position, it's the total byte count + offset. So this is the index of the final byte
 
 void process_packet() {
 	current_io_packet_command = SEGA_PACKET_CMD_REGISTER[0];
@@ -431,8 +424,10 @@ void process_packet() {
 		}
 		case REQ_MODE_SEGA_PACKET_CMD: {
 			uint startingAddress = SEGA_PACKET_CMD_REGISTER[2];
-			uint length = SEGA_PACKET_CMD_REGISTER[4];
+			uint length = SEGA_PACKET_CMD_REGISTER[4];	
 
+			// TODO icegdrom does this with 3 specific cases but nulldc just has a whole canned response array
+			// and none of this specific address checking. Might be worth condensing this without any magic numbers
 			if (startingAddress == 18 && length == 8) {
 				uint halfLength = length/2; // Divide by two because we are sending 2 bytes at a time (16bit bus)
 				
@@ -520,6 +515,56 @@ void process_packet() {
 			if(writtenRegisterIndex < 1000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAA;
 			}
+
+			/*
+			ice code---------
+			preload_status = PRELOAD_NONE;
+			service_sectors_left = ((packet.cd_read.transfer_length[1]<<8)|packet.cd_read.transfer_length[2]);
+			uint32_t blk = get_fad(packet.cd_read.start_addr, packet.cd_read.flags&1);
+			if (!imgfile_seek(blk, packet.cd_read.flags)) {
+				// Seek error
+				service_finish_packet(0x04); //Abort 
+				return;
+			}
+			service_cd_read_cont();
+			*/
+
+			/*
+			service_cd_read_cont---------
+
+			// Finish
+			if (!service_sectors_left) {
+    			service_finish_packet(0);
+    			return;
+  			}
+
+			uint8_t offs = imgfile_data_offs;
+			uint8_t len = imgfile_data_len;
+			if (imgfile_sector_complete())
+				--service_sectors_left;
+			if (service_dma) {
+				service_packet_data_dma(len, offs);
+			} else if(service_sectors_left) {
+				service_packet_data_cont(len, offs);
+			} else {
+				service_packet_data_last(len, offs);
+			}
+			
+			// Preload stuff ////////
+			if (service_sectors_left && imgfile_need_to_read) {
+				if (imgfile_read_next_sector(&IDE_DATA_BUFFER[512])) {
+					preload_status = PRELOAD_AVAILABLE;
+				} else {
+					preload_status = PRELOAD_FAILED;
+				}
+			} else {
+			 	preload_status = PRELOAD_NONE;
+			}
+			////////////////////////
+		
+
+			*/
+
 			break;
 		}
 		case CD_READ2_SEGA_PACKET_CMD: {
@@ -544,6 +589,7 @@ void process_packet() {
 }
 
 static inline void process_data_written() {
+	// I think this method will ONLY be called when dreamcast is writing a SPI packet
 	if(ide_current_mode == DATA_MODE_SPI) {
 		
 		spi_packet_register[spi_packet_word_count++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
@@ -553,23 +599,14 @@ static inline void process_data_written() {
 			ide_current_mode = DATA_MODE_IDLE;
 			spi_packet_word_count = 0;
 
-			// DEBUG
-			// printf("\nSPI Packet: ");
-			// for(int i = 0; i < 6; i++) {
-			// 	printf("%x ", spi_packet_register[i]);
-			// }
-			// printf("\t");
-			// for(int i = 0; i < 12; i++) {
-			// 	printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
-			// }
-			// printf("\n");
-
 			process_packet();
 		}
 	} else {
+		// So this else block is likely unneeded but will keep this here for debugging purposes
 		if(writtenRegisterIndex < 1000) {
 			writtenRegisters[writtenRegisterIndex++] = 0xEEEEEEEE;
 		}
+		// TODO might be better to just printf something instead?
 	}
 }
 

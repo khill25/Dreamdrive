@@ -51,17 +51,12 @@ pico_sdk_init()
 # Include 3rd party SDCard implementation
 # add_subdirectory(lib/no-OS-FatFS-SD-SPI-RPi-Pico/src)
 
-# Add shared code
-# add_subdirectory(shared)
-# add_subdirectory(mcu1/lib/sdcard/no-OS-FatFS-SD-SPI-RPi-Pico/src)
-
 # Add applications
 add_executable(dreamdrivecast
     rp2350.c
     sega_packet_interface.c
-    # sdcard/internal_sd_card.c
-    # sdcard/hw_config.c
-    # sdcard/simple.c
+    ${CMAKE_CURRENT_LIST_DIR}/utils/sd_utils.c
+    ${CMAKE_CURRENT_LIST_DIR}/utils/cd_utils.c
 )
 
 pico_generate_pio_header(dreamdrivecast
@@ -71,6 +66,7 @@ pico_generate_pio_header(dreamdrivecast
 target_include_directories(dreamdrivecast PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/library
 )
 
 # pull in common dependencies
@@ -83,6 +79,7 @@ target_link_libraries(dreamdrivecast
     # FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
     # FatFs_SPI # SDCard and FatFS
 )
+
 
 # stdio config
 pico_enable_stdio_usb(dreamdrivecast 0)
