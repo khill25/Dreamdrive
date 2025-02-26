@@ -56,7 +56,10 @@ add_executable(dreamdrivecast
     rp2350.c
     sega_packet_interface.c
     ${CMAKE_CURRENT_LIST_DIR}/utils/sd_utils.c
+    ${CMAKE_CURRENT_LIST_DIR}/utils/hw_config.c
     ${CMAKE_CURRENT_LIST_DIR}/utils/gdrom_utils.c
+    ${CMAKE_CURRENT_LIST_DIR}/lib/nullDC/ImgReader/common.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/lib/nullDC/ImgReader/gdi.cpp
 )
 
 pico_generate_pio_header(dreamdrivecast
@@ -67,8 +70,9 @@ target_include_directories(dreamdrivecast PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/library
-    ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/ff15/source
-    ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include
+    # ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/ff15/source
+    # ${CMAKE_CURRENT_LIST_DIR}/lib/no-OS-FatFS-SD-SDIO-SPI-RPi-Pico/src/include
+    ${CMAKE_CURRENT_LIST_DIR}/lib/nullDC/ImgReader
 )
 
 # pull in common dependencies
@@ -79,7 +83,7 @@ target_link_libraries(dreamdrivecast
 
     # 3rd party libs
     # FreeRTOS-Kernel-Static # FreeRTOS kernel, static allocations
-    FatFs_SPI # SDCard and FatFS
+    no-OS-FatFS-SD-SDIO-SPI-RPi-Pico
 )
 
 

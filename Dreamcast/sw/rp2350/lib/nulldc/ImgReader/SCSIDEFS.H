@@ -279,26 +279,26 @@ typedef struct {
 struct MMC_READCD
 {
 	//+0
-	u8 opcode;
+	uint8_t opcode;
 	//+1
-	u8 RelADR:1;
-	u8 res_1:1;
-	u8 ExpectedSectorType:3;
-	u8 res_2:3;
+	uint8_t RelADR:1;
+	uint8_t res_1:1;
+	uint8_t ExpectedSectorType:3;
+	uint8_t res_2:3;
 	//+2
-	u8 LBA[4];
+	uint8_t LBA[4];
 	//+6
-	u8 len[3];
+	uint8_t len[3];
 	//+9
-	u8 res_3:1;
-	u8 err:2;
-	u8 EDC_ECC:1;
-	u8 UserData:1;
-	u8 HeaderCodes:2;
-	u8 sync:1;
+	uint8_t res_3:1;
+	uint8_t err:2;
+	uint8_t EDC_ECC:1;
+	uint8_t UserData:1;
+	uint8_t HeaderCodes:2;
+	uint8_t sync:1;
 	//+10
-	u8 subchannel:3;
-	u8 res:5;
+	uint8_t subchannel:3;
+	uint8_t res:5;
 	//+11
-	u8 control;
+	uint8_t control;
 };

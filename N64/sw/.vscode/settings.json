@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "hw_config.h": "c",
+        "sd_card.h": "c"
+    }
+}

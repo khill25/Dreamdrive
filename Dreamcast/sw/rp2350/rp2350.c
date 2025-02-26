@@ -20,6 +20,8 @@
 
 #include "gdrom.h"
 
+#include "sd_card.h"
+
 // #include "ff.h" /* Obtains integer types */
 // #include "diskio.h" /* Declarations of disk functions */
 // #include "f_util.h"
@@ -643,6 +645,11 @@ static inline void process_data_read() {
 
 void second_core_main() {
 	printf("Core1 Online\n");
+
+	printf("Testing SD card...\n");
+	sdcard_init();
+	sdcard_read_test();
+	printf("DONE!\n");
 
 	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
 

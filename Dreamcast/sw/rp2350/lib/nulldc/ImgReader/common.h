@@ -1,33 +1,57 @@
 #pragma once
-#include "gd_driver.h"
+#include "pico/stdlib.h"
+#include "string.h"
 #include <vector>
+#include <string>
 using namespace std;
 
-extern u32 NullDriveDiscType;
+#define verify(x) if((x)==false){ printf("Verify Failed  : " #x "\n in %s -> %s : %d \n",__FUNCTION__,__FILE__,__LINE__); }
+
+enum DiscType
+{
+	CdDA=0x00,
+	CdRom=0x10,
+	CdRom_XA=0x20,
+	CdRom_Extra=0x30,
+	CdRom_CDI=0x40,
+	GdRom=0x80,		
+
+	NoDisk=0x1,			//These are a bit hacky .. but work for now ...
+	Open=0x2,			//tray is open :)
+	Busy=0x3			//busy -> needs to be automatically done by gdhost
+};
+
+enum DiskArea
+{
+	SingleDensity,
+	DoubleDensity
+};
+
+extern uint32_t NullDriveDiscType;
 struct TocTrackInfo
 {
-	u32 FAD;	//fad , intel format
-	u8 Control;	//cotnrol info
-	u8 Addr;	//addr info
-	u8 Session; //Session where teh track belongs
+	uint32_t FAD;	//fad , intel format
+	uint8_t Control;	//cotnrol info
+	uint8_t Addr;	//addr info
+	uint8_t Session; //Session where teh track belongs
 };
 struct TocInfo
 {
 	//0-98 ->1-99
 	TocTrackInfo tracks[99];
 
-	u8 FistTrack;
-	u8 LastTrack;
+	uint8_t FistTrack;
+	uint8_t LastTrack;
 
 	TocTrackInfo LeadOut;	//session set to 0 on that one
 };
 
 struct SessionInfo
 {
-	u32 SessionsEndFAD;	//end of Disc (?)
-	u8 SessionCount;	//must be at least 1
-	u32 SessionStart[99];//start track for session
-	u32 SessionFAD[99];	//for sessions 1-99 ;)
+	uint32_t SessionsEndFAD;	//end of Disc (?)
+	uint8_t SessionCount;	//must be at least 1
+	uint32_t SessionStart[99];//start track for session
+	uint32_t SessionFAD[99];	//for sessions 1-99 ;)
 };
 
 /*
@@ -78,45 +102,45 @@ enum SubcodeFormat
 	SUBFMT_96					//raw 96-byte subcode info
 };
 
-extern DriveNotifyEventFP* DriveNotifyEvent;
+bool ConvertSector(uint8_t* in_buff , uint8_t* out_buff , int from , int to,int sector);
 
-bool ConvertSector(u8* in_buff , u8* out_buff , int from , int to,int sector);
-
-bool InitDrive(u32 fileflags=0);
+bool InitDrive(uint32_t fileflags=0);
 void TermDrive();
 
-void PatchRegion_0(u8* sector,int size);
-void PatchRegion_6(u8* sector,int size);
-void ConvToc(u32* to,TocInfo* from);
-void GetDriveToc(u32* to,DiskArea area);
-void GetDriveSector(u8 * buff,u32 StartSector,u32 SectorCount,u32 secsz);
+void PatchRegion_0(uint8_t* sector,int size);
+void PatchRegion_6(uint8_t* sector,int size);
+void ConvToc(uint32_t* to,TocInfo* from);
+void GetDriveToc(uint32_t* to,DiskArea area);
+void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz);
+extern uint8_t q_subchannel[96];
 
-void GetDriveSessionInfo(u8* to,u8 session);
-int GetFile(TCHAR *szFileName, TCHAR *szParse=0,u32 flags=0);
-int msgboxf(wchar* text,unsigned int type,...);
-void printtoc(TocInfo* toc,SessionInfo* ses);
-extern u8 q_subchannel[96];
-
+// Originally in gd_driver.h ////////////////////////////////////////
+typedef void DriveRead(uint8_t * buff, uint32_t StartSector, uint32_t SectorCount, uint32_t secsz);
+typedef void DriveGetToc(uint32_t* toc, DiskArea area);
+typedef DiscType DriveGetType();
+typedef void DriveInit();
+typedef void DriveTerm();
+//////////////////////////////////////////////////////////////////////
 
 struct Session
 {
-	u32 StartFAD;			//session's start fad
-	u8 FirstTrack;			//session's first track
+	uint32_t StartFAD;			//session's start fad
+	uint8_t FirstTrack;			//session's first track
 };
 
 struct TrackFile
 {
-	virtual void Read(u32 FAD,u8* dst,SectorFormat* sector_type,u8* subcode,SubcodeFormat* subcode_type)=0;
+	virtual void Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)=0;
 	virtual ~TrackFile() {};
 };
 
 struct Track
 {
 	TrackFile* file;	//handler for actual IO
-	u32 StartFAD;		//Start FAD
-	u32 EndFAD;			//End FAD
-	u8 CTRL;
-	u8 ADDR;
+	uint32_t StartFAD;		//Start FAD
+	uint32_t EndFAD;			//End FAD
+	uint8_t CTRL;
+	uint8_t ADDR;
 
 	Track()
 	{
@@ -126,7 +150,7 @@ struct Track
 		CTRL = 0;
 		ADDR = 0;
 	}
-	bool Read(u32 FAD,u8* dst,SectorFormat* sector_type,u8* subcode,SubcodeFormat* subcode_type)
+	bool Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
 	{
 		if (FAD>=StartFAD && (FAD<=EndFAD || EndFAD==0) && file)
 		{
@@ -145,11 +169,11 @@ struct Disc
 	vector<Session> sessions;	//info for sessions
 	vector<Track> tracks;		//info for tracks
 	Track LeadOut;				//info for lead out track (can't read from here)
-	u32 EndFAD;					//Last valid disc sector
+	uint32_t EndFAD;					//Last valid disc sector
 	DiscType type;
 
 	//functions !
-	bool ReadSector(u32 FAD,u8* dst,SectorFormat* sector_type,u8* subcode,SubcodeFormat* subcode_type)
+	bool ReadSector(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
 	{
 		for(size_t i = tracks.size();(i--) > 0;)
 		{
@@ -162,9 +186,9 @@ struct Disc
 		return false;
 	}
 
-	void ReadSectors(u32 FAD,u32 count,u8* dst,u32 fmt)
+	void ReadSectors(uint32_t FAD,uint32_t count,uint8_t* dst,uint32_t fmt)
 	{
-		u8 temp[2352] = {0};
+		uint8_t temp[2352] = {0};
 		SectorFormat secfmt;
 		SubcodeFormat subfmt;		
 		bool readError = false;
@@ -234,11 +258,11 @@ extern Disc* disc;
 struct RawTrackFile : TrackFile
 {
 	FILE* file;
-	s32 offset;
-	u32 fmt;
+	int32_t offset;
+	uint32_t fmt;
 	bool cleanup;
 
-	RawTrackFile(FILE* file,u32 file_offs,u32 first_fad,u32 secfmt,const bool auto_cleanup = true)
+	RawTrackFile(FILE* file,uint32_t file_offs,uint32_t first_fad,uint32_t secfmt,const bool auto_cleanup = true)
 	{
 		this->file=file;
 		this->offset=file_offs-first_fad*secfmt;
@@ -246,7 +270,7 @@ struct RawTrackFile : TrackFile
 		this->cleanup=auto_cleanup;
 	}
 
-	virtual void Read(u32 FAD,u8* dst,SectorFormat* sector_type,u8* subcode,SubcodeFormat* subcode_type)
+	virtual void Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
 	{
 		//for now hackish
 		if (fmt==2352)

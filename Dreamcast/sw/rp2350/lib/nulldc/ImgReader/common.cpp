@@ -1,45 +1,26 @@
 #include "common.h"
-#include "cdi.h"
-#include "mds.h"
 #include "gdi.h"
-#include "chd.h"
-#include "ioctl.h"
 
 #include <memory.h>
-#include <windows.h>
-u32 NullDriveDiscType;
+
+uint32_t NullDriveDiscType;
 Disc* disc;
-Disc*(*drivers[])(wchar* path)=
+Disc*(*drivers[])(char* path)=
 {
 	gdi_parse,
-	cdi_parse,
-	ioctl_parse,
-	chd_parse,
-	mds_parse,
 	0
 };
 
-DriveNotifyEventFP* DriveNotifyEvent;
-u8 q_subchannel[96];
+uint8_t q_subchannel[96];
 
-int msgboxf(wchar* text,unsigned int type,...)
-{
-	va_list args;
+#define SETTING_SHOULD_PATCH_REGION (0)
 
-	wchar temp[2048];
-	va_start(args, type);
-	vswprintf(temp,sizeof(temp), text, args);
-	va_end(args);
-
-
-	return MessageBox(NULL,temp,emu_name,type | MB_TASKMODAL);
-}
-void PatchRegion_0(u8* sector,int size)
-{
-	if (settings.PatchRegion==0)
+void PatchRegion_0(uint8_t* sector,int size) {
+	if (SETTING_SHOULD_PATCH_REGION==0) {
 		return;
+	}
 
-	u8* usersect=sector;
+	uint8_t* usersect=sector;
 
 	if (size!=2048)
 	{
@@ -47,15 +28,16 @@ void PatchRegion_0(u8* sector,int size)
 	}
 
 	//patch meta info
-	u8* p_area_symbol=&usersect[0x30];
+	uint8_t* p_area_symbol=&usersect[0x30];
 	memcpy(p_area_symbol,"JUE        ",8);
 }
-void PatchRegion_6(u8* sector,int size)
-{
-	if (settings.PatchRegion==0)
-		return;
 
-	u8* usersect=sector;
+void PatchRegion_6(uint8_t* sector,int size) {
+	if (SETTING_SHOULD_PATCH_REGION==0) {
+		return;
+	}
+
+	uint8_t* usersect=sector;
 
 	if (size!=2048)
 	{
@@ -63,12 +45,13 @@ void PatchRegion_6(u8* sector,int size)
 	}
 
 	//patch area symbols
-	u8* p_area_text=&usersect[0x700];
+	uint8_t* p_area_text=&usersect[0x700];
 	memcpy(&p_area_text[4],"For JAPAN,TAIWAN,PHILIPINES.",28);
 	memcpy(&p_area_text[4 + 32],"For USA and CANADA.         ",28);
 	memcpy(&p_area_text[4 + 32 + 32],"For EUROPE.                 ",28);
 }
-bool ConvertSector(u8* in_buff , u8* out_buff , int from , int to,int sector)
+
+bool ConvertSector(uint8_t* in_buff , uint8_t* out_buff , int from , int to,int sector)
 {
 	//get subchannel data, if any
 	if (from==2448)
@@ -132,102 +115,31 @@ bool ConvertSector(u8* in_buff , u8* out_buff , int from , int to,int sector)
 	return true;
 }
 
-bool InitDrive_(wchar* fn)
-{
-	TermDrive();
-
-	//try all drivers
-	for (int i=0;drivers[i] && !(disc=drivers[i](fn));i++) ;
-
-	if (disc!=0)
-	{
-		NullDriveDiscType=Busy;
-		DriveNotifyEvent(DiskChange,0);
-		Sleep(400); //busy for a bit
-		return true;
-	}
-	else
-	{
-		NullDriveDiscType=NoDisk; //no disc :)
-	}
-	return false;
-}
-
-bool InitDrive(u32 fileflags)
-{
-	if (settings.LoadDefaultImage)
-	{
-		wprintf(L"Loading default image \"%s\"\n",settings.DefaultImage);
-		if (!InitDrive_(settings.DefaultImage))
-		{
-			msgboxf(L"Default image \"%s\" failed to load",MB_ICONERROR);
-			return false;
-		}
-		else
-			return true;
-	}
-
-	wchar fn[512];
-	wcscpy(fn,settings.LastImage);
-#ifdef BUILD_DREAMCAST
-	int gfrv=GetFile(fn,0,fileflags);
-#else
-	int gfrv=0;
-#endif
-	if (gfrv==0)
-	{
-		NullDriveDiscType=NoDisk;
-		return true;
-	}
-	else if (gfrv==-1)
-		return false;
-
-	wcscpy(settings.LastImage,fn);
-	SaveSettings();
-
-	if (!InitDrive_(fn))
-	{
-		msgboxf(L"Selected image failed to load",MB_ICONERROR);
-		return false;
-	}
-	else
-		return true;
-}
-
-void TermDrive()
-{
-	if (disc!=0)
-		delete disc;
-
-	disc=0;
-}
-
-
 //
 //convert our nice toc struct to dc's native one :)
 
-u32 CreateTrackInfo(u32 ctrl,u32 addr,u32 fad)
+uint32_t CreateTrackInfo(uint32_t ctrl,uint32_t addr,uint32_t fad)
 {
-	u8 p[4];
+	uint8_t p[4];
 	p[0]=(ctrl<<4)|(addr<<0);
 	p[1]=fad>>16;
 	p[2]=fad>>8;
 	p[3]=fad>>0;
 
-	return *(u32*)p;
+	return *(uint32_t*)p;
 }
-u32 CreateTrackInfo_se(u32 ctrl,u32 addr,u32 tracknum)
+uint32_t CreateTrackInfo_se(uint32_t ctrl,uint32_t addr,uint32_t tracknum)
 {
-	u8 p[4];
+	uint8_t p[4];
 	p[0]=(ctrl<<4)|(addr<<0);
 	p[1]=tracknum;
 	p[2]=0;
 	p[3]=0;
-	return *(u32*)p;
+	return *(uint32_t*)p;
 }
 
 
-void GetDriveSector(u8 * buff,u32 StartSector,u32 SectorCount,u32 secsz)
+void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz)
 {
 	if (disc)
 	{
@@ -239,7 +151,7 @@ void GetDriveSector(u8 * buff,u32 StartSector,u32 SectorCount,u32 secsz)
 		}
 	}
 }
-void GetDriveToc(u32* to,DiskArea area)
+void GetDriveToc(uint32_t* to,DiskArea area)
 {
 	if (!disc)
 		return;
@@ -251,8 +163,8 @@ void GetDriveToc(u32* to,DiskArea area)
 	//normal CDs: 1 .. tc
 	//GDROM: area0 is 1 .. 2, area1 is 3 ... tc
 
-	u32 first_track=1;
-	u32 last_track=disc->tracks.size();
+	uint32_t first_track=1;
+	uint32_t last_track=disc->tracks.size();
 	if (area==DoubleDensity)
 		first_track=3;
 	else if (disc->type==GdRom)
@@ -275,13 +187,13 @@ void GetDriveToc(u32* to,DiskArea area)
 	else
 		to[101]=CreateTrackInfo(disc->LeadOut.CTRL,disc->LeadOut.ADDR,disc->LeadOut.StartFAD);
 
-	for (u32 i=first_track-1;i<last_track;i++)
+	for (uint32_t i=first_track-1;i<last_track;i++)
 	{
 		to[i]=CreateTrackInfo(disc->tracks[i].CTRL,disc->tracks[i].ADDR,disc->tracks[i].StartFAD); 
 	}
 }
 
-void GetDriveSessionInfo(u8* to,u8 session)
+void GetDriveSessionInfo(uint8_t* to,uint8_t session)
 {
 	if (!disc)
 		return;
@@ -307,10 +219,10 @@ void GetDriveSessionInfo(u8* to,u8 session)
 void printtoc(TocInfo* toc,SessionInfo* ses)
 {
 	printf("Sessions %d\n",ses->SessionCount);
-	for (u32 i=0;i<ses->SessionCount;i++)
+	for (uint32_t i=0;i<ses->SessionCount;i++)
 	{
 		printf("Session %d: FAD %d,First Track %d\n",i+1,ses->SessionFAD[i],ses->SessionStart[i]);
-		for (u32 t=toc->FistTrack-1;t<=toc->LastTrack;t++)
+		for (uint32_t t=toc->FistTrack-1;t<=toc->LastTrack;t++)
 		{
 			if (toc->tracks[t].Session==i+1)
 			{
