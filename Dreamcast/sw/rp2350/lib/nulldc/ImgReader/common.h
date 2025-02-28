@@ -1,6 +1,8 @@
 #pragma once
 #include "pico/stdlib.h"
 #include "string.h"
+#include "sd_utils.h"
+#include <vector>
 #include <vector>
 #include <string>
 using namespace std;
@@ -128,15 +130,83 @@ struct Session
 	uint8_t FirstTrack;			//session's first track
 };
 
-struct TrackFile
+extern FIL* track_files; // Dynamic array of track file handles
+struct RawTrackFile
 {
-	virtual void Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)=0;
-	virtual ~TrackFile() {};
+	// FIL file;
+	char filename[512];
+	// TODO probably need to track the current offset if the filepointer keeps dying
+	int32_t offset;
+	uint32_t fmt;
+	bool cleanup;
+
+	RawTrackFile(const char* filename) {
+		strcpy(this->filename, filename);
+	}
+
+	void Populate(uint32_t file_offs,uint32_t first_fad,uint32_t secfmt,const bool auto_cleanup = true)
+	{
+		this->offset=file_offs-first_fad*secfmt;
+		this->fmt=secfmt;
+		this->cleanup=auto_cleanup;
+	}
+
+	virtual void Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
+	{
+		//for now hackish
+		if (fmt==2352)
+			*sector_type=SECFMT_2352;
+		else if (fmt==2048)
+			*sector_type=SECFMT_2048_MODE2_FORM1;
+		else if (fmt==2336)
+			*sector_type=SECFMT_2336_MODE2;
+		else
+		{
+			verify(false);
+		}
+
+		// TODO there has to be a better way to do this file reading
+		// without having to remount and reopen the file everytime...
+		FIL file;
+		FRESULT fr;
+		FATFS fs;
+		fr = f_mount(&fs, "", 1);
+		if (FR_OK != fr) {
+			printf("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+			return;
+		}
+
+		fr = f_open(&file, filename, FA_READ);
+		if (FR_OK != fr && FR_EXIST != fr) {
+			printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+			return;
+		}
+
+		// printf("offset+FAD*fmt: %d", (offset+FAD*fmt));
+		// Rewritten with supported methods
+		fr = f_lseek(&file, offset+FAD*fmt);
+		if (fr != FR_OK) {
+			printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
+		}
+		fr = f_read(&file,dst,fmt,0);
+		if (fr != FR_OK) {
+			printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
+		}
+
+		f_close(&file);
+	}
+	virtual ~RawTrackFile()
+	{
+		// printf("Destructing file...\n");
+		// if (&file) {
+		// 	f_close(&file);
+		// }
+	}
 };
 
 struct Track
 {
-	TrackFile* file;	//handler for actual IO
+	RawTrackFile* file;	//handler for actual IO
 	uint32_t StartFAD;		//Start FAD
 	uint32_t EndFAD;			//End FAD
 	uint8_t CTRL;
@@ -152,13 +222,14 @@ struct Track
 	}
 	bool Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
 	{
-		if (FAD>=StartFAD && (FAD<=EndFAD || EndFAD==0) && file)
-		{
+		if (FAD>=StartFAD && (FAD<=EndFAD || EndFAD==0) && file) {
 			file->Read(FAD,dst,sector_type,subcode,subcode_type);
 			return true;
 		}
-		else
+		else {
+			printf("Common.h:162\t - Track::Read() - FAD: %u, StartFAD: %u, EndFAD: %u, File ok? %u\n", FAD, StartFAD, EndFAD, file != 0);
 			return false;
+		}
 	}
 	void Destroy() { if (file) delete file; file=0; }
 };
@@ -175,12 +246,12 @@ struct Disc
 	//functions !
 	bool ReadSector(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
 	{
-		for(size_t i = tracks.size();(i--) > 0;)
-		{
+		for(size_t i = tracks.size();(i--) > 0;) {
 			*subcode_type=SUBFMT_NONE;
 
-			if (tracks[i].Read(FAD,dst,sector_type,subcode,subcode_type))
+			if (tracks[i].Read(FAD,dst,sector_type,subcode,subcode_type)) {
 				return true;
+			}
 		}
 
 		return false;
@@ -198,7 +269,8 @@ struct Disc
 			if (!readError && !ReadSector(FAD,temp,&secfmt,q_subchannel,&subfmt))
 			{				
 				readError = true; //verify(false);				
-				printf("ImgReader (common.h,177) - Sector read error!\n");
+				printf("ImgReader (common.h,201) - Sector read error!\n");
+				printf("FAD: %u, Count:%u, FMT: %u\n",FAD,count,fmt);
 			}
 
 			//TODO: Proper sector conversions
@@ -215,7 +287,7 @@ struct Disc
 			else if(!readError)
 			{
 				readError = true; //verify(false);
-				printf("ImgReader (common.h,194) - Sector conversion error!\n");
+				printf("ImgReader (common.h,218) - Sector conversion error!\n");
 			}
 
 			dst+=fmt;
@@ -254,44 +326,5 @@ struct Disc
 };
 
 extern Disc* disc;
-
-struct RawTrackFile : TrackFile
-{
-	FILE* file;
-	int32_t offset;
-	uint32_t fmt;
-	bool cleanup;
-
-	RawTrackFile(FILE* file,uint32_t file_offs,uint32_t first_fad,uint32_t secfmt,const bool auto_cleanup = true)
-	{
-		this->file=file;
-		this->offset=file_offs-first_fad*secfmt;
-		this->fmt=secfmt;
-		this->cleanup=auto_cleanup;
-	}
-
-	virtual void Read(uint32_t FAD,uint8_t* dst,SectorFormat* sector_type,uint8_t* subcode,SubcodeFormat* subcode_type)
-	{
-		//for now hackish
-		if (fmt==2352)
-			*sector_type=SECFMT_2352;
-		else if (fmt==2048)
-			*sector_type=SECFMT_2048_MODE2_FORM1;
-		else if (fmt==2336)
-			*sector_type=SECFMT_2336_MODE2;
-		else
-		{
-			verify(false);
-		}
-
-		fseek(file,offset+FAD*fmt,SEEK_SET);
-		fread(dst,1,fmt,file);
-	}
-	virtual ~RawTrackFile()
-	{
-		if (cleanup && file)
-			fclose(file);
-	}
-};
 
 DiscType GuessDiscType(bool m1, bool m2, bool da);

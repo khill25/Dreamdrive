@@ -20,7 +20,9 @@
 
 #include "gdrom.h"
 
-#include "sd_card.h"
+#include "sd_utils.h"
+
+#include "gdrom_utils.h"
 
 // #include "ff.h" /* Obtains integer types */
 // #include "diskio.h" /* Declarations of disk functions */
@@ -401,7 +403,7 @@ static uint8_t current_io_packet_command = 0; // This is just the current SPI pa
 
 // Bake the offset into the starting and ending positions
 static uint32_t io_current_position = 0;
-static uint32_t io_ending_position = 0; // IMPORTANT: this is not the ending position, it's the total byte count + offset. So this is the index of the final byte
+static uint32_t io_ending_position = 0;
 
 void process_packet() {
 	current_io_packet_command = SEGA_PACKET_CMD_REGISTER[0];
@@ -514,58 +516,14 @@ void process_packet() {
 			break;
 		}
 		case CD_READ_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAA;
-			}
+			// Setup state variables
+			gdrom_read_start(SEGA_PACKET_CMD_REGISTER, ide_current_transfer_mode);
 
-			/*
-			ice code---------
-			preload_status = PRELOAD_NONE;
-			service_sectors_left = ((packet.cd_read.transfer_length[1]<<8)|packet.cd_read.transfer_length[2]);
-			uint32_t blk = get_fad(packet.cd_read.start_addr, packet.cd_read.flags&1);
-			if (!imgfile_seek(blk, packet.cd_read.flags)) {
-				// Seek error
-				service_finish_packet(0x04); //Abort 
-				return;
-			}
-			service_cd_read_cont();
-			*/
+			// load buffer
 
-			/*
-			service_cd_read_cont---------
+			// read first word from buffer into data register
 
-			// Finish
-			if (!service_sectors_left) {
-    			service_finish_packet(0);
-    			return;
-  			}
-
-			uint8_t offs = imgfile_data_offs;
-			uint8_t len = imgfile_data_len;
-			if (imgfile_sector_complete())
-				--service_sectors_left;
-			if (service_dma) {
-				service_packet_data_dma(len, offs);
-			} else if(service_sectors_left) {
-				service_packet_data_cont(len, offs);
-			} else {
-				service_packet_data_last(len, offs);
-			}
-			
-			// Preload stuff ////////
-			if (service_sectors_left && imgfile_need_to_read) {
-				if (imgfile_read_next_sector(&IDE_DATA_BUFFER[512])) {
-					preload_status = PRELOAD_AVAILABLE;
-				} else {
-					preload_status = PRELOAD_FAILED;
-				}
-			} else {
-			 	preload_status = PRELOAD_NONE;
-			}
-			////////////////////////
-		
-
-			*/
+			// handle sending data in the process_data_read method
 
 			break;
 		}
@@ -637,19 +595,75 @@ static inline void process_data_read() {
 			// 	writtenRegisters[writtenRegisterIndex++] = 0xFFFF0000;
 			// }
 		}
+	} else if (current_io_packet_command == CD_READ_SEGA_PACKET_CMD) { 
+		// read from the sd card and send data from the gdrom_read_buffer
+		
+
 	} else {
 		printf("\n!");
 	}
 
 }
 
+#define DEBUG_TEST (1)
 void second_core_main() {
 	printf("Core1 Online\n");
 
-	printf("Testing SD card...\n");
-	sdcard_init();
-	sdcard_read_test();
+	printf("Opening default disc image...\n");
+	gdrom_read_default_disc_image();
 	printf("DONE!\n");
+
+	#ifdef DEBUG_TEST
+	busy_wait_ms(500);
+
+	// Test the read command
+	SEGA_PACKET_CMD_REGISTER[0] = 0x30;
+	SEGA_PACKET_CMD_REGISTER[1] = 0x24;
+	SEGA_PACKET_CMD_REGISTER[2] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
+	SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
+	SEGA_PACKET_CMD_REGISTER[5] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[6] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[7] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[8] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[9] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[10] = 0x07;
+	SEGA_PACKET_CMD_REGISTER[11] = 0x00;
+	gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
+
+	printf("GDROM Read Test\n");
+
+	printf("SPI Command Packet:\t");
+	for(int i = 0; i < 12; i++) {
+		printf("(%u)%x ", i, SEGA_PACKET_CMD_REGISTER[i]);
+	}
+	printf("\n");
+
+	printf("Sector Start: %u(0x%x), Sector Count: %u(0x%x), Sector Size: %u(0x%x)\n", gdrom_read_start_sector, gdrom_read_start_sector, gdrom_read_remaining_sectors, gdrom_read_remaining_sectors, gdrom_read_sector_size, gdrom_read_sector_size);
+	printf("Data Buffer:");
+	for (int i = 0; i < 32; i++) {
+		if (i % 8 == 0) {
+			printf("\n%d: ", i);
+		}
+		printf("%x ", gdrom_read_buffer[i]);
+	}
+
+	printf("\nData Register:");
+	for (int i = 0; i < 32; i++) {
+		gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+		if (i % 8 == 0) {
+			printf("\n%d: ", i);
+		}
+		printf("%x ", SPI_registers[SPI_DATA_REGISTER_INDEX]);
+	}
+	printf("\n\n");
+
+	// printf("Data_Buffer[0]: %x\n", gdrom_read_buffer[0]);
+	// printf("Data Register:  %x\n", SPI_registers[SPI_DATA_REGISTER_INDEX]);
+
+	// Stall here
+	while(1);;;
+	#endif
 
 	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
 

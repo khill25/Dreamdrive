@@ -5,14 +5,8 @@
  */
 
  #include <stdio.h>
-
 #include "pico/stdlib.h"
-
-#include "f_util.h"
-#include "ff.h"
-#include "hw_config.h"
-
- #include "sd_utils.h"
+#include "sd_utils.h"
 
 // TODO
 // * Create a read buffer.... so we can dma? How do we read this from main to send to DC?
@@ -22,10 +16,7 @@
 // Sectors are 2048 bytes (I think?)
 // SD card sectors are 512 bytes so we can read 4 sectors at a time into a single gdrom sector buffer
 // nulldc uses a 32 sector buffer 
-#define MAX_SECTOR_BYTE_SIZE (2336) // This is a weird number, but also includes dummy bytes
-#define MAX_BUFFERED_SECTORS (32)
-#define MAX_BUFFER_SIZE (MAX_SECTOR_BYTE_SIZE * MAX_BUFFERED_SECTORS)
-uint8_t sd_read_buffer[MAX_BUFFER_SIZE]; // Place to put read data
+
 
 
 /*
@@ -41,12 +32,16 @@ struct
 /*
 Sector size
 mode 1 = 2048 bytes
-mode 2 = 2336 bytes
+mode 2 = 2336 bytes + 4 bytes as dummy??
 mode 2 form 1 = 2048 bytes
 mode 2 form 2 = 2324 bytes
 mode 2 non-xa = 2336 bytes
 
 Extra info...
+MODE1:
+    This mode consists of 2048-byte User Data a 4-byte error detection flag area 
+    and a 276-byte error correction area for flag error control.
+
 When Mode 2 has been specified, a Sub Header is also automatically transferred when data is specified in Data Select. 
 Also, when the data is Form 1: 
     28 bytes are added as dummy bytes for the transmission 
