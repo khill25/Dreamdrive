@@ -17,7 +17,8 @@ set(PICO_BOARD pimoroni_pga2350 CACHE STRING "Board type")
 cmake_minimum_required(VERSION 3.5)
 
 # Build as release but with debug symbols
-set(CMAKE_BUILD_TYPE RelWithDebugInfo)
+# set(CMAKE_BUILD_TYPE RelWithDebugInfo)
+set(CMAKE_BUILD_TYPE Debug)
 set(PICO_PLATFORM rp2350-arm-s)
 
 # Pull in SDK (must be before project)

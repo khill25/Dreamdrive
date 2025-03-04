@@ -131,17 +131,20 @@ struct Session
 };
 
 extern FIL* track_files; // Dynamic array of track file handles
+extern FATFS ddrdc_fs;
 struct RawTrackFile
 {
 	// FIL file;
+	uint8_t trackNum;
 	char filename[512];
 	// TODO probably need to track the current offset if the filepointer keeps dying
 	int32_t offset;
 	uint32_t fmt;
 	bool cleanup;
 
-	RawTrackFile(const char* filename) {
+	RawTrackFile(const char* filename, uint8_t trackNum) {
 		strcpy(this->filename, filename);
+		this->trackNum = trackNum;
 	}
 
 	void Populate(uint32_t file_offs,uint32_t first_fad,uint32_t secfmt,const bool auto_cleanup = true)
@@ -165,35 +168,45 @@ struct RawTrackFile
 			verify(false);
 		}
 
-		// TODO there has to be a better way to do this file reading
-		// without having to remount and reopen the file everytime...
-		FIL file;
-		FRESULT fr;
-		FATFS fs;
-		fr = f_mount(&fs, "", 1);
-		if (FR_OK != fr) {
-			printf("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-			return;
-		}
-
-		fr = f_open(&file, filename, FA_READ);
+		FRESULT fr = f_open(&track_files[trackNum], filename, FA_READ);
 		if (FR_OK != fr && FR_EXIST != fr) {
 			printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
 			return;
 		}
-
-		// printf("offset+FAD*fmt: %d", (offset+FAD*fmt));
-		// Rewritten with supported methods
-		fr = f_lseek(&file, offset+FAD*fmt);
-		if (fr != FR_OK) {
-			printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
-		}
-		fr = f_read(&file,dst,fmt,0);
+		fr = f_read(&track_files[trackNum],dst,fmt,0);
 		if (fr != FR_OK) {
 			printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
 		}
 
-		f_close(&file);
+		// TODO there has to be a better way to do this file reading
+		// without having to remount and reopen the file everytime...
+		// FIL file;
+		// FRESULT fr;
+		// FATFS fs;
+		// fr = f_mount(&fs, "", 1);
+		// if (FR_OK != fr) {
+		// 	printf("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+		// 	return;
+		// }
+
+		// fr = f_open(&file, filename, FA_READ);
+		// if (FR_OK != fr && FR_EXIST != fr) {
+		// 	printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+		// 	return;
+		// }
+
+		// // printf("offset+FAD*fmt: %d", (offset+FAD*fmt));
+		// // Rewritten with supported methods
+		// fr = f_lseek(&file, offset+FAD*fmt);
+		// if (fr != FR_OK) {
+		// 	printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
+		// }
+		// fr = f_read(&file,dst,fmt,0);
+		// if (fr != FR_OK) {
+		// 	printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
+		// }
+
+		// f_close(&file);
 	}
 	virtual ~RawTrackFile()
 	{

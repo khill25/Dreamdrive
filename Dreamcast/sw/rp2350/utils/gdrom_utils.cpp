@@ -29,6 +29,7 @@ track x, x, x, x, filename, x
 
 Disc* current_disc;
 FIL* track_files;
+FATFS ddrdc_fs;
 
 uint8_t gdrom_read_buffer[MAX_BUFFER_SIZE];
 uint16_t* gdrom_16bit_buffer_ptr = (uint16_t*)gdrom_read_buffer;

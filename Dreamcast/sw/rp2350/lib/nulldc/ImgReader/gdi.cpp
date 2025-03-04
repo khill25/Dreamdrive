@@ -12,9 +12,9 @@ Disc* load_gdi(char* filename) {
 
 	FRESULT fr;
 	FIL fil;
-    FATFS fs;
+    //FATFS fs;
     
-    fr = f_mount(&fs, "", 1);
+    fr = f_mount(&ddrdc_fs, "", 1);
     if (FR_OK != fr) {
         panic("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
         return NULL;
@@ -86,19 +86,18 @@ Disc* load_gdi(char* filename) {
         if (SSIZE != 0) {
             strcpy(pathptr, temp);
 
-
-            t.file = new RawTrackFile(path);
+            t.file = new RawTrackFile(path, currentTrackNum);
             
-            // fr = f_open(&t.file->file, path, FA_READ);
-            // if (FR_OK != fr && FR_EXIST != fr) {
-            //     panic("gdi.cpp: f_open(%s) error: %s (%d)\n", path, FRESULT_str(fr), fr);
-            //     return NULL;
-            // }
-            // fr = f_lseek(&t.file->file, OFFSET);
+            fr = f_open(&track_files[currentTrackNum++], path, FA_READ);
+            if (FR_OK != fr && FR_EXIST != fr) {
+                panic("gdi.cpp: f_open(%s) error: %s (%d)\n", path, FRESULT_str(fr), fr);
+                return NULL;
+            }
+            // fr = f_lseek(&track_files[currentTrackNum], OFFSET);
             // if (fr != FR_OK) {
             //     printf("Error [(%d)(%s)] seeking file in gdi.cpp\n", fr, FRESULT_str(fr));
             // }
-            // f_close(&t.file->file);
+            // f_close(&track_files[currentTrackNum]);
             
             t.file->Populate(OFFSET, t.StartFAD, SSIZE);
         }
