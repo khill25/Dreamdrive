@@ -409,6 +409,8 @@ static uint32_t io_ending_position = 0;
 void process_packet() {
 	current_io_packet_command = SEGA_PACKET_CMD_REGISTER[0];
 	ide_current_mode = DATA_MODE_IDLE;
+	// Get and set transfer mode from the features register
+	ide_current_transfer_mode = SPI_registers[SPI_FEATURES_REGISTER_INDEX] & 1;
 
 	switch(current_io_packet_command) {
 		case 0x70:
@@ -481,9 +483,25 @@ void process_packet() {
 			break;
 		}
 		case GET_TOC_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x44444444;
-			}
+			// TOC is ALWAYS 408 bytes
+			current_io_mode = IO_MODE_WRITE;
+			io_current_position = 0;
+			io_ending_position = 204; // 408 bytes / 2 bytes per word
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			// put first word in data register
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = SEGA_PACKET_TOC_INFO_16[io_current_position++];
+
+			// Put the correct values in the registers
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			 // length is 408 bytes which is 0x198 in Hex, so just magic number it
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0x1;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 0x98;
+			*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+			
 			break;
 		}
 		case REQ_SES_SEGA_PACKET_CMD: {
@@ -517,15 +535,7 @@ void process_packet() {
 			break;
 		}
 		case CD_READ_SEGA_PACKET_CMD: {
-			// Setup state variables
 			gdrom_read_start(SEGA_PACKET_CMD_REGISTER, ide_current_transfer_mode);
-
-			// load buffer
-
-			// read first word from buffer into data register
-
-			// handle sending data in the process_data_read method
-
 			break;
 		}
 		case CD_READ2_SEGA_PACKET_CMD: {
@@ -537,6 +547,12 @@ void process_packet() {
 		case GET_SCD_SEGA_PACKET_CMD: {
 			if(writtenRegisterIndex < 1000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xCCCCCCCC;
+			}
+			break;
+		}
+		case Code71_PACKET_CMD: {
+			if(writtenRegisterIndex < 1000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x00000071;
 			}
 			break;
 		}
@@ -589,14 +605,29 @@ static inline void process_data_read() {
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
 			*status_register = 0x50; // DRQ = 0 BSY = 0
 			
-			// Maybe we need to negate the irq line for the dc to continue to read?
-			// OR we sent the data incorrectly.
+			// Assert the IRQ line to announce we are finished
 			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
-
-			// if(writtenRegisterIndex < 1000) {
-			// 	writtenRegisters[writtenRegisterIndex++] = 0xFFFF0000;
-			// }
 		}
+	} else if (current_io_packet_command == GET_TOC_SEGA_PACKET_CMD) {
+		// TODO error handling
+		// If the disc image we read doesn't have any TOC we should set error in status register
+
+		// Start sending the TOC
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(SEGA_PACKET_TOC_INFO_16[io_current_position++]);
+		if (io_current_position >= io_ending_position) {
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Assert the IRQ line to announce we are finished
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+		}
+
 	} else if (current_io_packet_command == CD_READ_SEGA_PACKET_CMD) { 
 		// read from the sd card and send data from the gdrom_read_buffer
 		if (ide_current_transfer_mode == IDE_TRANSFER_MODE_DMA) {
@@ -664,7 +695,7 @@ static inline void process_data_read() {
 		}	
 
 	} else {
-		printf("\n!");
+		printf("\nunimplemented current_io_packet: %u\n", current_io_packet_command);
 	}
 
 }

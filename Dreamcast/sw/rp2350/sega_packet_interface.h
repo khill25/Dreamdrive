@@ -165,6 +165,8 @@ extern uint8_t SEGA_PACKET_CMD_REGISTER[12];
 #define CD_READ_SEGA_PACKET_CMD         0x30
 #define CD_READ2_SEGA_PACKET_CMD        0x31
 #define GET_SCD_SEGA_PACKET_CMD         0x40
+#define Code70_PACKET_CMD               0x70 // this seems to work the same as test unit
+#define Code71_PACKET_CMD               0x71 // this is some kind of mysterious command that is probably some kind of encryption?
 
 // uint8_t SEGA_PACKET_CMD_TEST_UNIT[12] = {
 //     TEST_UNIT_SEGA_PACKET_CMD,
@@ -348,6 +350,7 @@ extern uint8_t SEGA_PACKET_REQ_MODE_HARDWARE_INFO[32];
 #define SEGA_PACKET_ADR_CODE_SUB_Q_ISRC_CODE            0x3
 
 extern uint8_t SEGA_PACKET_TOC_INFO[408];
+extern uint16_t* SEGA_PACKET_TOC_INFO_16; // 16bit pointer to the TOC, just a convience
 // = { 0
 /*
  * 0-3, Track 1 information *1
