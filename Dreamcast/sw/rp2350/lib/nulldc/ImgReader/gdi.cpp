@@ -31,7 +31,7 @@ Disc* load_gdi(char* filename) {
 	// fscanf(t,"%d\r\n",&iso_tc);
 	f_gets(line, sizeof(line), &fil);
 	iso_tc = atoi(line);
-	printf("\nGDI : %d tracks\n",iso_tc);
+	// printf("\nGDI : %d tracks\n",iso_tc);
 
 	char temp[512];
     char path[512];
@@ -74,8 +74,8 @@ Disc* load_gdi(char* filename) {
         token = strtok(NULL, " ");
         if (token) OFFSET = atoi(token);
 
-        printf("file[%d] \"%s\": FAD:%d, CTRL:%d, SSIZE:%d, OFFSET:%d\n",
-               TRACK, temp, FADS, CTRL, SSIZE, OFFSET);
+        // printf("file[%d] \"%s\": FAD:%d, CTRL:%d, SSIZE:%d, OFFSET:%d\n",
+        //        TRACK, temp, FADS, CTRL, SSIZE, OFFSET);
         
         Track t;
         t.ADDR = 0;
@@ -93,11 +93,6 @@ Disc* load_gdi(char* filename) {
                 panic("gdi.cpp: f_open(%s) error: %s (%d)\n", path, FRESULT_str(fr), fr);
                 return NULL;
             }
-            // fr = f_lseek(&track_files[currentTrackNum], OFFSET);
-            // if (fr != FR_OK) {
-            //     printf("Error [(%d)(%s)] seeking file in gdi.cpp\n", fr, FRESULT_str(fr));
-            // }
-            // f_close(&track_files[currentTrackNum]);
             
             t.file->Populate(OFFSET, t.StartFAD, SSIZE);
         }

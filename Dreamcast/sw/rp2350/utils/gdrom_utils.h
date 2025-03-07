@@ -74,8 +74,11 @@ void gdrom_read_default_disc_image();
 
 // Call at the start of a cd_read command to setup state variables and init the read buffer
 void gdrom_read_start(uint8_t* packet, bool isDMA);
+
 // Pass in the ata data register to write the data to
-void gdrom_read_consume_buffer(uint16_t* toBuffer);
+// Returns false if there is no more data to read
+// Returns true if the buffer still has requested data remaining
+bool gdrom_read_consume_buffer(uint16_t* toBuffer);
 
 // Read sectors and put them in the buffer
 // Another helper method that probably doesn't need to be called directly

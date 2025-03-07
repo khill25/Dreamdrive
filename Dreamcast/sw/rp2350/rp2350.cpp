@@ -223,7 +223,10 @@ int main(void) {
 	gpio_put(PIN_INTRQ, INTRQ_DEASSERT); // was 0
 
 	gpio_init(PIN_DMARQ);
-	gpio_set_dir(PIN_DMARQ, false); // input
+	gpio_set_dir(PIN_DMARQ, true); // output
+
+	gpio_init(PIN_DMACK);
+	gpio_set_dir(PIN_DMACK, false); // input
 
 	// Setup and start the ide databus programs
 	printf("Setting up PIO ide databus programs...\n");
@@ -290,8 +293,6 @@ int main(void) {
 			registerIndex_map[i] = &SPI_registers[SPI_REGISTER_COUNT]; // Use the SPI_REGISTER_COUNT as a dump register
 		}
 	}
-
-	printf("DMARQ: %x\n", gpio_get(PIN_DMARQ));
 	
 	printf("Dreamcast booting...\n");
 
@@ -301,8 +302,6 @@ int main(void) {
 	while(!gpio_get(PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
 
 	printf("Dreamcast booted!\n");
-
-	printf("DMARQ: %x\n", gpio_get(PIN_DMARQ));
 
 	busy_wait_ms(1000); // TODO this is likely not needed? 
 
@@ -388,6 +387,8 @@ volatile uint8_t spi_packet_word_count = 0;
 
 #define DATA_MODE_IDLE 		(0)
 #define DATA_MODE_SPI 		(1) // Sega SPI packet mode, processing their 12 byte packets
+#define IDE_TRANSFER_MODE_PIO (0)
+#define IDE_TRANSFER_MODE_DMA (1)
 static uint8_t ide_current_mode = DATA_MODE_IDLE;
 static uint8_t ide_current_transfer_mode = 0; // 0 = PIO, 1 = DMA
 
@@ -439,7 +440,7 @@ void process_packet() {
 				current_io_mode = IO_MODE_WRITE;
 				io_current_position = startingAddress / 2;
 				io_ending_position = (startingAddress / 2) + (halfLength);
-				ide_current_transfer_mode = 0x0; // PIO
+				ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 				
 				// put first word in data register
 				SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(reply_11[io_current_position++]);
@@ -570,6 +571,7 @@ static inline void process_data_written() {
 	}
 }
 
+static bool gdrom_buffer_has_more_data = 0;
 static inline void process_data_read() {
 	// TODO
 	// Dreamcast has read the data register. Put the next word in the register
@@ -597,7 +599,69 @@ static inline void process_data_read() {
 		}
 	} else if (current_io_packet_command == CD_READ_SEGA_PACKET_CMD) { 
 		// read from the sd card and send data from the gdrom_read_buffer
-		
+		if (ide_current_transfer_mode == IDE_TRANSFER_MODE_DMA) {
+			/*
+			 *
+			 * DMA Data Transfer Handshake in ATA/ATAPI
+			 * 	The two key signals for DMA transfers are:
+
+			 * 	*	DMARQ (DMA Request): Asserted by the device (GD-ROM) when it has data ready to transfer.
+			 * 	*	DMACK (DMA Acknowledge): Asserted by the host (Dreamcast) when it is ready to receive data.
+			 * 	This forms a handshake mechanism where:
+
+			 * 	1.	GD-ROM sets DMARQ high when it has a word (16-bit) of data ready.
+			 * 	2.	Dreamcast sets DMACK low when it is ready to accept data.
+			 * 	3.	GD-ROM places data on the bus and waits for the host to acknowledge.
+			 * 	4.	Dreamcast deasserts DMACK, signaling the drive to send the next word.
+			 * 	5.	Steps 1-4 repeat for each word until the entire transfer is complete.
+			 */
+			// IMPORTANT: So the approach here is to tie up this core with the DMA transfer.
+			// And presumably nothing is happening at the register level because there will
+			// be no one to response to commands since this thread wont be popping the core fifo
+			// IF this is a problem, we should just work the dma transfer into the main loop
+
+			do {
+				gdrom_buffer_has_more_data = gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+
+				// Put data on the bus
+				pio0->txf[IDE_WRITE_TO_HOST_SM] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+
+				// Signal we have data and wait for dreamcast to acknowledge
+				gpio_put(PIN_DMARQ, 1);
+				while(gpio_get(PIN_DMACK) != 0) { tight_loop_contents(); }
+
+				// Dreamcast has acknowledged, send the data, and wait for dreamcast to be ready for the next word
+				gpio_put(PIN_DMARQ, 0);
+				while(gpio_get(PIN_DMACK) == 0) { tight_loop_contents(); }
+
+				// reset databus for next word
+				pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
+
+			} while(gdrom_buffer_has_more_data);
+			
+			// All the data has been sent, signal the end of the transfer
+			current_io_mode = IO_MODE_IDLE;
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+
+			// Do we need to assert the irq line for a read?
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+		// PIO
+		} else {
+			gdrom_buffer_has_more_data = gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+
+			if (!gdrom_buffer_has_more_data) {
+				current_io_mode = IO_MODE_IDLE;
+				// Set the status register to indicate the data is finished
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+				*status_register = 0x50; // DRQ = 0 BSY = 0
+				
+				// Do we need to assert the irq line for a read?
+				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+			}
+		}	
 
 	} else {
 		printf("\n!");
@@ -605,65 +669,12 @@ static inline void process_data_read() {
 
 }
 
-#define DEBUG_TEST (1)
 void second_core_main() {
 	printf("Core1 Online\n");
 
 	printf("Opening default disc image...\n");
 	gdrom_read_default_disc_image();
 	printf("DONE!\n");
-
-	#ifdef DEBUG_TEST
-	busy_wait_ms(500);
-
-	// Test the read command
-	SEGA_PACKET_CMD_REGISTER[0] = 0x30;
-	SEGA_PACKET_CMD_REGISTER[1] = 0x24;
-	SEGA_PACKET_CMD_REGISTER[2] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
-	SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
-	SEGA_PACKET_CMD_REGISTER[5] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[6] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[7] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[8] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[9] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[10] = 0x07;
-	SEGA_PACKET_CMD_REGISTER[11] = 0x00;
-	gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
-
-	printf("GDROM Read Test\n");
-
-	printf("SPI Command Packet:\t");
-	for(int i = 0; i < 12; i++) {
-		printf("(%u)%x ", i, SEGA_PACKET_CMD_REGISTER[i]);
-	}
-	printf("\n");
-
-	printf("Sector Start: %u(0x%x), Sector Count: %u(0x%x), Sector Size: %u(0x%x)\n", gdrom_read_start_sector, gdrom_read_start_sector, gdrom_read_remaining_sectors, gdrom_read_remaining_sectors, gdrom_read_sector_size, gdrom_read_sector_size);
-	printf("Data Buffer:");
-	for (int i = 0; i < 32; i++) {
-		if (i % 8 == 0) {
-			printf("\n%d: ", i);
-		}
-		printf("%x ", gdrom_read_buffer[i]);
-	}
-
-	printf("\nData Register:");
-	for (int i = 0; i < 32; i++) {
-		gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
-		if (i % 8 == 0) {
-			printf("\n%d: ", i);
-		}
-		printf("%x ", SPI_registers[SPI_DATA_REGISTER_INDEX]);
-	}
-	printf("\n\n");
-
-	// printf("Data_Buffer[0]: %x\n", gdrom_read_buffer[0]);
-	// printf("Data Register:  %x\n", SPI_registers[SPI_DATA_REGISTER_INDEX]);
-
-	// Stall here
-	while(1);;;
-	#endif
 
 	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
 
@@ -796,32 +807,67 @@ void second_core_main() {
 				*status_register = *status_register ^ 0x80; 
 			}
 		}
-
-		/*
-		Switch case below....
-		Best Case: 5 cycles.
-		Worst Case: 33 cycles.
-		Average Case: Approximately 19 cycles.
-		--
-		Remove register cases that don't need to be processed
-		*/
-		// switch(register_index) {
-			// case SPI_COMMAND_REGISTER_INDEX: { break; }
-			// case SPI_ATA_IO_REGISTER_INDEX: { break; }
-			// case SPI_STATUS_REGISTER_INDEX: { break; } 
-			// case SPI_ALTERNATE_STATUS_REGISTER_INDEX: { break; }
-			// case SPI_DATA_REGISTER_INDEX: { break; }
-			// case SPI_DEVICE_CONTROL_REGISTER_INDEX: { break; }
-			// case SPI_DRIVE_SELECT_REGISTER_INDEX: { break; }  
-			// case SPI_INTERRUPT_REASON_REGISTER_INDEX: { break; }
-			// case SPI_SECTOR_COUNT_REGISTER_INDEX: { break; }
-			// case SPI_SECTOR_NUMBER_REGISTER_INDEX: { break; }
-			// case SPI_ERROR_REGISTER_INDEX: { break; }    
-			// case SPI_FEATURES_REGISTER_INDEX: { break; }
-			// case SPI_BYTE_COUNT_REGISTER_LOW_INDEX: { break; }
-			// case SPI_BYTE_COUNT_REGISTER_HIGH_INDEX: { break; }
-			// case SPI_REGISTER_COUNT: { break; }
-		// }
 	}
+}
+
+// Store the test functions here so we can get around to organizing them later
+void test_gdrom_read() {
+	#ifdef DEBUG_TEST
+	busy_wait_ms(500);
+
+	// Test the read command
+	SEGA_PACKET_CMD_REGISTER[0] = 0x30;
+	SEGA_PACKET_CMD_REGISTER[1] = 0x24;
+	SEGA_PACKET_CMD_REGISTER[2] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
+	SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
+	SEGA_PACKET_CMD_REGISTER[5] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[6] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[7] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[8] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[9] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[10] = 0x07;
+	SEGA_PACKET_CMD_REGISTER[11] = 0x00;
+
+	uint32_t endTime = 0;
+	uint32_t startTime = time_us_32();
+	gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
+	endTime = time_us_32();
+
+	printf("Read Time: %u\n", endTime - startTime);
+
+	printf("GDROM Read Test\n");
+
+	printf("SPI Command Packet:\t");
+	for(int i = 0; i < 12; i++) {
+		printf("(%u)%x ", i, SEGA_PACKET_CMD_REGISTER[i]);
+	}
+	printf("\n");
+
+	printf("Sector Start: %u(0x%x), Sector Count: %u(0x%x), Sector Size: %u(0x%x)\n", gdrom_read_start_sector, gdrom_read_start_sector, gdrom_read_remaining_sectors, gdrom_read_remaining_sectors, gdrom_read_sector_size, gdrom_read_sector_size);
+	printf("Data Buffer:");
+	for (int i = 0; i < 32; i++) {
+		if (i % 8 == 0) {
+			printf("\n%d: ", i);
+		}
+		printf("%x ", gdrom_read_buffer[i]);
+	}
+
+	printf("\nData Register:");
+	for (int i = 0; i < 32; i++) {
+		gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+		if (i % 8 == 0) {
+			printf("\n%d: ", i);
+		}
+		printf("%x ", SPI_registers[SPI_DATA_REGISTER_INDEX]);
+	}
+	printf("\n\n");
+
+	// printf("Data_Buffer[0]: %x\n", gdrom_read_buffer[0]);
+	// printf("Data Register:  %x\n", SPI_registers[SPI_DATA_REGISTER_INDEX]);
+
+	// Stall here
+	while(1);;;
+	#endif
 }
 

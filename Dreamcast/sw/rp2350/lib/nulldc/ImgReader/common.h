@@ -168,12 +168,12 @@ struct RawTrackFile
 			verify(false);
 		}
 
-		FRESULT fr = f_open(&track_files[trackNum], filename, FA_READ);
-		if (FR_OK != fr && FR_EXIST != fr) {
-			printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-			return;
-		}
-		fr = f_read(&track_files[trackNum],dst,fmt,0);
+		// FRESULT fr = f_open(&track_files[trackNum], filename, FA_READ);
+		// if (FR_OK != fr && FR_EXIST != fr) {
+		// 	printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
+		// 	return;
+		// }
+		FRESULT fr = f_read(&track_files[trackNum],dst,fmt,0);
 		if (fr != FR_OK) {
 			printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
 		}

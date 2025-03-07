@@ -45,6 +45,7 @@ uint32_t gdrom_read_read_sectors = 0;
 uint32_t gdrom_read_start_sector = 0;
 uint32_t gdrom_read_remaining_sectors = 0;
 uint32_t gdrom_read_sector_size = 0;
+uint32_t gdrom_read_original_num_sectors_to_read = 0;
 
 uint32_t gdrom_read_current_byte_count = 0;
 uint32_t gdrom_read_bytes_remanining_in_sector = 0;
@@ -71,7 +72,8 @@ uint32_t _gdrom_get_sector_type(uint8_t dataSelect, uint8_t expectedDataType, ui
     
     // Header, subheader, and data bites are all set AND the expected data type is Mode 2 Form 1
     if(((dataSelect & 0b1110) == 0b1110) && (expectedDataType == 0b011)) {
-        printf("Sector size set to 2340 Bytes \tHeader/Subheader/Data, Mode 2\n");
+        // printf("Sector size set to 2340 Bytes \tHeader/Subheader/Data, Mode 2\n");
+        return 2340;
 
     // If data bit with any other data select bits are set and not mode 2
     } else if (((dataSelect & 0b1101) != 0) && ((dataSelect & 0b0010) == 0)) {
@@ -80,7 +82,7 @@ uint32_t _gdrom_get_sector_type(uint8_t dataSelect, uint8_t expectedDataType, ui
         return 0;
     }
 	
-    printf("Sector size set to 2048 Bytes\n");
+    // printf("Sector size set to 2048 Bytes\n");
 	return 2048;
 }
 
@@ -103,9 +105,11 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
 
     gdrom_read_sector_size = _gdrom_get_sector_type(gdrom_read_data_select_value, gdrom_read_expected_data_type, gdrom_read_data_parameter_type);
     gdrom_read_start_sector = _gdrom_read_get_FAD(&packet[2], gdrom_read_data_parameter_type);
-    printf("Start Sector: %u\n", gdrom_read_start_sector);
+    // printf("Start Sector: %u\n", gdrom_read_start_sector);
     gdrom_read_remaining_sectors = (packet[8] << 16) | (packet[9] << 8) | (packet[10]);
     
+    gdrom_read_original_num_sectors_to_read = gdrom_read_remaining_sectors;
+
     gdrom_read_bytes_remanining = gdrom_read_remaining_sectors * gdrom_read_sector_size;
 
     // Setup a 16bit version of the buffer
@@ -120,15 +124,18 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
         gdrom_fill_read_buffer();
     }
 
-    if (current_disc->type == GdRom && gdrom_read_start_sector == 45150 && gdrom_read_remaining_sectors == 7) {
+    if (current_disc->type == GdRom && gdrom_read_start_sector == 45150 && gdrom_read_original_num_sectors_to_read == 7) {
         printf("Special buffer patching for sector 45150 with sector count of 7\n");
         PatchRegion_0(gdrom_read_buffer, gdrom_read_sector_size);
         PatchRegion_6(gdrom_read_buffer + 2048 * 6, gdrom_read_sector_size);
+    } else {
+        printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
+
     }
 }
 
 // Updates state variables for micro updates related to actually sending data over the 16-bit bus
-void gdrom_read_consume_buffer(uint16_t* toBuffer) {
+bool gdrom_read_consume_buffer(uint16_t* toBuffer) {
     gdrom_read_bytes_remanining_in_sector -= GDROM_BYTES_PER_READ;
     gdrom_read_bytes_remanining -= GDROM_BYTES_PER_READ;
 
@@ -156,9 +163,11 @@ void gdrom_read_consume_buffer(uint16_t* toBuffer) {
             gdrom_read_buffer_size = 0;
             gdrom_read_bytes_remanining_in_sector = 0;
             gdrom_read_bytes_remanining = 0;
+            return false; // Finished reading all the data!!
         }
-    // If we have read a whole sector, reset the bytes remanining in sector
     }
+
+    return true; // more data still needs to be read
 }
 
 void gdrom_read_sectors(uint8_t* buffer, uint32_t sector, uint32_t sectorCount, uint32_t sectorSize) {
