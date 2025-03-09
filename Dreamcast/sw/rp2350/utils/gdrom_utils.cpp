@@ -130,7 +130,6 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
         PatchRegion_6(gdrom_read_buffer + 2048 * 6, gdrom_read_sector_size);
     } else {
         printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
-
     }
 }
 
@@ -157,6 +156,7 @@ bool gdrom_read_consume_buffer(uint16_t* toBuffer) {
 
         // No more sectors to read
         } else {
+            printf("Data finished!\n");
             // Zero out all the state variables    
             gdrom_read_buffer_size = 0;
             gdrom_read_buffer_index = 0;
