@@ -151,7 +151,7 @@ void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uin
 		}
 	}
 }
-void GetDriveToc(uint32_t* to,DiskArea area)
+void GetDriveToc(uint32_t* to, DiskArea area)
 {
 	if (!disc)
 		return;

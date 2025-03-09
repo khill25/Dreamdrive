@@ -489,6 +489,9 @@ void process_packet() {
 			io_ending_position = 204; // 408 bytes / 2 bytes per word
 			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 
+			DiskArea tocSelectBit = (SEGA_PACKET_CMD_REGISTER[1] & 0x1) ? DoubleDensity : SingleDensity;
+			GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), tocSelectBit);
+
 			// put first word in data register
 			SPI_registers[SPI_DATA_REGISTER_INDEX] = SEGA_PACKET_TOC_INFO_16[io_current_position++];
 
