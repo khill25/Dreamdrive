@@ -151,8 +151,10 @@ bool gdrom_read_consume_buffer(uint16_t* toBuffer) {
     gdrom_read_bytes_remanining -= GDROM_BYTES_PER_READ;
 
     // Bytes will be swapped correctly by reading a 16bit value from the 8bit buffer
-    toBuffer[0] = gdrom_16bit_buffer_ptr[gdrom_read_buffer_index];
-    gdrom_read_buffer_index += GDROM_BYTES_PER_READ; // Increment buffer index AFTER reading data to caller
+    toBuffer[0] = gdrom_16bit_buffer_ptr[gdrom_read_buffer_index++];
+    /// This was bugged! We only want to increment by 1 since we are reading a word at a time (2 bytes)
+    // This was basically skipping bytes
+    // gdrom_read_buffer_index += GDROM_BYTES_PER_READ; // Increment buffer index AFTER reading data to caller
 
     // If we have read all the bytes in the sector, reset the bytes remanining in sector
     if (gdrom_read_bytes_remanining_in_sector == 0) {
