@@ -276,6 +276,7 @@ struct Disc
 		SectorFormat secfmt;
 		SubcodeFormat subfmt;		
 		bool readError = false;
+		printf("ReadSectors: FAD: %u, Count: %u, FMT: %u\n", FAD, count, fmt);
 
 		while(count)
 		{			

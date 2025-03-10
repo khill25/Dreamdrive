@@ -13,7 +13,7 @@ Disc*(*drivers[])(char* path)=
 
 uint8_t q_subchannel[96];
 
-#define SETTING_SHOULD_PATCH_REGION (0)
+#define SETTING_SHOULD_PATCH_REGION (1)
 
 void PatchRegion_0(uint8_t* sector,int size) {
 	if (SETTING_SHOULD_PATCH_REGION==0) {

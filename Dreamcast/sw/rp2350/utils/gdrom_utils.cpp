@@ -99,6 +99,18 @@ void gdrom_read_default_disc_image() {
 
 // Parses the data from the read command packet and sets up the state variables for the read
 void gdrom_read_start(uint8_t* packet, bool isDMA) {
+
+    // Zero out all the values on a fresh read start / helps if a dma timed out
+    gdrom_read_read_sectors = 0;
+    gdrom_read_buffer_size = 0;
+    gdrom_read_buffer_index = 0;
+    gdrom_read_buffer_size = 0;
+    gdrom_read_bytes_remanining_in_sector = 0;
+    gdrom_read_bytes_remanining = 0;
+    gdrom_read_current_byte_count = 0;
+    gdrom_read_bytes_remanining_in_sector = 0;
+    gdrom_read_bytes_remanining = 0;
+
     gdrom_read_data_select_value = (packet[1] & 0xFF00) >> 8;
     gdrom_read_expected_data_type = (packet[1] & 0xE) >> 1;
     gdrom_read_data_parameter_type = (packet[1] & 0x1);
