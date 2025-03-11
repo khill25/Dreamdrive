@@ -216,11 +216,11 @@ int main(void) {
 	// TODO: Figure out which pins need to be set to output
 	gpio_init(PIN_IORDY);
 	gpio_set_dir(PIN_IORDY, true);
-	gpio_pull_up(PIN_IORDY);
+	// gpio_pull_up(PIN_IORDY);
 
 	gpio_init(PIN_DOPEN);
 	gpio_set_dir(PIN_DOPEN, true);
-	gpio_pull_down(PIN_DOPEN);
+	// gpio_pull_down(PIN_DOPEN);
 
 	gpio_init(PIN_INTRQ);
 	gpio_set_dir(PIN_INTRQ, true);
@@ -231,6 +231,7 @@ int main(void) {
 
 	gpio_init(PIN_DMACK);
 	gpio_set_dir(PIN_DMACK, false); // input
+	// gpio_pull_up(PIN_DMACK);
 
 	// Setup and start the ide databus programs
 	printf("Setting up PIO ide databus programs...\n");
@@ -305,40 +306,26 @@ int main(void) {
 	return 0;
 }
 
-void ide_register_controller_main() {
-	printf("Dreamcast booting...\n");
-
-	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
-	// Not sure if this is real data or just a fun little startup sequence
-
-	while(!gpio_get(PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
-
-	printf("Dreamcast booted!\n");
-
-	busy_wait_ms(800); // TODO this is likely not needed? 
-
-	volatile uint32_t readWriteLineValues = 0;
-	selectedRegister = registerIndex_map[SPI_REGISTER_COUNT];
-	volatile uint8_t dreamcastWantsRead = 0;
-	// 00 (0x0) - nothing
-	// 01 (0x1) - read
-	// 10 (0x2) - write
-	// 11 (0x3) - nothing
-
-	// By using the IORDY pin, we can slow down the control signaling.
-	// This makes it a lot slower to read/write to the dreamcast but does at least work
-	// TODO: Figure out how to do this without the IORDY pin to speed up the control processing
-	gpio_put(PIN_IORDY, 0);
-	volatile uint32_t csLineCheck = 0;
-
+volatile uint32_t readWriteLineValues = 0;
+void __not_in_flash_func(process_ata_register_access)() {
 	while(1) {
+
 		do {
-			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;								// 16ns (4 cycles)
+			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
 		} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
 
+		do {
+			readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
+		} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
+
+		// Chatgpt suggested this, it seems to execute MUCH faster
+		// Something about branch prediction taking a long time and the compiler directive 
+		// fixes that
 		// do {
-		// 	readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
-		// } while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
+		// 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
+		// } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
+		
+		// gpio_put(PIN_IORDY, 0);
 
 		// Figure out the register index and get the pointer to the selected register
 		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
@@ -366,7 +353,9 @@ void ide_register_controller_main() {
 			pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
 			*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
 
-			multicore_fifo_push_blocking(register_index);
+			if (register_index != 0x4e) {
+				multicore_fifo_push_blocking(register_index);
+			}
 			// core_command_buffer[core0_buffer_index++] = register_index;
 
 			gpio_put(PIN_IORDY, 1);
@@ -375,6 +364,90 @@ void ide_register_controller_main() {
 			gpio_put(PIN_IORDY, 0);
 		}
 	}
+}
+
+void ide_register_controller_main() {
+	printf("Dreamcast booting...\n");
+
+	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
+	// Not sure if this is real data or just a fun little startup sequence
+
+	while(!gpio_get(PIN_CS0)); // loop until the cs lines are active (really only useful when powering the board on before the console)
+
+	printf("Dreamcast booted!\n");
+
+	busy_wait_ms(800); // TODO this is likely not needed? 
+
+	selectedRegister = registerIndex_map[SPI_REGISTER_COUNT];
+	volatile uint8_t dreamcastWantsRead = 0;
+	// 00 (0x0) - nothing
+	// 01 (0x1) - read
+	// 10 (0x2) - write
+	// 11 (0x3) - nothing
+
+	// By using the IORDY pin, we can slow down the control signaling.
+	// This makes it a lot slower to read/write to the dreamcast but does at least work
+	// TODO: Figure out how to do this without the IORDY pin to speed up the control processing
+	gpio_put(PIN_IORDY, 0);
+
+	process_ata_register_access();
+
+	// while(1) {
+
+	// 	do {
+	// 		readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
+	// 	} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
+
+	// 	do {
+	// 		readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
+	// 	} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
+
+	// 	// Chatgpt suggested this, it seems to execute MUCH faster
+	// 	// Something about branch prediction taking a long time and the compiler directive 
+	// 	// fixes that
+	// 	// do {
+	// 	// 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
+	// 	// } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
+		
+	// 	// gpio_put(PIN_IORDY, 0);
+
+	// 	// Figure out the register index and get the pointer to the selected register
+	// 	register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
+	// 	selectedRegister = registerIndex_map[register_index];
+
+	// 	// Read from register send to Dreamcast
+	// 	if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
+	// 		pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
+
+	// 		multicore_fifo_push_blocking(register_index);
+	// 		// core_command_buffer[core0_buffer_index++] = register_index;
+
+	// 		gpio_put(PIN_IORDY, 1);
+	// 		// wait for latch
+	// 		while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
+			
+	// 		// Send a signal to pio to let it go back to input
+	// 		pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
+			
+	// 		gpio_put(PIN_IORDY, 0);
+
+	// 	// Write to Dreamcast from register
+	// 	} else {
+	// 		// Let pio know we are ready to read data
+	// 		pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
+	// 		*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
+
+	// 		if (register_index != 0x4e) {
+	// 			multicore_fifo_push_blocking(register_index);
+	// 		}
+	// 		// core_command_buffer[core0_buffer_index++] = register_index;
+
+	// 		gpio_put(PIN_IORDY, 1);
+	// 		// wait for latch
+	// 		while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
+	// 		gpio_put(PIN_IORDY, 0);
+	// 	}
+	// }
 
 	printf("\nERROR!!! Register controller core main loop ended.\n");
 }
@@ -410,6 +483,8 @@ static uint8_t current_io_packet_command = 0; // This is just the current SPI pa
 // Bake the offset into the starting and ending positions
 static uint32_t io_current_position = 0;
 static uint32_t io_ending_position = 0;
+volatile uint8_t secnr_poll_count = 0;
+volatile uint8_t secnr_poll_next_status = 0x80;
 
 void process_packet() {
 	current_io_packet_command = SEGA_PACKET_CMD_REGISTER[0];
@@ -800,7 +875,7 @@ void process_packet() {
 		}
 		case Code71_PACKET_CMD: {
 			if(writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x71AAAAAA;
+				writtenRegisters[writtenRegisterIndex++] = 0x71000000 | SEGA_PACKET_CMD_REGISTER[1];
 			}
 
 			uint32_t countData71 = 0;
@@ -831,7 +906,7 @@ void process_packet() {
 			// SPI_registers[SPI_DATA_REGISTER_INDEX] = cmd71_reply[io_current_position++];
 
 			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x81;
-			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x81;
+			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x83;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = countData71 >> 8;
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = countData71 && 0xFF; 
@@ -1020,7 +1095,7 @@ static inline void process_data_read() {
 					numDmackWaits++;
 					tight_loop_contents(); 
 				}
-				if (numDmackWaits >= 10) {
+				if (numDmackWaits >= 100) {
 					dmaDidTimeout = 1;
 				}
 				numDmackWaits = 0;
@@ -1267,15 +1342,29 @@ void main_processing_loop() {
 
 		// Please skip all the stupid alt status register reads
 		if(writtenRegisterIndex < 5000 && core0CData != 0x4e) {
-			// if (writtenRegisterIndex > 0 && 
-			// 	(core0CData == 0x53 || core0CData == 0x50) &&
-			// 	((writtenRegisters[writtenRegisterIndex-1] == 0x53) || 
-			// 	(writtenRegisters[writtenRegisterIndex-1] == 0x50))) {
-			// 	// Dont add any more of reads or sector number peeks, they clutter the logs
-			// } else {
-			// 	writtenRegisters[writtenRegisterIndex++] = core0CData;
-			// }
 			writtenRegisters[writtenRegisterIndex++] = core0CData;
+
+			// Debugging for when the dc polls disc status
+			// if (core0CData == 0x53) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0x53FFFFFF;
+			// 	secnr_poll_count++;
+			// 	if (secnr_poll_count > 10) {
+			// 		if (secnr_poll_next_status == 0x80) {
+			// 			secnr_poll_next_status = 0x81;
+			// 		} else if (secnr_poll_next_status == 0x81) {
+			// 			secnr_poll_next_status = 0x82;
+			// 		} else if (secnr_poll_next_status == 0x82) {
+			// 			secnr_poll_next_status = 0x83;
+			// 		} else if (secnr_poll_next_status == 0x83) {
+			// 			secnr_poll_next_status = 0x80;
+			// 		}
+
+			// 		writtenRegisters[writtenRegisterIndex++] = secnr_poll_next_status;
+			// 		SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = secnr_poll_next_status;
+			// 		writtenRegisters[writtenRegisterIndex++] = 0x53AAAAAA;
+					
+			// 	}
+			// }
 		}
 
 		// Host has read the status register
