@@ -4,7 +4,7 @@
 #include <memory.h>
 
 uint32_t NullDriveDiscType;
-Disc* disc;
+
 Disc*(*drivers[])(char* path)=
 {
 	gdi_parse,
@@ -141,78 +141,92 @@ uint32_t CreateTrackInfo_se(uint32_t ctrl,uint32_t addr,uint32_t tracknum)
 
 void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz)
 {
-	if (disc)
-	{
-		disc->ReadSectors(StartSector,SectorCount,buff,secsz);
-		if (disc->type == GdRom && StartSector==45150 && SectorCount==7)
+	if (current_disc) {
+		current_disc->ReadSectors(StartSector,SectorCount,buff,secsz);
+		if (current_disc->type == GdRom && StartSector==45150 && SectorCount==7)
 		{
 			PatchRegion_0(buff,secsz);
 			PatchRegion_6(buff+2048*6,secsz);
 		}
+	} else {
+		printf("GetDriveSector: Disc not loaded\n");
 	}
 }
 void GetDriveToc(uint32_t* to, DiskArea area)
 {
-	if (!disc)
+	if (!current_disc) {
+		printf("GetDriveToc: Disc not loaded\n");
 		return;
+	}
 	memset(to,0xFFFFFFFF,102*4);
 
 	//can't get toc on the second area on discs that don't have it
-	verify(area != DoubleDensity || disc->type == GdRom);
+	verify(area != DoubleDensity || current_disc->type == GdRom);
 
 	//normal CDs: 1 .. tc
 	//GDROM: area0 is 1 .. 2, area1 is 3 ... tc
 
 	uint32_t first_track=1;
-	uint32_t last_track=disc->tracks.size();
-	if (area==DoubleDensity)
-		first_track=3;
-	else if (disc->type==GdRom)
-	{
-		last_track=2;
+	uint32_t last_track=current_disc->tracks.size();
+	if (area==DoubleDensity) {
+		first_track = 3;
+	} else if (current_disc->type==GdRom) {
+		last_track = 2;
 	}
 
-	//Geneate the TOC info
+	// printf("disc type=%d\n",current_disc->type);
+	// printf("first_track=%d\n",first_track);
+	// printf("last_track=%d\n",last_track);
+	// printf("Num tracks: %d", current_disc->tracks.size());
+	// printf("track0: %s\n", current_disc->tracks[0].file->filename);
+	// if (current_disc->tracks.size() > 1)
+	// 	printf("track1: %s\n", current_disc->tracks[1].file->filename);
+	// if (current_disc->tracks.size() > 2)
+	// 	printf("track2: %s\n", current_disc->tracks[2].file->filename);
+	
+	//Generate the TOC info
 
 	//-1 for 1..99 0 ..98
-	to[99]=CreateTrackInfo_se(disc->tracks[first_track-1].CTRL,disc->tracks[first_track-1].ADDR,first_track); 
-	to[100]=CreateTrackInfo_se(disc->tracks[last_track-1].CTRL,disc->tracks[last_track-1].ADDR,last_track); 
+	to[99]=CreateTrackInfo_se(current_disc->tracks[first_track-1].CTRL,current_disc->tracks[first_track-1].ADDR,first_track); 
+	to[100]=CreateTrackInfo_se(current_disc->tracks[last_track-1].CTRL,current_disc->tracks[last_track-1].ADDR,last_track); 
 	
-	if (disc->type==GdRom)
-	{
+	if (current_disc->type==GdRom) {
 		//use smaller LEADOUT
-		if (area==SingleDensity)
-			to[101]=CreateTrackInfo(disc->LeadOut.CTRL,disc->LeadOut.ADDR,13085);
+		if (area==SingleDensity) {
+			to[101]=CreateTrackInfo(current_disc->LeadOut.CTRL,current_disc->LeadOut.ADDR,13085);
+		}
 	}
-	else
-		to[101]=CreateTrackInfo(disc->LeadOut.CTRL,disc->LeadOut.ADDR,disc->LeadOut.StartFAD);
+	else {
+		to[101]=CreateTrackInfo(current_disc->LeadOut.CTRL,current_disc->LeadOut.ADDR,current_disc->LeadOut.StartFAD);
+	}
 
-	for (uint32_t i=first_track-1;i<last_track;i++)
-	{
-		to[i]=CreateTrackInfo(disc->tracks[i].CTRL,disc->tracks[i].ADDR,disc->tracks[i].StartFAD); 
+	for (uint32_t i=first_track-1;i<last_track;i++) {
+		to[i]=CreateTrackInfo(current_disc->tracks[i].CTRL,current_disc->tracks[i].ADDR,current_disc->tracks[i].StartFAD); 
 	}
 }
 
 void GetDriveSessionInfo(uint8_t* to,uint8_t session)
 {
-	if (!disc)
+	if (!current_disc) {
+		printf("GetDriveSessionInfo: Disc not loaded\n");
 		return;
+	}
 	to[0]=2;//status , will get overwrited anyway
 	to[1]=0;//0's
 	
 	if (session==0)
 	{
-		to[2]=disc->sessions.size();//count of sessions
-		to[3]=disc->EndFAD>>16;//fad is sessions end
-		to[4]=disc->EndFAD>>8;
-		to[5]=disc->EndFAD>>0;
+		to[2]=current_disc->sessions.size();//count of sessions
+		to[3]=current_disc->EndFAD>>16;//fad is sessions end
+		to[4]=current_disc->EndFAD>>8;
+		to[5]=current_disc->EndFAD>>0;
 	}
 	else
 	{
-		to[2]=disc->sessions[session-1].FirstTrack;//start track of this session
-		to[3]=disc->sessions[session-1].StartFAD>>16;//fad is session start
-		to[4]=disc->sessions[session-1].StartFAD>>8;
-		to[5]=disc->sessions[session-1].StartFAD>>0;
+		to[2]=current_disc->sessions[session-1].FirstTrack;//start track of this session
+		to[3]=current_disc->sessions[session-1].StartFAD>>16;//fad is session start
+		to[4]=current_disc->sessions[session-1].StartFAD>>8;
+		to[5]=current_disc->sessions[session-1].StartFAD>>0;
 	}
 }
 

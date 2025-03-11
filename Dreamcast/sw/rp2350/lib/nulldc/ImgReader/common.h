@@ -114,6 +114,7 @@ void PatchRegion_6(uint8_t* sector,int size);
 void ConvToc(uint32_t* to,TocInfo* from);
 void GetDriveToc(uint32_t* to,DiskArea area);
 void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz);
+void GetDriveSessionInfo(uint8_t* to,uint8_t session);
 extern uint8_t q_subchannel[96];
 
 // Originally in gd_driver.h ////////////////////////////////////////
@@ -339,6 +340,6 @@ struct Disc
 	}
 };
 
-extern Disc* disc;
+extern Disc* current_disc;
 
 DiscType GuessDiscType(bool m1, bool m2, bool da);

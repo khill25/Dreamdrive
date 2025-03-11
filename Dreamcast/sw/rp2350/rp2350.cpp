@@ -122,6 +122,9 @@ int registerIndexFromControlValue(uint32_t controlValue) {
 #define DEBUG_UART_BAUD_RATE 115200
 #define CORE1_PROCESS_REGISTER_CMD 0x1
 #define CORE1_CHIRP_CMD 0x2
+volatile uint8_t core_command_buffer[256];
+volatile uint8_t core0_buffer_index = 0;
+volatile uint8_t core1_buffer_index = 0;
 
 // IRQ does seem to be asserted high which is in contrast to the CS0, CS1, RD, and WR signals.
 #define INTRQ_ASSERT 	(1)
@@ -331,20 +334,21 @@ int main(void) {
 		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
 		selectedRegister = registerIndex_map[register_index];
 
-		if(writtenRegisterIndex < 1000) {
-			writtenRegisters[writtenRegisterIndex++] = register_index;
-		}
+		// if(writtenRegisterIndex < 5000) {
+		// 	writtenRegisters[writtenRegisterIndex++] = register_index;
+		// }
 
 		// Read from register send to Dreamcast
 		if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
 			pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
 
-			if(writtenRegisterIndex < 1000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-			}
+			// if(writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
+			// 	writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			// }
 
 			multicore_fifo_push_blocking(register_index);
+			// core_command_buffer[core0_buffer_index++] = register_index;
 
 			gpio_put(PIN_IORDY, 1);
 			// wait for latch
@@ -361,12 +365,13 @@ int main(void) {
 			pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
 			*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
 
-			if(writtenRegisterIndex < 1000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-			}
+			// if(writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
+			// 	writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			// }
 
 			multicore_fifo_push_blocking(register_index);
+			// core_command_buffer[core0_buffer_index++] = register_index;
 
 			gpio_put(PIN_IORDY, 1);
 			// wait for latch
@@ -384,6 +389,7 @@ volatile uint32_t core0CData = 0;
 volatile uint16_t core0commandRegister = 0;
 volatile uint16_t* spi_packet_register = 0;
 volatile uint8_t spi_packet_word_count = 0;
+volatile uint16_t generic_data_buffer[64] = {0}; // Basic buffer to send data for things like req_ses, error, etc
 
 #define DATA_MODE_IDLE 		(0)
 #define DATA_MODE_SPI 		(1) // Sega SPI packet mode, processing their 12 byte packets
@@ -412,20 +418,29 @@ void process_packet() {
 	// Get and set transfer mode from the features register
 	ide_current_transfer_mode = SPI_registers[SPI_FEATURES_REGISTER_INDEX] & 1;
 
+	if (writtenRegisterIndex < 5000) {
+		writtenRegisters[writtenRegisterIndex++] = 0xDAAAAAAA;
+		writtenRegisters[writtenRegisterIndex++] = SEGA_PACKET_CMD_REGISTER[0];
+		writtenRegisters[writtenRegisterIndex++] = 0xAAAAAAAD;
+	}
+
 	switch(current_io_packet_command) {
 		case 0x70:
+		SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x80;
+		if(writtenRegisterIndex < 5000) {
+			writtenRegisters[writtenRegisterIndex++] = 0x70FFFFFF;
+		}
 		case TEST_UNIT_SEGA_PACKET_CMD: {
 			*status_register = 0x50; // only drive ready bit set
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
 			SPI_registers[SPI_ERROR_REGISTER_INDEX] = 0x00; // no error
-			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x83;
 
 			// Set interrupt bit and assert line
 			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 			break;
 		}
 		case REQ_STAT_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x11111111;
 			}
 			break;
@@ -446,7 +461,7 @@ void process_packet() {
 				ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 				
 				// put first word in data register
-				SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(reply_11[io_current_position++]);
+				SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++];
 
 				// Put the correct values in the registers
 				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
@@ -458,13 +473,31 @@ void process_packet() {
 				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 
 			} else if (startingAddress == 0 && length == 10) {
-				if(writtenRegisterIndex < 1000) {
-					writtenRegisters[writtenRegisterIndex++] = 0xDEADBEEF;
+				if(writtenRegisterIndex < 5000) {
+					writtenRegisters[writtenRegisterIndex++] = 0x011F0F10;
 				}
+				
+				// Setup the IO infos
+				current_io_mode = IO_MODE_WRITE;
+				io_current_position = startingAddress / 2;
+				io_ending_position = (startingAddress / 2) + (length / 2);
+				ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+				
+				// put first word in data register
+				SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++];
+
+				// Put the correct values in the registers
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+				SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = length >> 8;
+				SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = length & 0xFF;
+				*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+				// set irq
+				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 
 			} else {
 				// finish packet by setting an error
-				if(writtenRegisterIndex < 1000) {
+				if(writtenRegisterIndex < 5000) {
 					writtenRegisters[writtenRegisterIndex++] = 0xDEADDEAD;
 				}
 			}
@@ -472,23 +505,63 @@ void process_packet() {
 			break;
 		}
 		case SET_MODE_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x22222222;
 			}
+
+			uint startingAddress = SEGA_PACKET_CMD_REGISTER[2];
+			uint length = SEGA_PACKET_CMD_REGISTER[4];	
+			
+			if (length == 0) {
+				writtenRegisters[writtenRegisterIndex++] = 0x2222FFFF;
+			} else {
+				writtenRegisters[writtenRegisterIndex++] = 0x2222AAAA;
+			}
+
+			// Setup the IO infos
+			current_io_mode = IO_MODE_READ;
+			io_current_position = startingAddress / 2;
+			io_ending_position = (startingAddress / 2) + (length / 2);
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+			
+			// We will be READING data into the reply 11 array
+
+			// Put the correct values in the registers
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x00; // IO=0, CoD=0
+
+			writtenRegisters[writtenRegisterIndex++] = SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX];
+			writtenRegisters[writtenRegisterIndex++] = SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX];
+
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = length >> 8;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = length & 0xFF;
+			*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
 			break;
 		}
 		case REQ_ERROR_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x33333333;
 			}
 			break;
 		}
 		case GET_TOC_SEGA_PACKET_CMD: {
+			if(writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x14FFFFFF;
+			}
 			// TOC is ALWAYS 408 bytes
 			current_io_mode = IO_MODE_WRITE;
 			io_current_position = 0;
 			io_ending_position = 204; // 408 bytes / 2 bytes per word
-			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+			// ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			printf("Read TOC - Double Density: %x:\n", (SEGA_PACKET_CMD_REGISTER[1] & 0x1));
+			for(int i = 0; i < 12; i++) {
+				printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
+			}
+			printf("\n");
 
 			DiskArea tocSelectBit = (SEGA_PACKET_CMD_REGISTER[1] & 0x1) ? DoubleDensity : SingleDensity;
 			GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), tocSelectBit);
@@ -509,31 +582,55 @@ void process_packet() {
 			break;
 		}
 		case REQ_SES_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x55555555;
 			}
+
+			uint sessionNumber = SEGA_PACKET_CMD_REGISTER[2];
+			uint length = SEGA_PACKET_CMD_REGISTER[4];	
+
+			current_io_mode = IO_MODE_WRITE;
+			io_current_position = 0;
+			io_ending_position = 3; // req ses is always 6 bytes, 3 words
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			GetDriveSessionInfo((uint8_t*)(generic_data_buffer), sessionNumber);
+			((uint8_t*)(generic_data_buffer))[0]= SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX];
+
+			// put first word in data register
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
+
+			// Put the correct values in the registers
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 6; // length is 6 bytes
+			*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
 			break;
 		}
 		case CD_OPEN_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x66666666;
 			}
 			break;
 		}
 		case CD_PLAY_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x77777777;
 			}
 			break;
 		}
 		case CD_SEEK_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x88888888;
 			}
 			break;
 		}
 		case CD_SCAN_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x99999999;
 			}
 			break;
@@ -559,7 +656,7 @@ void process_packet() {
 				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 			} else {
 				// Fall through to main loop and start the DMA transfer
-				if(writtenRegisterIndex < 1000) {
+				if(writtenRegisterIndex < 5000) {
 					writtenRegisters[writtenRegisterIndex++] = 0xD8A10000;
 				}
 			}	
@@ -567,25 +664,142 @@ void process_packet() {
 			break;
 		}
 		case CD_READ2_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x1234BBBB;
 			}
 			break;
 		}
 		case GET_SCD_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xCCCCCCCC;
 			}
+
+			uint8_t format = SEGA_PACKET_CMD_REGISTER[1] & 0xF;
+			uint32_t lengthFromPacket = (SEGA_PACKET_CMD_REGISTER[3] << 8) | (SEGA_PACKET_CMD_REGISTER[4]);
+			uint32_t length = lengthFromPacket;
+			uint8_t* bufferPtr = (uint8_t*)(generic_data_buffer);
+			uint8_t discStatus = SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] & 0xF;
+			
+			/*
+			 * Data Format
+			 * 0h = All subcode information is transferred as raw data, number of transfer bytes = 96
+			 * 1h = Subcode Q data only, 12 bytes
+			 * 2h = Media catalog number (UPC/Bar code)
+			 * 3h = ISRC code International Standard Recording Code
+			 * 4-Fh = reserved
+			 */
+
+			// Load the buffer with the correct data
+			/*
+			 * Byte 0    = reserved
+			 * Byte 1    = status
+			 * Byte 2,3  = subcode data length 100 = 64h
+			 * Byte 4-99 = subcode
+			 */
+
+			bufferPtr[0] = 0x00;
+
+			// TODO we aren't actually playing any audio data, but we should probably figure that out. 
+			// For now the disc is in standby (sector number = 0x82), so this will return no audio status (0x15)
+			if (discStatus == REQ_STAT_INFO_STATUS_PAUSE) {
+				bufferPtr[1] = 0x12;
+			} else if (discStatus == REQ_STAT_INFO_STATUS_STANDBY) {
+				bufferPtr[1] = 0x13;
+			} else if (discStatus == REQ_STAT_INFO_STATUS_PLAY) {
+				bufferPtr[1] = 0x11;
+			} else {
+				bufferPtr[1] = 0x15; // no audio status information
+			}
+
+			bufferPtr[1] = 0x15;
+
+			if (format == 0) {
+				length = 100;
+				bufferPtr[2] = 0;
+				bufferPtr[3] = 100; // 0x64
+				// copy subchannel array?
+				memcpy(&bufferPtr[4], q_subchannel, 96);
+			} else if (format == 1) {
+				length = 0xE; // 14 bytes
+				// Data length MSB (0 = 0x0)
+				bufferPtr[2] = 0;
+				// Data length LSB (14 = 0xE)
+				bufferPtr[3] = 0xE;
+				// Control(top 4 bits)/ADR (bottom 4 bits)
+				bufferPtr[4] = (4<<4) | (1);
+				// Copy the rest from nulldc, icegdrom's version looks really complicated :|
+				//5-13	DATA-Q
+				uint8_t* data_q = &bufferPtr[5-1];
+				//-When ADR = 1
+				//Byte	Description
+				//1	TNO
+				data_q[1]=1;//Track number .. duno whats it :P gota parse toc xD ;p
+				//2	X
+				data_q[2]=1;//gap #1 (main track)
+				//3-5	Elapsed FAD within track
+				//u32 FAD_el=cdda.CurrAddr.FAD-cdda.StartAddr.FAD;
+				data_q[3]=0;//(u8)(FAD_el>>16);
+				data_q[4]=0;//(u8)(FAD_el>>8);
+				data_q[5]=0;//(u8)(FAD_el>>0);
+				//6	0	0	0	0	0	0	0	0
+				data_q[6]=0;//
+				//7-9	-> seems to be FAD
+				data_q[7]=0;//(u8)(cdda.CurrAddr.FAD>>16);
+				data_q[8]=0x0;//(u8)(cdda.CurrAddr.FAD>>8);
+				data_q[9]=0x96;//(u8)(cdda.CurrAddr.FAD>>0);
+
+			} else {
+				// Unsupported, abort!
+				printf("SCD format: %x, unsupported\n", format);
+			}
+
+			current_io_mode = IO_MODE_WRITE;
+			io_current_position = 0;
+			io_ending_position = length/2;
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			// put first word in data register
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
+
+			// Put the correct values in the registers
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = length >> 8;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = length & 0xFF;
+			*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
 			break;
 		}
 		case Code71_PACKET_CMD: {
-			if(writtenRegisterIndex < 1000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x00000071;
+			if(writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x71AAAAAA;
 			}
+
+			current_io_mode = IO_MODE_WRITE;
+			io_current_position = 0;
+			io_ending_position = reply_71_sz/2;
+			// io_ending_position = sizeof(cmd71_reply)/2;
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_71[io_current_position++];
+			// SPI_registers[SPI_DATA_REGISTER_INDEX] = cmd71_reply[io_current_position++];
+
+			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x81;
+			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x82;
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = reply_71_sz >> 8;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = reply_71_sz && 0xFF; 
+			*status_register = 0x58; // DRQ = 1 BSY = 0
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
 			break;
 		}
 		default: {
-			if(writtenRegisterIndex < 1000) {
+			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xDEAD0000 | current_io_packet_command;
 			}
 			break;
@@ -594,9 +808,38 @@ void process_packet() {
 }
 
 static inline void process_data_written() {
+
+	if (current_io_mode == IO_MODE_READ) {
+
+		if (current_io_packet_command == SET_MODE_SEGA_PACKET_CMD) {
+
+			reply_11[io_current_position++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+
+			if (io_current_position >= io_ending_position) {
+				// for(int i = 0; i < 16; i++) {
+				// 	printf("0x%02X ", reply_11[i]);
+				// }
+				// printf("\n");
+				current_io_packet_command = 0;
+				io_current_position = 0;
+				io_ending_position = 0;
+				current_io_mode = IO_MODE_IDLE;
+
+				// Set the status register to indicate the data is finished
+				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+				*status_register = 0x50; // DRQ = 0 BSY = 0
+				
+				// Assert the IRQ line to announce we are finished
+				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+			}
+
+		}
+
+		return;
+	}
+
 	// I think this method will ONLY be called when dreamcast is writing a SPI packet
 	if(ide_current_mode == DATA_MODE_SPI) {
-		
 		spi_packet_register[spi_packet_word_count++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
 
 		// This is the last word of the packet, process it
@@ -608,9 +851,14 @@ static inline void process_data_written() {
 		}
 	} else {
 		// So this else block is likely unneeded but will keep this here for debugging purposes
-		if(writtenRegisterIndex < 1000) {
+		if(writtenRegisterIndex < 5000) {
 			writtenRegisters[writtenRegisterIndex++] = 0xEEEEEEEE;
 		}
+		printf("!!error process_data_written- ide_current_mode: %x\n", ide_current_mode);
+		for(int i = 0; i < 12; i++) {
+			printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
+		}
+		printf("\n");
 		// TODO might be better to just printf something instead?
 	}
 }
@@ -624,9 +872,13 @@ static inline void process_data_read() {
 	// Dreamcast has read the data register. Put the next word in the register
 
 	if(current_io_packet_command == REQ_MODE_SEGA_PACKET_CMD) {
-		SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(reply_11[io_current_position++]); // put next word in data register
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++]; // put next word in data register
 
 		if (io_current_position >= io_ending_position) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x1100FFFF;
+			}
+			// printf("REQ_MODE finished\n");
 			current_io_packet_command = 0;
 			io_current_position = 0;
 			io_ending_position = 0;
@@ -644,8 +896,32 @@ static inline void process_data_read() {
 		// If the disc image we read doesn't have any TOC we should set error in status register
 
 		// Start sending the TOC
-		SPI_registers[SPI_DATA_REGISTER_INDEX] = swap8(SEGA_PACKET_TOC_INFO_16[io_current_position++]);
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = SEGA_PACKET_TOC_INFO_16[io_current_position++];
 		if (io_current_position >= io_ending_position) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x1400FFFF;
+			}
+			// printf("TOC finished\n");
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Assert the IRQ line to announce we are finished
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+		}
+
+	} else if (current_io_packet_command == REQ_SES_SEGA_PACKET_CMD) {
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++]; // put next word in data register
+
+		if (io_current_position >= io_ending_position) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x1500FFFF;
+			}
 			current_io_packet_command = 0;
 			io_current_position = 0;
 			io_ending_position = 0;
@@ -682,7 +958,7 @@ static inline void process_data_read() {
 			// be no one to response to commands since this thread wont be popping the core fifo
 			// IF this is a problem, we should just work the dma transfer into the main loop
 
-			// if(writtenRegisterIndex < 1000) {
+			// if(writtenRegisterIndex < 5000) {
 			// 	writtenRegisters[writtenRegisterIndex++] = 0xD8A00000;
 			// }
 
@@ -691,11 +967,11 @@ static inline void process_data_read() {
 				
 
 				// Put data on the bus
-				pio0->txf[IDE_WRITE_TO_HOST_SM] = swap8(SPI_registers[SPI_DATA_REGISTER_INDEX]);
+				pio0->txf[IDE_WRITE_TO_HOST_SM] = SPI_registers[SPI_DATA_REGISTER_INDEX];
 
 				// Signal we have data and wait for dreamcast to acknowledge
 				gpio_put(PIN_DMARQ, 1);
-				while(gpio_get(PIN_DMACK) == 1 && numDmackWaits < 10) { 
+				while(gpio_get(PIN_DMACK) == 1 && numDmackWaits < 100) { 
 					numDmackWaits++;
 					tight_loop_contents(); 
 				}
@@ -715,7 +991,7 @@ static inline void process_data_read() {
 
 			// } while(gdrom_buffer_has_more_data);
 
-			// if(writtenRegisterIndex < 1000) {
+			// if(writtenRegisterIndex < 5000) {
 			// 	writtenRegisters[writtenRegisterIndex++] = 0xD8A01111;
 			// }
 
@@ -728,7 +1004,7 @@ static inline void process_data_read() {
 				// Do we need to assert the irq line for a read?
 				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 
-				if(writtenRegisterIndex < 1000) {
+				if(writtenRegisterIndex < 5000) {
 					writtenRegisters[writtenRegisterIndex++] = dmaTransfersCompleted;
 					writtenRegisters[writtenRegisterIndex++] = 0xD8A07777;
 					dmaTransfersCompleted = 0;
@@ -747,7 +1023,7 @@ static inline void process_data_read() {
 				// Do we need to assert the irq line for a read?
 				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 
-				if(writtenRegisterIndex < 1000) {
+				if(writtenRegisterIndex < 5000) {
 					writtenRegisters[writtenRegisterIndex++] = 0xD8A01111;
 				}
 			}
@@ -767,8 +1043,72 @@ static inline void process_data_read() {
 			}
 		}	
 
+	} else if (current_io_packet_command == CD_PLAY_SEGA_PACKET_CMD) {
+		printf("CD_PLAY_SEGA_PACKET_CMD\n");
+	} else if (current_io_packet_command == CD_SEEK_SEGA_PACKET_CMD) {
+		printf("CD_SEEK_SEGA_PACKET_CMD\n");
+	} else if (current_io_packet_command == CD_SCAN_SEGA_PACKET_CMD) {
+		printf("CD_SCAN_SEGA_PACKET_CMD\n");
+	} else if (current_io_packet_command == CD_READ2_SEGA_PACKET_CMD) {
+		printf("CD_READ2_SEGA_PACKET_CMD\n");
+	} else if (current_io_packet_command == GET_SCD_SEGA_PACKET_CMD) {
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++]; // put next word in data register
+
+		if (io_current_position >= io_ending_position) {
+
+			if(writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x4000FFFF;
+			}
+
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Assert the IRQ line to announce we are finished
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+		}
+
+	} else if (current_io_packet_command == Code71_PACKET_CMD) {
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_71[io_current_position++]; // put next word in data register
+		// SPI_registers[SPI_DATA_REGISTER_INDEX] = cmd71_reply[io_current_position++]; // put next word in data register
+
+		if (io_current_position >= io_ending_position) {
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Assert the IRQ line to announce we are finished
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+			if(writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x71FFFFFF;
+			}
+		}
+
 	} else {
 		printf("\nunimplemented current_io_packet: %u\n", current_io_packet_command);
+		printf("Resetting all variables\n\n");
+		current_io_packet_command = 0;
+		io_current_position = 0;
+		io_ending_position = 0;
+		current_io_mode = IO_MODE_IDLE;
+
+		// Set the status register to indicate the data is finished
+		SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+		*status_register = 0x50; // DRQ = 0 BSY = 0
+		
+		// Assert the IRQ line to announce we are finished
+		gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 	}
 
 }
@@ -780,73 +1120,15 @@ void second_core_main() {
 	gdrom_read_default_disc_image();
 	printf("DONE!\n");
 
-
-	// busy_wait_ms(500);
-
-	// // Test the read command
-	// SEGA_PACKET_CMD_REGISTER[0] = 0x30;
-	// SEGA_PACKET_CMD_REGISTER[1] = 0x24;
-	// SEGA_PACKET_CMD_REGISTER[2] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
-	// SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
-	// SEGA_PACKET_CMD_REGISTER[5] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[6] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[7] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[8] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[9] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[10] = 0x07;
-	// SEGA_PACKET_CMD_REGISTER[11] = 0x00;
-
-	// uint32_t endTime = 0;
-	// uint32_t startTime = time_us_32();
-	// gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
-	// endTime = time_us_32();
-
-	// printf("Read Time: %u\n", endTime - startTime);
-
-	// printf("GDROM Read Test\n");
-
-	// printf("SPI Command Packet:\t");
-	// for(int i = 0; i < 12; i++) {
-	// 	printf("(%u)%x ", i, SEGA_PACKET_CMD_REGISTER[i]);
-	// }
-	// printf("\n");
-
-	// printf("Sector Start: %u(0x%x), Sector Count: %u(0x%x), Sector Size: %u(0x%x)\n", gdrom_read_start_sector, gdrom_read_start_sector, gdrom_read_remaining_sectors, gdrom_read_remaining_sectors, gdrom_read_sector_size, gdrom_read_sector_size);
-	
-	// printf("Data Buffer:");
-	// for (int i = 2048; i < 2048+32; i++) {
+	// printf("TOC dump...\n");
+	// GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), SingleDensity);
+	// for(int i = 0; i < 408; i++) {
 	// 	if (i % 8 == 0) {
-	// 		printf("\n%d: ", i);
+	// 		printf("\n");
 	// 	}
-	// 	printf("%x ", gdrom_read_buffer[i]);
+	// 	printf("%x ", SEGA_PACKET_TOC_INFO[i]);
 	// }
-
-	// for(int i = 0; i < 1024; i++) {
-	// 	gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
-	// }
-
-	// printf("gdrom_read_buffer_index: %u\n", gdrom_read_buffer_index);
-
-	// printf("\nData Register:");
-	// for (int i = 0; i < 32; i++) {
-	// 	gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
-	// 	if (i % 8 == 0) {
-	// 		printf("\n%d: ", i);
-	// 	}
-	// 	printf("%x ", SPI_registers[SPI_DATA_REGISTER_INDEX]);
-	// }
-
-
-	// printf("\n\n");
-
-	// // printf("Data_Buffer[0]: %x\n", gdrom_read_buffer[0]);
-	// // printf("Data Register:  %x\n", SPI_registers[SPI_DATA_REGISTER_INDEX]);
-
-	// // Stall here
-	// while(1);;;
-
-
+	// printf("DONE!\n");
 
 	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
 
@@ -882,6 +1164,10 @@ void second_core_main() {
 				// 	i++;
 				// }
 			}
+			
+			// Allow this to dump data every minute
+			writtenRegisterIndex = 0;
+			hasChirped = false;
 
 			// for(int i = 0; i < SPI_REGISTER_COUNT; i++) {
 			// 	printNameOfRegister(i);
@@ -903,6 +1189,7 @@ void second_core_main() {
 			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
 			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
 			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			printf("sector count: %x\n", SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]);
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
 
@@ -923,6 +1210,27 @@ void second_core_main() {
 		// Get data
 		core0CData = multicore_fifo_pop_blocking();
 
+		// if (core1_buffer_index == core0_buffer_index) {
+		// 	continue;
+		// }
+
+		// if (core1_buffer_index != core0_buffer_index) {
+		// 	core0CData = core_command_buffer[core1_buffer_index++];
+		// }
+
+		// Please skip all the stupid alt status register reads
+		if(writtenRegisterIndex < 5000 && core0CData != 0x4e) {
+			// if (writtenRegisterIndex > 0 && 
+			// 	(core0CData == 0x53 || core0CData == 0x50) &&
+			// 	((writtenRegisters[writtenRegisterIndex-1] == 0x53) || 
+			// 	(writtenRegisters[writtenRegisterIndex-1] == 0x50))) {
+			// 	// Dont add any more of reads or sector number peeks, they clutter the logs
+			// } else {
+			// 	writtenRegisters[writtenRegisterIndex++] = core0CData;
+			// }
+			writtenRegisters[writtenRegisterIndex++] = core0CData;
+		}
+
 		// Host has read the status register
 		if (core0CData == CODED_STATUS_REGISTER_READ) {
 			gpio_put(PIN_INTRQ, INTRQ_DEASSERT); // negate the interrupt line
@@ -937,6 +1245,11 @@ void second_core_main() {
 		if (core0CData == CODED_DATA_REGISTER_READ) {
 			if (current_io_mode == IO_MODE_WRITE) {
 				process_data_read();
+			} else {
+				// printf("ERROR register READ current_io_mode incorrect: %x | %x, %u, %u, dma:%u\n", current_io_mode, current_io_packet_command, io_current_position, io_ending_position, ide_current_transfer_mode);
+				if(writtenRegisterIndex < 5000) {
+					writtenRegisters[writtenRegisterIndex++] = 0xDEADDDDD;
+				}
 			}
 
 			continue;

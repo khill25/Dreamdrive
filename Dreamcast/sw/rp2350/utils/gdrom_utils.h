@@ -29,8 +29,6 @@ extern uint32_t gdrom_read_current_byte_count;
 extern uint32_t gdrom_read_bytes_remanining_in_sector;
 extern uint32_t gdrom_read_bytes_remanining;
 
-extern Disc* current_disc;
-
 // Not sure I need to keep track of any of this as it's done in the nulldc code
 // enum cd_read_data_select_type {
 //     CD_READ_HEADER = 0,

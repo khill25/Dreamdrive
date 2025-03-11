@@ -143,6 +143,7 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     } else {
         printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
     }
+    // printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
 }
 
 // Updates state variables for micro updates related to actually sending data over the 16-bit bus
@@ -192,6 +193,7 @@ void gdrom_read_sectors(uint8_t* buffer, uint32_t sector, uint32_t sectorCount, 
     // cross check with icegdrom code to see if their tools do anything like this
     // to the disc image conversions.
     if (current_disc->type == GdRom && sector == 45150 && sectorCount == 7) {
+        printf("ReadSectors: Special buffer patching for sector 45150 with sector count of 7\n");
         PatchRegion_0(buffer, sectorSize);
         PatchRegion_6(buffer + 2048 * 6, sectorSize);
     }
