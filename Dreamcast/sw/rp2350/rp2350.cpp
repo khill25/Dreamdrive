@@ -191,6 +191,27 @@ void setup_write_to_dreamcast() {
 	pio_sm_init(pio0, sm, offset, &c);
 }
 
+void setup_ata_register_emulator() {
+	uint sm = 0;
+	uint offset = pio_add_program(pio0, &ata_bus_interface_program);
+	pio_sm_config c = ata_bus_interface_program_get_default_config(offset);
+
+	// Input pins start at pin 0
+	sm_config_set_in_pins(&c, 0);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 16);
+	
+	// Still set the initial pins to be read
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x800000, 0xFFFFFF);
+	
+	sm_config_set_in_shift(&c, false, false, 32);
+
+	sm_config_set_sideset_pins(&c, PIN_IORDY);
+
+	pio_sm_init(pio0, sm, offset, &c);
+}
+
 int main(void) {
 	// Set clock speed to 266MHz (3.76ns per cycle)
 	const int freq_khz = 266000;
@@ -215,7 +236,7 @@ int main(void) {
 	// Some pins that need to be set to output
 	// TODO: Figure out which pins need to be set to output
 	gpio_init(PIN_IORDY);
-	gpio_set_dir(PIN_IORDY, true);
+	// gpio_set_dir(PIN_IORDY, true);
 	// gpio_pull_up(PIN_IORDY);
 
 	gpio_init(PIN_DOPEN);
@@ -236,17 +257,22 @@ int main(void) {
 	// Setup and start the ide databus programs
 	printf("Setting up PIO ide databus programs...\n");
 	printf("\tiniting gpio for pio...");
-	for(int i = 0; i < 16; i++) {
+	for(int i = 0; i <= PIN_WR; i++) {
 		gpio_init(i);
 		gpio_set_function(i, GPIO_FUNC_PIO0);
 		pio_gpio_init(pio0, i);
 	}
+	gpio_set_function(PIN_IORDY, GPIO_FUNC_PIO0);
+	pio_gpio_init(pio0, PIN_IORDY);
+
 	printf("DONE!\n\tSetting up programs...");
-	setup_read_from_dreamcast();
-	setup_write_to_dreamcast();
+	// setup_read_from_dreamcast();
+	// setup_write_to_dreamcast();
+	setup_ata_register_emulator();
 	printf("DONE!\n\tEnabling programs...");
-	pio_sm_set_enabled(pio0, IDE_READ_FROM_HOST_SM, true);
-	pio_sm_set_enabled(pio0, IDE_WRITE_TO_HOST_SM, true);
+	// pio_sm_set_enabled(pio0, IDE_READ_FROM_HOST_SM, true);
+	// pio_sm_set_enabled(pio0, IDE_WRITE_TO_HOST_SM, true);
+	pio_sm_set_enabled(pio0, 0, true);
 	printf("DONE!\n");
 
 	volatile uint32_t pins = 0;
@@ -310,59 +336,83 @@ volatile uint32_t readWriteLineValues = 0;
 void __not_in_flash_func(process_ata_register_access)() {
 	while(1) {
 
-		do {
-			readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
-		} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
-
-		do {
-			readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
-		} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
-
-		// Chatgpt suggested this, it seems to execute MUCH faster
-		// Something about branch prediction taking a long time and the compiler directive 
-		// fixes that
-		// do {
-		// 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
-		// } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
-		
-		// gpio_put(PIN_IORDY, 0);
-
-		// Figure out the register index and get the pointer to the selected register
-		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
+		readWriteLineValues = pio_sm_get_blocking(pio0, 0);
+		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16;
 		selectedRegister = registerIndex_map[register_index];
 
-		// Read from register send to Dreamcast
-		if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
-			pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
-
-			multicore_fifo_push_blocking(register_index);
-			// core_command_buffer[core0_buffer_index++] = register_index;
-
-			gpio_put(PIN_IORDY, 1);
-			// wait for latch
-			while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
-			
-			// Send a signal to pio to let it go back to input
-			pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
-			
-			gpio_put(PIN_IORDY, 0);
-
-		// Write to Dreamcast from register
-		} else {
-			// Let pio know we are ready to read data
-			pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
-			*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
-
-			if (register_index != 0x4e) {
-				multicore_fifo_push_blocking(register_index);
-			}
-			// core_command_buffer[core0_buffer_index++] = register_index;
-
-			gpio_put(PIN_IORDY, 1);
-			// wait for latch
-			while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
-			gpio_put(PIN_IORDY, 0);
+		if (writtenRegisterIndex < 5000) {
+			writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
+			writtenRegisters[writtenRegisterIndex++] = register_index;
 		}
+
+		if (readWriteLineValues == 0) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			}
+
+			pio_sm_put_blocking(pio0, 0, *selectedRegister);
+
+		} else if (readWriteLineValues == 1) {
+			*selectedRegister = pio_sm_get_blocking(pio0, 0);
+
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			}
+		}
+
+		// do {
+		// 	readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
+		// } while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
+
+		// do {
+		// 	readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
+		// } while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
+
+		// // Chatgpt suggested this, it seems to execute MUCH faster
+		// // Something about branch prediction taking a long time and the compiler directive 
+		// // fixes that
+		// // do {
+		// // 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
+		// // } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
+		
+		// // gpio_put(PIN_IORDY, 0);
+
+		// // Figure out the register index and get the pointer to the selected register
+		// register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
+		// selectedRegister = registerIndex_map[register_index];
+
+		// // Read from register send to Dreamcast
+		// if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
+		// 	pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
+
+		// 	multicore_fifo_push_blocking(register_index);
+		// 	// core_command_buffer[core0_buffer_index++] = register_index;
+
+		// 	gpio_put(PIN_IORDY, 1);
+		// 	// wait for latch
+		// 	while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
+			
+		// 	// Send a signal to pio to let it go back to input
+		// 	pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
+			
+		// 	gpio_put(PIN_IORDY, 0);
+
+		// // Write to Dreamcast from register
+		// } else {
+		// 	// Let pio know we are ready to read data
+		// 	pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
+		// 	*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
+
+		// 	if (register_index != 0x4e) {
+		// 		multicore_fifo_push_blocking(register_index);
+		// 	}
+		// 	// core_command_buffer[core0_buffer_index++] = register_index;
+
+		// 	gpio_put(PIN_IORDY, 1);
+		// 	// wait for latch
+		// 	while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
+		// 	gpio_put(PIN_IORDY, 0);
+		// }
 	}
 }
 
@@ -388,7 +438,7 @@ void ide_register_controller_main() {
 	// By using the IORDY pin, we can slow down the control signaling.
 	// This makes it a lot slower to read/write to the dreamcast but does at least work
 	// TODO: Figure out how to do this without the IORDY pin to speed up the control processing
-	gpio_put(PIN_IORDY, 0);
+	gpio_put(PIN_IORDY, 1);
 
 	process_ata_register_access();
 

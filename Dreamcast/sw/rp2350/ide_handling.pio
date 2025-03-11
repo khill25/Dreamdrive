@@ -30,68 +30,117 @@ wait_for_wr:
     pull
 .wrap
 
+.program ata_bus_interface
+.side_set 1 opt
+.wrap_target
+idle:
+    mov osr, null          ; Set inputs
+    out pindirs, 16
+
+    ;; clear x and y
+    mov x, null
+    mov y, null 
+
+    ; Read all pins into OSR
+    mov osr, pins 
+    ; Dump 20 bits of OSR contents ()
+    out null, 20 ;; we want cs0, cs1, rd, wr
+    ;; cs0 = pin 19
+
+    ; Effectively read gpio 19 into y
+    out y, 1 ; Read cs0
+    out x, 1 ; Read cs1
+    jmp x!=y check_read_write
+    jmp idle
+
+check_read_write:
+    ;; clear x and y
+    mov x, null side 1
+    mov y, null
+
+    mov osr, pins 
+    out null, 22 ;; dump 22 bits to get to read bit
+
+    out y, 1 ; read rd
+    mov osr, y
+
+    push ;; push the value of the read pin to C
+
+    jmp !y handle_read; read is asserted (active low)
+    ;; if read isn't low then write must be
+handle_write:
+    in pins, 16 side 0;; read data
+
+    push;; push the data to C
+
+    wait 1 gpio 22 ;; wait for WR to go high
+    jmp idle
+
+handle_read:
+    mov osr, ~null side 0;; set all bits to 1 for output
+    out pindirs, 16 ;; set pins 0-15 as outputs
+
+    pull ;; wait for data from C
+    
+    out pins, 16 ;; send data to pins
+    wait 1 gpio 21 ;; wait for RD to go high
+
+    jmp idle
+
+.wrap
+
 ;;; code chatgpt came up with
 ; PIO program to handle ATA read/write register cycles
-.program ata_bus_interface
-; %{}        ; (Assembler directives can be added here if using SDK)
+; .program ata_bus_interface
+;     ; Initialize data bus as input
+; .wrap_target
+; idle:
+;     mov osr, null          ; Set inputs
+;     out pindirs, 16
 
-    ; Define pin indices for clarity (relative to base if needed)
-    ; Using absolute GPIO in WAIT instructions for control lines.
+;     ; Read control signals (CS0, CS1, RD, WR)
+;     mov x, pins              
+;     mov isr, x               
+;     in null, 19              
 
-    ; Initialize: ensure data bus is input (tri-stated)
-    set pindirs, 0            ; Set 16 data pins (GPIO0-15) as inputs (0=input for all)
+;     ; Check CS signals and validate
+;     mov x, isr               
+;     jmp !x check_cs1         ; If CS0=0, check CS1
+;     in x, 1                  ; CS0=1, check CS1
+;     jmp !x cs_valid          ; If CS1=0, valid
+;     jmp idle                 ; Both high = invalid
 
-idle:
-    ; Continuously monitor control signals for a valid transaction.
-    mov x, pins               ; Read current state of all assigned pins (D0-D15, A0-A2, CS0, CS1, RD, WR)
-    mov isr, x                ; Copy to ISR to manipulate bits (non-destructive for X)
-    in null, 16               ; Drop the 16 data bits (D0-D15) from ISR – we only care about control signals now
-    in null, 3                ; Drop A0-A2 as well, leaving CS0, CS1, RD, WR in the lowest 4 bits of ISR
-    mov x, isr                ; X now holds [CS0, CS1, RD, WR] in bits 0..3 (bit0=CS0, bit1=CS1, bit2=RD, bit3=WR, 1=HIGH, 0=LOW)
+; check_cs1:
+;     in x, 1                  ; Get CS1
+;     jmp !x idle              ; Both low = invalid
 
-    ; Check for a valid chip-select and strobe combination:
-    ; Valid patterns (in binary [WR,RD,CS1,CS0]) are:
-    ;  0b0101 (0x5) – CS1 active, Write strobe (WR=0,RD=1)
-    ;  0b0110 (0x6) – CS0 active, Write strobe
-    ;  0b1001 (0x9) – CS1 active, Read strobe (RD=0,WR=1)
-    ;  0b1010 (0xA) – CS0 active, Read strobe
-    ; All other patterns (both CS high, both CS low, or both strobes inactive) are ignored.
+; cs_valid:
+;     ; Check RD/WR
+;     mov x, isr
+;     in x, 1                  ; Get RD
+;     jmp !x handle_read       ; RD=0, do read
+;     in x, 1                  ; Get WR
+;     jmp !x handle_write      ; WR=0, do write
+;     jmp idle
 
-    set y, 0x5
-    jmp x==y do_write         ; If X == 0x5 (CS1 + WRITE), branch to write handler
-    set y, 0x6
-    jmp x==y do_write         ; If X == 0x6 (CS0 + WRITE), branch to write handler
-    set y, 0x9
-    jmp x==y do_read          ; If X == 0x9 (CS1 + READ), branch to read handler
-    set y, 0xA
-    jmp x==y do_read          ; If X == 0xA (CS0 + READ), branch to read handler
+; handle_read:
+;     mov x, isr                 ; 0 indicates read operation
+;     push                     ; Send operation type to C
+;     in pins, 16              ; Read data
+;     push                     ; Send data to C
+;     wait 1 gpio 21          ; Wait RD high
+;     jmp idle
 
-    jmp idle                  ; If no valid combination, continue polling (idle loop)
-
-; --- Read cycle handler ---
-do_read:
-    ; At this point, one CS is low and RD is active (low), WR is high.
-    ; The ATA device will be driving the data bus. We sample 16-bit data:
-    in pins, 16               ; Read 16 bits from data bus (D0-D15) into ISR
-    push block                ; Push the 16-bit word to RX FIFO (block if FIFO full)
-    wait 1 gpio 21            ; Wait for RD (GPIO21) to return high (end of read strobe)
-    ; (Data bus remains input, no need to change pindirs here)
-    jmp idle                  ; Transaction done – return to monitoring idle state
-
-; --- Write cycle handler ---
-do_write:
-    ; One CS is low and WR is active (low). Prepare to drive the bus:
-    ; Set data bus pins to output so we can drive the ATA device.
-    set x, 0                  ; Prepare all-ones mask for 16 pins by inverting 0
-    mov x, ~x                 ; Now X = 0xFFFFFFFF (all bits = 1)
-    mov osr, x                ; Load OSR with mask (lower 16 bits = 1 will be used)
-    out pindirs, 16           ; Set 16 data pins (GPIO0-15) to outputs (1=output for each bit)
-    pull block                ; Pull 16-bit data word from TX FIFO (block if empty – CPU must provide data)
-    out pins, 16              ; Output the 16-bit word on D0-D15
-    wait 1 gpio 22            ; Wait for WR (GPIO22) to return high (end of write strobe – device has latched the data)
-    set pindirs, 0            ; Revert D0-D15 to inputs (tri-state the bus after write)
-    jmp idle                  ; Return to idle loop for next transaction
-;;;;;;;;;
+; handle_write:
+;     mov x, isr                 ; 1 indicates write operation
+;     push                     ; Send operation type to C
+;     mov osr, ~null          ; Set outputs
+;     out pindirs, 16
+;     pull                    ; Get data from C
+;     out pins, 16
+;     wait 1 gpio 22         ; Wait WR high
+;     jmp idle
+; .wrap
 
 ;;; Code that Copilot came up with.
 ;;; I think that it works in theroy, but I haven't tested it yet.
