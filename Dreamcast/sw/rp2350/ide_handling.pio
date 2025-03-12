@@ -32,10 +32,11 @@ wait_for_wr:
 
 ;; pio0 sm = 0
 .program ata_cs0_read
+.side_set 1 opt
 .wrap_target
 
 wait_for_cs:
-    wait 0 gpio 19 ;; wait for cs0 to go low
+    wait 0 gpio 19;; wait for cs0 to go low
 
 wait_for_rd_asserted_low:
     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
@@ -45,7 +46,7 @@ wait_for_rd_asserted_low:
     out pindirs, 16
 
     ; Read all pins into OSR
-    mov osr, pins 
+    mov osr, pins side 1
     ; Put data lines from pins into x
     out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
@@ -61,26 +62,23 @@ wait_for_rd_asserted_low:
 
     ;; Move the data so the dma can read it
     mov isr, x
-    push
+    push side 0
 
     wait 1 gpio 21 ;; wait for RD to go high
 .wrap
 
 ;; pio0 sm = 1
 .program ata_cs0_write
+.side_set 1 opt
 .wrap_target
 wait_for_cs:
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16
-
     wait 0 gpio 19 ;; wait for cs0 to go low
 
 wait_for_wr_asserted_low:
     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
 
     ; Read all pins into OSR
-    mov osr, pins 
+    mov osr, pins side 1
     out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
 
     ;; set pins to output
@@ -98,13 +96,18 @@ wait_for_wr_asserted_low:
 	out pindirs, 16         ;; set pins 0-15 as outputs
 
 	pull ;; get data from dma
-	out pins, 16            ;; send data to pins
+	out pins, 16 side 0           ;; send data to pins
 
     wait 1 gpio 22 ;; wait for WR to go high
+
+    ;; set pins to input
+    mov osr, null
+    out pindirs, 16
 .wrap
 
 ;; pio2 sm = 0
 .program ata_cs1_read
+.side_set 1 opt
 .wrap_target
 wait_for_cs:
     wait 0 gpio 20 ;; wait for cs1 to go low
@@ -112,12 +115,8 @@ wait_for_cs:
 wait_for_rd_asserted_low:
     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
 
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16
-
     ; Read all pins into OSR
-    mov osr, pins 
+    mov osr, pins side 1
     ; Put data lines from pins into x
     out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
@@ -133,34 +132,35 @@ wait_for_rd_asserted_low:
 
     ;; Move the data so the dma can read it
     mov isr, x
-    push
+    push side 0
 
     wait 1 gpio 21 ;; wait for RD to go high
+
+    ;; set pins to input
+    mov osr, null
+    out pindirs, 16 side 0
 .wrap
 
 ;; pio2 sm = 1
 .program ata_cs1_write
+.side_set 1 opt
 .wrap_target
 wait_for_cs:
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16
-
     wait 0 gpio 20 ;; wait for cs0 to go low
 
 wait_for_wr_asserted_low:
     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
 
     ; Read all pins into OSR
-    mov osr, pins 
+    mov osr, pins side 1
     out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
+
+    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
+    out y, 7 ;; read in the address
 
     ;; set pins to output
     mov osr, ~null
     out pindirs, 16
-
-    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
-    out y, 7 ;; read in the address
 
     ;; move the address so the dma can read it
     mov isr, y
@@ -170,162 +170,12 @@ wait_for_wr_asserted_low:
 	out pindirs, 16         ;; set pins 0-15 as outputs
 
 	pull ;; get data from dma
-	out pins, 16            ;; send data to pins
+	out pins, 16 side 0           ;; send data to pins
 
     wait 1 gpio 22 ;; wait for WR to go high
 
-.wrap
-
-.program ata_bus_interface
-.side_set 1 opt
-.wrap_target
-idle:
-    mov osr, null          ; Set inputs
-    out pindirs, 16
-
-    ;; clear x and y
-    mov x, null
-    mov y, null 
-
-    ; Read all pins into OSR
-    mov osr, pins 
-    ; Dump 20 bits of OSR contents ()
-    out null, 20 ;; we want cs0, cs1, rd, wr
-    ;; cs0 = pin 19
-
-    ; Effectively read gpio 19 into y
-    out y, 1 ; Read cs0
-    out x, 1 ; Read cs1
-    jmp x!=y check_read_write
-    jmp idle
-
-check_read_write:
-    ;; clear x and y
-    mov x, null side 1
-    mov y, null
-
-    mov osr, pins 
-    out null, 22 ;; dump 22 bits to get to read bit
-
-    out y, 1 ; read rd
-    mov osr, y
-
-    push ;; push the value of the read pin to C
-
-    jmp !y handle_read; read is asserted (active low)
-    ;; if read isn't low then write must be
-handle_write:
-    in pins, 16 side 0;; read data
-
-    push;; push the data to C
-
-    wait 1 gpio 22 ;; wait for WR to go high
-    jmp idle
-
-handle_read:
-    mov osr, ~null side 0;; set all bits to 1 for output
-    out pindirs, 16 ;; set pins 0-15 as outputs
-
-    pull ;; wait for data from C
-    
-    out pins, 16 ;; send data to pins
-    wait 1 gpio 21 ;; wait for RD to go high
-
-    jmp idle
+    ;; set pins to input
+    mov osr, null
+    out pindirs, 16 side 0
 
 .wrap
-
-;;; code chatgpt came up with
-; PIO program to handle ATA read/write register cycles
-; .program ata_bus_interface
-;     ; Initialize data bus as input
-; .wrap_target
-; idle:
-;     mov osr, null          ; Set inputs
-;     out pindirs, 16
-
-;     ; Read control signals (CS0, CS1, RD, WR)
-;     mov x, pins              
-;     mov isr, x               
-;     in null, 19              
-
-;     ; Check CS signals and validate
-;     mov x, isr               
-;     jmp !x check_cs1         ; If CS0=0, check CS1
-;     in x, 1                  ; CS0=1, check CS1
-;     jmp !x cs_valid          ; If CS1=0, valid
-;     jmp idle                 ; Both high = invalid
-
-; check_cs1:
-;     in x, 1                  ; Get CS1
-;     jmp !x idle              ; Both low = invalid
-
-; cs_valid:
-;     ; Check RD/WR
-;     mov x, isr
-;     in x, 1                  ; Get RD
-;     jmp !x handle_read       ; RD=0, do read
-;     in x, 1                  ; Get WR
-;     jmp !x handle_write      ; WR=0, do write
-;     jmp idle
-
-; handle_read:
-;     mov x, isr                 ; 0 indicates read operation
-;     push                     ; Send operation type to C
-;     in pins, 16              ; Read data
-;     push                     ; Send data to C
-;     wait 1 gpio 21          ; Wait RD high
-;     jmp idle
-
-; handle_write:
-;     mov x, isr                 ; 1 indicates write operation
-;     push                     ; Send operation type to C
-;     mov osr, ~null          ; Set outputs
-;     out pindirs, 16
-;     pull                    ; Get data from C
-;     out pins, 16
-;     wait 1 gpio 22         ; Wait WR high
-;     jmp idle
-; .wrap
-
-;;; Code that Copilot came up with.
-;;; I think that it works in theroy, but I haven't tested it yet.
-;;; It probably also needs to have it's pins changed for the rp2350 version board
-
-; .program ata_cs_handler
-
-;; Configure pin mapping in C:
-;; JMP_PIN = CS1 (pin 9)
-;; IN_BASE = CS0 (pin 8)
-
-; .wrap_target
-; start:
-;     ; Load CS0 into X
-;     mov x, pins        
-;     ; Check if CS0 is 0
-;     jmp !x check_cs1_high    ; CS0 is 0
-;     ; CS0 is 1, CS1 must be 0
-;     jmp pin invalid          ; If CS1 is 1, invalid
-;     jmp valid               ; CS0=1, CS1=0 valid
-; check_cs1_high:
-;     ; CS0 is 0, CS1 must be 1
-;     jmp pin valid           ; If CS1 is 1, valid
-; invalid:
-;     nop               
-;     jmp start
-; valid:
-;     in pins, 7              ; Read control signals
-;     push
-; .wrap
-
-; % c-sdk {
-; static inline void ata_cs_handler_init(PIO pio, uint sm, uint offset) {
-;     pio_sm_config c = ata_cs_handler_program_get_default_config(offset);
-    
-;     sm_config_set_in_pins(&c, 8);     // CS0 on pin 8
-;     sm_config_set_jmp_pin(&c, 9);     // CS1 on pin 9 for JMP PIN
-    
-;     pio_sm_init(pio, sm, offset, &c);
-;     pio_sm_set_enabled(pio, sm, true);
-; }
-; %}
