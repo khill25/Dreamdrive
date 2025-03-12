@@ -34,15 +34,16 @@ wait_for_wr:
 .side_set 1 opt
 .wrap_target
 check_cs_lines:
+;; Clear scratch registers
+    mov x, null
+    mov y, null
+
     mov osr, pins
     out null, 19 ;; shift out data lines and a0, a1, a2
 
     out y, 1 ;; read cs0
     out x, 1 ;; read cs1
     jmp x!=y check_rd_rw ;; If cs0 and cs1 are different check read/write
-    
-    mov x, null
-    mov y, null
     jmp check_cs_lines ;; else keep checking
 
 ;; JMP pin is write, if it's high then we are writing to the dreamcast
@@ -56,14 +57,12 @@ check_rd_rw:
 
     out y, 1 ;; read rd
     out x, 1 ;; read wr
-    jmp x!=y clear_and_continue ;; If cs0 and cs1 are different check read/write
+    jmp x!=y clear_and_continue ;; If rd and wr are different continue on
     jmp check_rd_rw ;; else keep checking
 
 clear_and_continue:
-
-;; Hope that RD/WR has changed state by this point
     ;; read the address and send to dma
-    mov osr, pins
+    mov osr, pins side 1
     out x, 16
     out y, 7
     mov isr, y
@@ -81,8 +80,7 @@ read_from_dreamcast:
 write_to_dreamcast:
     
     ;; set pins to output
-    mov osr, ~null
-    out pindirs, 32
+    mov pindirs, ~null
 
     ;; read from dma and send to pins
     pull ;; get data from DMA
@@ -91,9 +89,7 @@ write_to_dreamcast:
     wait 1 gpio 21 ;; wait for RD to go high
 
     ;; set pins to input
-    mov osr, null side 0
-    out pindirs, 32
-
+    mov pindirs, null side 0
 .wrap
 
 ; ;; pio0 sm = 0
