@@ -30,152 +30,218 @@ wait_for_wr:
     pull
 .wrap
 
-;; pio0 sm = 0
-.program ata_cs0_read
+.program ata_bus_handler
 .side_set 1 opt
 .wrap_target
+check_cs_lines:
+    mov osr, pins
+    out null, 19 ;; shift out data lines and a0, a1, a2
 
-wait_for_cs:
-    wait 0 gpio 19;; wait for cs0 to go low
-
-wait_for_rd_asserted_low:
-    jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
-
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16
-
-    ; Read all pins into OSR
-    mov osr, pins side 1
-    ; Put data lines from pins into x
-    out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
-    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
-    out y, 7 ;; read in the address
-
-    ;; at this point 
-    ;; x contains data
-    ;; y contains address
-
-    ;; move the address so the dma can read it
-    mov isr, y
-    push
-
-    ;; Move the data so the dma can read it
-    mov isr, x
-    push side 0
-
-    wait 1 gpio 21 ;; wait for RD to go high
-.wrap
-
-;; pio0 sm = 1
-.program ata_cs0_write
-.side_set 1 opt
-.wrap_target
-wait_for_cs:
-    wait 0 gpio 19 ;; wait for cs0 to go low
-
-wait_for_wr_asserted_low:
-    jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
-
-    ; Read all pins into OSR
-    mov osr, pins side 1
-    out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
-
-    ;; set pins to output
-    mov osr, ~null
-    out pindirs, 16
-
-    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
-    out y, 7 ;; read in the address
-
-    ;; move the address so the dma can read it
-    mov isr, y
-    push
+    out y, 1 ;; read cs0
+    out x, 1 ;; read cs1
+    jmp x!=y check_rd_rw ;; If cs0 and cs1 are different check read/write
     
-	mov osr, ~null          ;; set all bits to 1 for output
-	out pindirs, 16         ;; set pins 0-15 as outputs
+    mov x, null
+    mov y, null
+    jmp check_cs_lines ;; else keep checking
 
-	pull ;; get data from dma
-	out pins, 16 side 0           ;; send data to pins
+;; JMP pin is write, if it's high then we are writing to the dreamcast
+check_rd_rw:
+;; Clear scratch registers
+    mov x, null
+    mov y, null
+
+    mov osr, pins
+    out null, 21 ;; shift out data lines, a0, a1, a2, cs0, and cs1
+
+    out y, 1 ;; read rd
+    out x, 1 ;; read wr
+    jmp x!=y clear_and_continue ;; If cs0 and cs1 are different check read/write
+    jmp check_rd_rw ;; else keep checking
+
+clear_and_continue:
+
+;; Hope that RD/WR has changed state by this point
+    ;; read the address and send to dma
+    mov osr, pins
+    out x, 16
+    out y, 7
+    mov isr, y
+    push ;; DMA address
+    
+;; write low
+read_from_dreamcast:
+    mov isr, x
+    push  ;; DMA data
 
     wait 1 gpio 22 ;; wait for WR to go high
+    jmp check_cs_lines side 0
 
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16
-.wrap
+;; read low
+write_to_dreamcast:
+    
+    ;; set pins to output
+    mov osr, ~null
+    out pindirs, 32
 
-;; pio2 sm = 0
-.program ata_cs1_read
-.side_set 1 opt
-.wrap_target
-wait_for_cs:
-    wait 0 gpio 20 ;; wait for cs1 to go low
-
-wait_for_rd_asserted_low:
-    jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
-
-    ; Read all pins into OSR
-    mov osr, pins side 1
-    ; Put data lines from pins into x
-    out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
-    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
-    out y, 7 ;; read in the address
-
-    ;; at this point 
-    ;; x contains data
-    ;; y contains address
-
-    ;; move the address so the dma can read it
-    mov isr, y
-    push
-
-    ;; Move the data so the dma can read it
-    mov isr, x
-    push side 0
+    ;; read from dma and send to pins
+    pull ;; get data from DMA
+    out pins, 16
 
     wait 1 gpio 21 ;; wait for RD to go high
 
     ;; set pins to input
-    mov osr, null
-    out pindirs, 16 side 0
+    mov osr, null side 0
+    out pindirs, 32
+
 .wrap
 
-;; pio2 sm = 1
-.program ata_cs1_write
-.side_set 1 opt
-.wrap_target
-wait_for_cs:
-    wait 0 gpio 20 ;; wait for cs0 to go low
+; ;; pio0 sm = 0
+; .program ata_cs0_read
+; .side_set 1 opt
+; .wrap_target
 
-wait_for_wr_asserted_low:
-    jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
+; wait_for_cs:
+;     wait 0 gpio 19;; wait for cs0 to go low
 
-    ; Read all pins into OSR
-    mov osr, pins side 1
-    out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
+; wait_for_rd_asserted_low:
+;     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
 
-    ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
-    out y, 7 ;; read in the address
+;     ;; set pins to input
+;     mov osr, null
+;     out pindirs, 16
 
-    ;; set pins to output
-    mov osr, ~null
-    out pindirs, 16
+;     ; Read all pins into OSR
+;     mov osr, pins side 1
+;     ; Put data lines from pins into x
+;     out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
+;     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
+;     out y, 7 ;; read in the address
 
-    ;; move the address so the dma can read it
-    mov isr, y
-    push
+;     ;; at this point 
+;     ;; x contains data
+;     ;; y contains address
+
+;     ;; move the address so the dma can read it
+;     mov isr, y
+;     push
+
+;     ;; Move the data so the dma can read it
+;     mov isr, x
+;     push side 0
+
+;     wait 1 gpio 21 ;; wait for RD to go high
+; .wrap
+
+; ;; pio0 sm = 1
+; .program ata_cs0_write
+; .side_set 1 opt
+; .wrap_target
+; wait_for_cs:
+;     wait 0 gpio 19 ;; wait for cs0 to go low
+
+; wait_for_wr_asserted_low:
+;     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
+
+;     ; Read all pins into OSR
+;     mov osr, pins side 1
+;     out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
+
+;     ;; set pins to output
+;     mov osr, ~null
+;     out pindirs, 16
+
+;     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
+;     out y, 7 ;; read in the address
+
+;     ;; move the address so the dma can read it
+;     mov isr, y
+;     push
     
-	mov osr, ~null          ;; set all bits to 1 for output
-	out pindirs, 16         ;; set pins 0-15 as outputs
+; 	mov osr, ~null          ;; set all bits to 1 for output
+; 	out pindirs, 16         ;; set pins 0-15 as outputs
 
-	pull ;; get data from dma
-	out pins, 16 side 0           ;; send data to pins
+; 	pull ;; get data from dma
+; 	out pins, 16 side 0           ;; send data to pins
 
-    wait 1 gpio 22 ;; wait for WR to go high
+;     wait 1 gpio 22 ;; wait for WR to go high
 
-    ;; set pins to input
-    mov osr, null
-    out pindirs, 16 side 0
+;     ;; set pins to input
+;     mov osr, null
+;     out pindirs, 16
+; .wrap
 
-.wrap
+; ;; pio2 sm = 0
+; .program ata_cs1_read
+; .side_set 1 opt
+; .wrap_target
+; wait_for_cs:
+;     wait 0 gpio 20 ;; wait for cs1 to go low
+
+; wait_for_rd_asserted_low:
+;     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
+
+;     ; Read all pins into OSR
+;     mov osr, pins side 1
+;     ; Put data lines from pins into x
+;     out x, 16 ;; we want a0-a2, cs0, cs1, rd, wr, so we are shifting the 16 bits of data lines into a scratch register
+;     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
+;     out y, 7 ;; read in the address
+
+;     ;; at this point 
+;     ;; x contains data
+;     ;; y contains address
+
+;     ;; move the address so the dma can read it
+;     mov isr, y
+;     push
+
+;     ;; Move the data so the dma can read it
+;     mov isr, x
+;     push side 0
+
+;     wait 1 gpio 21 ;; wait for RD to go high
+
+;     ;; set pins to input
+;     mov osr, null
+;     out pindirs, 16 side 0
+; .wrap
+
+; ;; pio2 sm = 1
+; .program ata_cs1_write
+; .side_set 1 opt
+; .wrap_target
+; wait_for_cs:
+;     wait 0 gpio 20 ;; wait for cs0 to go low
+
+; wait_for_wr_asserted_low:
+;     jmp pin, wait_for_cs ;; if read is high (not asserted) keep waiting
+
+;     ; Read all pins into OSR
+;     mov osr, pins side 1
+;     out null, 16 ; we want a0-a2, cs0, cs1, rd, wr
+
+;     ;; this means we are left with a0-a2, cs0, cs1, rd, wr in osr
+;     out y, 7 ;; read in the address
+
+;     ;; set pins to output
+;     mov osr, ~null
+;     out pindirs, 16
+
+;     ;; move the address so the dma can read it
+;     mov isr, y
+;     push
+    
+; 	mov osr, ~null          ;; set all bits to 1 for output
+; 	out pindirs, 16         ;; set pins 0-15 as outputs
+
+; 	pull ;; get data from dma
+; 	out pins, 16 side 0           ;; send data to pins
+
+;     wait 1 gpio 22 ;; wait for WR to go high
+
+;     ;; set pins to input
+;     mov osr, null
+;     out pindirs, 16 side 0
+
+; .wrap
