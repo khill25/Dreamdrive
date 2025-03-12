@@ -402,9 +402,6 @@ void __not_in_flash_func(process_ata_register_access)() {
 
 		register_index = readWriteLineValues & 0x7F;
 
-		if (writtenRegisterIndex < 5000) {
-			writtenRegisters[writtenRegisterIndex++] = register_index;
-		}
 
 		selectedRegister = registerIndex_map[register_index];
 
@@ -412,11 +409,15 @@ void __not_in_flash_func(process_ata_register_access)() {
 		// read pin active low (so write is high)
 		if ((readWriteLineValues & READ_WRITE_PIN_MASK) == READ_PIN_MASK) {
 
+			// bigbessie = *selectedRegister;
 			pio_sm_put_blocking(pio0, 0, *selectedRegister);
+
 			if (writtenRegisterIndex < 5000 && register_index != 0x4e) {
 				writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
+				writtenRegisters[writtenRegisterIndex++] = register_index;
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-				
+				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
+
 				multicore_fifo_push_blocking(register_index);
 			}
 
@@ -425,12 +426,14 @@ void __not_in_flash_func(process_ata_register_access)() {
 		} else if ((readWriteLineValues & READ_WRITE_PIN_MASK) == WRITE_PIN_MASK) {
 			if (writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
+				writtenRegisters[writtenRegisterIndex++] = register_index;
 			}
 
 			*selectedRegister = pio_sm_get_blocking(pio0, 0);
 
 			if (writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
 			}
 			
 			multicore_fifo_push_blocking(register_index);
@@ -438,7 +441,9 @@ void __not_in_flash_func(process_ata_register_access)() {
 		} else {
 			if (writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0xCCCC;
+				writtenRegisters[writtenRegisterIndex++] = register_index;
 				writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
+				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
 			}
 		}
 
