@@ -191,9 +191,10 @@ void setup_write_to_dreamcast() {
 	pio_sm_init(pio0, sm, offset, &c);
 }
 
-void setup_ata_register_emulator() {
+void setup_ata_cs0_read() {
+	PIO pio = pio0;
 	uint sm = 0;
-	uint offset = pio_add_program(pio0, &ata_bus_interface_program);
+	uint offset = pio_add_program(pio, &ata_bus_interface_program);
 	pio_sm_config c = ata_bus_interface_program_get_default_config(offset);
 
 	// Input pins start at pin 0
@@ -203,13 +204,304 @@ void setup_ata_register_emulator() {
 	sm_config_set_out_pins(&c, 0, 16);
 	
 	// Still set the initial pins to be read
-	pio_sm_set_pindirs_with_mask(pio0, sm, 0x800000, 0xFFFFFF);
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800000, 0xFFFFFF);
+	sm_config_set_jmp_pin(&c, PIN_RD);
 	
 	sm_config_set_in_shift(&c, false, false, 32);
 
 	sm_config_set_sideset_pins(&c, PIN_IORDY);
 
-	pio_sm_init(pio0, sm, offset, &c);
+	pio_sm_init(pio, sm, offset, &c);
+}
+
+void setup_ata_cs0_write() {
+	PIO pio = pio0;
+	uint sm = 1;
+	uint offset = pio_add_program(pio, &ata_bus_interface_program);
+	pio_sm_config c = ata_bus_interface_program_get_default_config(offset);
+
+	// Input pins start at pin 0
+	sm_config_set_in_pins(&c, 0);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 16);
+	
+	// Still set the initial pins to be read
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800000, 0xFFFFFF);
+	sm_config_set_jmp_pin(&c, PIN_WR);
+	
+	sm_config_set_in_shift(&c, false, false, 32);
+
+	sm_config_set_sideset_pins(&c, PIN_IORDY);
+
+	pio_sm_init(pio, sm, offset, &c);
+}
+
+void setup_ata_cs1_read() {
+	PIO pio = pio2;
+	uint sm = 0;
+	uint offset = pio_add_program(pio, &ata_bus_interface_program);
+	pio_sm_config c = ata_bus_interface_program_get_default_config(offset);
+
+	// Input pins start at pin 0
+	sm_config_set_in_pins(&c, 0);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 16);
+	
+	// Still set the initial pins to be read
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800000, 0xFFFFFF);
+	sm_config_set_jmp_pin(&c, PIN_RD);
+	
+	sm_config_set_in_shift(&c, false, false, 32);
+
+	sm_config_set_sideset_pins(&c, PIN_IORDY);
+
+	pio_sm_init(pio, sm, offset, &c);
+}
+void setup_ata_cs1_write() {
+	PIO pio = pio2;
+	uint sm = 1;
+	uint offset = pio_add_program(pio, &ata_bus_interface_program);
+	pio_sm_config c = ata_bus_interface_program_get_default_config(offset);
+
+	// Input pins start at pin 0
+	sm_config_set_in_pins(&c, 0);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 16);
+	
+	// Still set the initial pins to be read
+	pio_sm_set_pindirs_with_mask(pio, sm, 0x800000, 0xFFFFFF);
+	sm_config_set_jmp_pin(&c, PIN_WR);
+	
+	sm_config_set_in_shift(&c, false, false, 32);
+
+	sm_config_set_sideset_pins(&c, PIN_IORDY);
+
+	pio_sm_init(pio, sm, offset, &c);
+}
+
+static uint dma_channel_cs0_read1 = 0;
+static uint dma_channel_cs0_read2 = 0;
+static uint dma_channel_cs0_write1 = 0;
+static uint dma_channel_cs0_write2 = 0;
+static uint dma_channel_cs1_read1 = 0;
+static uint dma_channel_cs1_read2 = 0;
+static uint dma_channel_cs1_write1 = 0;
+static uint dma_channel_cs1_write2 = 0;
+
+volatile uint16_t cs0_read_dma_index_address = 0;
+volatile uint16_t cs0_write_dma_index_address = 0;
+volatile uint16_t cs1_read_dma_index_address = 0;
+volatile uint16_t cs1_write_dma_index_address = 0;
+
+void configure_ata_cs0_read_dma() {
+	// PIO and state machine
+	PIO pio = pio0;
+	uint sm = 0;
+
+	// Store the array base address
+	volatile uint16_t array_base_addr = &SPI_registers;
+
+	// DMA Channels
+	dma_channel_cs0_read1 = dma_claim_unused_channel(true);
+	dma_channel_cs0_read2 = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_channel_cs0_read1);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_8);
+	channel_config_set_read_increment(&c1, false);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio, sm, false));
+
+	dma_channel_configure(
+		dma_channel_cs0_read1,
+		&c1,
+		&cs0_read_dma_index_address,   // Store the index
+		&pio->rxf[sm],       // Read from PIO RX FIFO
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+
+	// DMA2: Compute the memory address and write data
+	dma_channel_config c2 = dma_channel_get_default_config(dma_channel_cs0_read2);
+	channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);
+	channel_config_set_read_increment(&c2, false);
+	channel_config_set_write_increment(&c2, false);
+	channel_config_set_dreq(&c2, pio_get_dreq(pio, sm, false));
+
+	// Set chaining: DMA2 runs after DMA1
+	channel_config_set_chain_to(&c1, dma_channel_cs0_read2);
+
+	dma_channel_configure(
+		dma_channel_cs0_read2,
+		&c2,
+		&target_array[cs0_read_dma_index_address],  // Address computed dynamically
+		&pio->rxf[sm],  // Read data from PIO FIFO
+		1,  // Single word transfer
+		false  // Do not start yet
+	);
+
+	// Start DMA chain
+	dma_channel_start(dma_channel_cs0_read1);
+	dma_channel_start(dma_channel_cs0_read2);
+}
+
+void configure_ata_cs0_write_dma() {
+	// PIO and state machine
+	PIO pio = pio0;
+	uint sm = 1;
+
+	// Store the array base address
+	volatile uint16_t array_base_addr = &SPI_registers;
+
+	// DMA Channels
+	dma_channel_cs0_write1 = dma_claim_unused_channel(true);
+	dma_channel_cs0_write2 = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_channel_cs0_write1);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_8);
+	channel_config_set_read_increment(&c1, false);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio, sm, false));
+
+	dma_channel_configure(
+		dma_channel_cs0_write1,
+		&c1,
+		&cs0_write_dma_index_address,   // Store the index
+		&pio->rxf[sm],       // Read from PIO RX FIFO
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+
+	// DMA2: Compute the memory address and write data
+	dma_channel_config c2 = dma_channel_get_default_config(dma_channel_cs0_write2);
+	channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);
+	channel_config_set_read_increment(&c2, false);
+	channel_config_set_write_increment(&c2, false);
+	channel_config_set_dreq(&c2, pio_get_dreq(pio, sm, false));
+
+	// Set chaining: DMA2 runs after DMA1
+	channel_config_set_chain_to(&c1, dma_channel_cs0_write2);
+
+	dma_channel_configure(
+		dma2,
+		&c2,
+		&pio->rxf[sm], // write to the fifo
+		&target_array[cs0_write_dma_index_address],  // Address computed dynamically
+		1,  // Single word transfer
+		false  // Do not start yet
+	);
+
+	// Start DMA chain
+	dma_channel_start(dma_channel_cs0_write1);
+	dma_channel_start(dma_channel_cs0_write2);
+}
+
+void configure_ata_cs1_read_dma() {
+	// PIO and state machine
+	PIO pio = pio2;
+	uint sm = 0;
+
+	// Store the array base address
+	volatile uint16_t array_base_addr = &SPI_registers;
+
+	// DMA Channels
+	dma_channel_cs1_read1 = dma_claim_unused_channel(true);
+	dma_channel_cs1_read2 = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_channel_cs1_read1);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_8);
+	channel_config_set_read_increment(&c1, false);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio, sm, false));
+
+	dma_channel_configure(
+		dma_channel_cs1_read1,
+		&c1,
+		&cs1_read_dma_index_address,   // Store the index
+		&pio->rxf[sm],       // Read from PIO RX FIFO
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+
+	// DMA2: Compute the memory address and write data
+	dma_channel_config c2 = dma_channel_get_default_config(dma_channel_cs1_read2);
+	channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);
+	channel_config_set_read_increment(&c2, false);
+	channel_config_set_write_increment(&c2, false);
+	channel_config_set_dreq(&c2, pio_get_dreq(pio, sm, false));
+
+	// Set chaining: DMA2 runs after DMA1
+	channel_config_set_chain_to(&c1, dma_channel_cs1_read2);
+
+	dma_channel_configure(
+		dma_channel_cs1_read2,
+		&c2,
+		&target_array[cs1_read_dma_index_address],  // Address computed dynamically
+		&pio->rxf[sm],  // Read data from PIO FIFO
+		1,  // Single word transfer
+		false  // Do not start yet
+	);
+
+	// Start DMA chain
+	dma_channel_start(dma_channel_cs1_read1);
+	dma_channel_start(dma_channel_cs1_read2);
+}
+
+void configure_ata_cs1_write_dma() {
+	// PIO and state machine
+	PIO pio = pio2;
+	uint sm = 1;
+
+	// Store the array base address
+	volatile uint16_t array_base_addr = &SPI_registers;
+
+	// DMA Channels
+	dma_channel_cs1_write1 = dma_claim_unused_channel(true);
+	dma_channel_cs1_write2 = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_channel_cs1_write1);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_8);
+	channel_config_set_read_increment(&c1, false);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio, sm, false));
+
+	dma_channel_configure(
+		dma_channel_cs1_write1,
+		&c1,
+		&cs1_write_dma_index_address,   // Store the index
+		&pio->rxf[sm],       // Read from PIO RX FIFO
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+
+	// DMA2: Compute the memory address and write data
+	dma_channel_config c2 = dma_channel_get_default_config(dma_channel_cs1_write2);
+	channel_config_set_transfer_data_size(&c2, DMA_SIZE_16);
+	channel_config_set_read_increment(&c2, false);
+	channel_config_set_write_increment(&c2, false);
+	channel_config_set_dreq(&c2, pio_get_dreq(pio, sm, false));
+
+	// Set chaining: DMA2 runs after DMA1
+	channel_config_set_chain_to(&c1, dma_channel_cs1_write2);
+
+	dma_channel_configure(
+		dma_channel_cs1_write2,
+		&c2,
+		&pio->rxf[sm], // write to the fifo
+		&target_array[cs1_write_dma_index_address],  // Address computed dynamically
+		1,  // Single word transfer
+		false  // Do not start yet
+	);
+
+	// Start DMA chain
+	dma_channel_start(dma_channel_cs1_write1);
+	dma_channel_start(dma_channel_cs1_write2);
 }
 
 int main(void) {
@@ -265,18 +557,7 @@ int main(void) {
 	gpio_set_function(PIN_IORDY, GPIO_FUNC_PIO0);
 	pio_gpio_init(pio0, PIN_IORDY);
 
-	printf("DONE!\n\tSetting up programs...");
-	// setup_read_from_dreamcast();
-	// setup_write_to_dreamcast();
-	setup_ata_register_emulator();
-	printf("DONE!\n\tEnabling programs...");
-	// pio_sm_set_enabled(pio0, IDE_READ_FROM_HOST_SM, true);
-	// pio_sm_set_enabled(pio0, IDE_WRITE_TO_HOST_SM, true);
-	pio_sm_set_enabled(pio0, 0, true);
-	printf("DONE!\n");
-
-	volatile uint32_t pins = 0;
-
+	
 	printf("Setting up register map...");
 
 	// This is used to quickly get the right register, read/write should be handled by whatever is doing the lookup
@@ -323,6 +604,22 @@ int main(void) {
 		}
 	}
 
+	printf("DONE!\n\tSetting up programs...");
+	setup_ata_cs0_read();
+	setup_ata_cs0_write();
+	setup_ata_cs1_read();
+	setup_ata_cs1_write();
+	configure_ata_cs0_read_dma();
+	configure_ata_cs0_write_dma();
+	configure_ata_cs1_read_dma();
+	configure_ata_cs1_write_dma();
+	printf("DONE!\n\tEnabling programs...");
+	pio_sm_set_enabled(pio0, 0, true);
+	pio_sm_set_enabled(pio0, 1, true);
+	pio_sm_set_enabled(pio2, 0, true);
+	pio_sm_set_enabled(pio2, 1, true);
+	printf("DONE!\n");
+
 	// Launch the register loop on core 1
 	multicore_launch_core1(ide_register_controller_main);
 
@@ -334,31 +631,61 @@ int main(void) {
 
 volatile uint32_t readWriteLineValues = 0;
 void __not_in_flash_func(process_ata_register_access)() {
+
+	dma_channel_set_irq0_enabled(dma_channel_cs0_read1, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs0_read2, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs0_write1, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs0_write2, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs1_read1, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs1_read2, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs1_write1, true);
+	dma_channel_set_irq0_enabled(dma_channel_cs1_write2, true);
+
+	uint dmaChannels[] = {
+		dma_channel_cs0_read1,
+		dma_channel_cs0_read2,
+		dma_channel_cs0_write1,
+		dma_channel_cs0_write2,
+		dma_channel_cs1_read1,
+		dma_channel_cs1_read2,
+		dma_channel_cs1_write1,
+		dma_channel_cs1_write2
+	};
+
 	while(1) {
 
-		readWriteLineValues = pio_sm_get_blocking(pio0, 0);
-		register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16;
-		selectedRegister = registerIndex_map[register_index];
-
-		if (writtenRegisterIndex < 5000) {
-			writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
-			writtenRegisters[writtenRegisterIndex++] = register_index;
-		}
-
-		if (readWriteLineValues == 0) {
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-			}
-
-			pio_sm_put_blocking(pio0, 0, *selectedRegister);
-
-		} else if (readWriteLineValues == 1) {
-			*selectedRegister = pio_sm_get_blocking(pio0, 0);
-
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+		// Check all the dma channels for irq status
+		for(int i = 0; i < 8; i++) {
+			if (dma_channel_get_irq0_status(dmaChannels[i])) {
+				dma_channel_acknowledge_irq0(dmaChannels[i]);
 			}
 		}
+
+		multicore_fifo_push_blocking(register_index);
+
+		// readWriteLineValues = pio_sm_get_blocking(pio0, 0);
+		// register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16;
+		// selectedRegister = registerIndex_map[register_index];
+
+		// if (writtenRegisterIndex < 5000) {
+		// 	writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
+		// 	writtenRegisters[writtenRegisterIndex++] = register_index;
+		// }
+
+		// if (readWriteLineValues == 0) {
+		// 	if (writtenRegisterIndex < 5000) {
+		// 		writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+		// 	}
+
+		// 	pio_sm_put_blocking(pio0, 0, *selectedRegister);
+
+		// } else if (readWriteLineValues == 1) {
+		// 	*selectedRegister = pio_sm_get_blocking(pio0, 0);
+
+		// 	if (writtenRegisterIndex < 5000) {
+		// 		writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+		// 	}
+		// }
 
 		// do {
 		// 	readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
