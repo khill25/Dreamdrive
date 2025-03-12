@@ -35,7 +35,7 @@ wait_for_wr:
 .wrap_target
 check_cs_lines:
 ;; Clear scratch registers
-    mov x, null
+    mov x, null side 1
     mov y, null
 
     mov osr, pins
@@ -62,34 +62,37 @@ check_rd_rw:
 
 clear_and_continue:
     ;; read the address and send to dma
-    mov osr, pins side 1
-    out x, 16
-    out y, 7
-    mov isr, y
-    push ;; DMA address
+    mov osr, pins ;side 1
+    out x, 16 ;; save the data pins
+    out y, 7 ;; save the address pins
+
+    mov isr, y ;; move adress pins into isr
+    push side 0 ;; DMA address
+
+    jmp pin, write_to_dreamcast ;; if read is high, write to dreamcast
     
 ;; write low
 read_from_dreamcast:
-    mov isr, x
-    push  ;; DMA data
+    mov isr, x side 1
+    push ;; DMA data
 
     wait 1 gpio 22 ;; wait for WR to go high
-    jmp check_cs_lines side 0
+    ;; and back to the beginning
+    jmp check_cs_lines ;side 0
 
 ;; read low
 write_to_dreamcast:
-    
     ;; set pins to output
-    mov pindirs, ~null
+    mov pindirs, ~null side 1
 
     ;; read from dma and send to pins
-    pull ;; get data from DMA
-    out pins, 16
+    pull;; get data from DMA
+    out pins, 32
 
     wait 1 gpio 21 ;; wait for RD to go high
 
     ;; set pins to input
-    mov pindirs, null side 0
+    mov pindirs, null ;side 0
 .wrap
 
 ; ;; pio0 sm = 0

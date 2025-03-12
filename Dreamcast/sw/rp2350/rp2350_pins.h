@@ -33,9 +33,9 @@
 #define PIN_SD_D3 39
 
 // Update masks for the new pin layout
-#define CS_PINS_MASK (0x180000)
-#define READ_WRITE_PIN_MASK (0x600000)
-#define READ_PIN_MASK (0x400000)
-#define WRITE_PIN_MASK (0x200000)
-#define REGISTER_PIN_MASK (0x7F0000)
+#define CS_PINS_MASK (0x18)
+#define READ_WRITE_PIN_MASK (0x60)
+#define READ_PIN_MASK (0x40)
+#define WRITE_PIN_MASK (0x20)
+#define REGISTER_PIN_MASK (0x7F)
 #define BIT_SHIFTED_READ_PIN_MASK (0x40)

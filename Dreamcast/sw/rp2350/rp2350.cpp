@@ -268,6 +268,22 @@ int main(void) {
 	gpio_set_function(PIN_IORDY, GPIO_FUNC_PIO0);
 	pio_gpio_init(pio0, PIN_IORDY);
 
+	// gpio_init(PIN_CS0);
+	// gpio_set_function(PIN_CS0, GPIO_FUNC_SIO);
+	// gpio_set_dir(PIN_CS0, false);
+
+	// gpio_init(PIN_CS1);
+	// gpio_set_function(PIN_CS1, GPIO_FUNC_SIO);
+	// gpio_set_dir(PIN_CS1, false);
+
+	gpio_init(PIN_RD);
+	gpio_set_function(PIN_RD, GPIO_FUNC_SIO);
+	gpio_set_dir(PIN_RD, false);
+
+	gpio_init(PIN_WR);
+	gpio_set_function(PIN_WR, GPIO_FUNC_SIO);
+	gpio_set_dir(PIN_WR, false);
+
 	
 	printf("Setting up register map...");
 
@@ -333,7 +349,6 @@ int main(void) {
 
 	printf("DONE!\n\tSetting up programs...");
 	setup_ata_bus_handler();
-	pio_sm_set_enabled(pio0, 0, true);
 	printf("DONE!\n");
 
 	// Launch the register loop on core 1
@@ -378,25 +393,56 @@ void __not_in_flash_func(process_ata_register_access)() {
 	// 	&cs1_write_dma_index_address,
 	// 	&cs1_write_dma_index_address
 	// };
+	volatile uint32_t bigbessie = 0;
+	pio_sm_set_enabled(pio0, 0, true);
 
 	while(1) {
 
 		readWriteLineValues = pio_sm_get_blocking(pio0, 0);
-		if (writtenRegisterIndex < 5000) {
-			writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
-		}
 
-		register_index = readWriteLineValues & 0x7F;// (readWriteLineValues & REGISTER_PIN_MASK) >> 16;
+		register_index = readWriteLineValues & 0x7F;
 
 		if (writtenRegisterIndex < 5000) {
 			writtenRegisters[writtenRegisterIndex++] = register_index;
 		}
 
-		if (readWriteLineValues & READ_PIN_MASK == 0) {
-			SPI_registers[register_index] = pio_sm_get_blocking(pio0, 0);
+		selectedRegister = registerIndex_map[register_index];
+
+		// WRITE TO DREAMCAST (write == 1, read == 0)
+		// read pin active low (so write is high)
+		if ((readWriteLineValues & READ_WRITE_PIN_MASK) == READ_PIN_MASK) {
+
+			pio_sm_put_blocking(pio0, 0, *selectedRegister);
+			if (writtenRegisterIndex < 5000 && register_index != 0x4e) {
+				writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
+				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+				
+				multicore_fifo_push_blocking(register_index);
+			}
+
+		// READ FROM DREAMCAST (write == 0, read == 1)
+		// write pin active low (so read is high)
+		} else if ((readWriteLineValues & READ_WRITE_PIN_MASK) == WRITE_PIN_MASK) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
+			}
+
+			*selectedRegister = pio_sm_get_blocking(pio0, 0);
+
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			}
+			
+			multicore_fifo_push_blocking(register_index);
+			
 		} else {
-			pio_sm_put_blocking(pio0, 0, SPI_registers[register_index]);
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xCCCC;
+				writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
+			}
 		}
+
+		
 
 		// Check all the dma channels for irq status
 		// for(int i = 0; i < 8; i++) {
@@ -492,6 +538,14 @@ void __not_in_flash_func(process_ata_register_access)() {
 }
 
 void ide_register_controller_main() {
+
+
+	uint32_t t = 0x30;
+	uint32_t t1 = t & WRITE_PIN_MASK;
+	uint32_t t2 = t & READ_PIN_MASK;
+	uint32_t t3 = t & READ_WRITE_PIN_MASK;
+	printf("%x, %x, %x\n", t1, t2, t3); // 20, 0, 20
+
 	printf("Dreamcast booting...\n");
 
 	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
@@ -501,7 +555,7 @@ void ide_register_controller_main() {
 
 	printf("Dreamcast booted!\n");
 
-	busy_wait_ms(800); // TODO this is likely not needed? 
+	busy_wait_ms(1000); // TODO this is likely not needed? 
 
 	selectedRegister = registerIndex_map[SPI_REGISTER_COUNT];
 	volatile uint8_t dreamcastWantsRead = 0;
