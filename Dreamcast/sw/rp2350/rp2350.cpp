@@ -193,11 +193,62 @@ void setup_write_to_dreamcast() {
 	pio_sm_init(pio0, sm, offset, &c);
 }
 
+#define DMA_HANDLER_SM (1)
+#define ATA_BUS_HANDLER_SM (0)
+
+uint ata_bus_handler_offset = 0;
+uint dma_bus_handler_offset = 0;
+
+uint dma_bus_handler_dma_channel = 0;
+void setup_dma_bus_handler() {
+	uint sm = DMA_HANDLER_SM;
+	dma_bus_handler_offset = pio_add_program(pio0, &dma_bus_handler_program);
+	pio_sm_config c = dma_bus_handler_program_get_default_config(dma_bus_handler_offset);
+
+	// Output pins are 0-15, but this is the low byte so start at pin 0
+	sm_config_set_out_pins(&c, 0, 16);
+	
+	// Still set the initial pins to be output
+	pio_sm_set_pindirs_with_mask(pio0, sm, 0x2200FFFF, 0x2200FFFF);
+	
+	sm_config_set_out_shift(&c, false, false, 16); // not sure if we need to do this
+	sm_config_set_in_shift(&c, false, false, 16);
+
+	sm_config_set_set_pins(&c, PIN_DMARQ, 1);
+
+	sm_config_set_sideset_pins(&c, PIN_CD_SDAT);
+
+	pio_sm_init(pio0, sm, dma_bus_handler_offset, &c);
+
+	// setup dma unit
+	// DMA Channels
+	dma_bus_handler_dma_channel = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_bus_handler_dma_channel);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_16);
+	channel_config_set_read_increment(&c1, true);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio0, sm, true));
+
+	dma_channel_configure(
+		dma_bus_handler_dma_channel,
+		&c1,
+		&pio0->txf[sm],		 // Push values to sm 
+		gdrom_read_buffer,  // Read from gdrom buffer
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+}
+
+uint8_t dma_bus_started = 0;
+uint8_t ata_bus_started = 0;
+
 void setup_ata_bus_handler() {
 	PIO pio = pio0;
-	uint sm = 0;
-	uint offset = pio_add_program(pio, &ata_bus_handler_program);
-	pio_sm_config c = ata_bus_handler_program_get_default_config(offset);
+	uint sm = ATA_BUS_HANDLER_SM;
+	ata_bus_handler_offset = pio_add_program(pio, &ata_bus_handler_program);
+	pio_sm_config c = ata_bus_handler_program_get_default_config(ata_bus_handler_offset);
 
 	// Input pins start at pin 0
 	sm_config_set_in_pins(&c, 0);
@@ -214,8 +265,35 @@ void setup_ata_bus_handler() {
 
 	sm_config_set_sideset_pins(&c, PIN_IORDY);
 
-	pio_sm_init(pio, sm, offset, &c);
+	pio_sm_init(pio, sm, ata_bus_handler_offset, &c);
+
+	ata_bus_started = 1;
 }
+
+void start_dma_bus_handler() {
+	if (ata_bus_started) {
+		pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, false);
+		pio_remove_program(pio0, &ata_bus_handler_program, ata_bus_handler_offset);
+		ata_bus_started = 0;
+	}
+
+	setup_dma_bus_handler();
+	pio_sm_set_enabled(pio0, DMA_HANDLER_SM, true);
+
+	dma_bus_started = 1;
+}
+
+void start_ata_bus_handler() {
+	if (dma_bus_started) {
+		pio_sm_set_enabled(pio0, DMA_HANDLER_SM, false);
+		pio_remove_program(pio0, &dma_bus_handler_program, dma_bus_handler_offset);
+		dma_bus_started = 0;
+	}
+
+	setup_ata_bus_handler();
+	pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, true);
+}
+
 
 int main(void) {
 	// Set clock speed to 266MHz (3.76ns per cycle)
@@ -286,6 +364,14 @@ int main(void) {
 	gpio_set_function(PIN_WR, GPIO_FUNC_SIO);
 	gpio_set_dir(PIN_WR, false);
 
+	// Setup dmarq line so it can be used by the dma handler state machine
+	gpio_init(PIN_DMARQ);
+	gpio_set_function(PIN_DMARQ, GPIO_FUNC_PIO0);
+	pio_gpio_init(pio0, PIN_DMARQ);
+
+	gpio_init(PIN_CD_SDAT);
+	gpio_set_function(PIN_CD_SDAT, GPIO_FUNC_PIO0);
+	pio_gpio_init(pio0, PIN_CD_SDAT);
 	
 	printf("Setting up register map...");
 
@@ -333,24 +419,18 @@ int main(void) {
 		}
 	}
 
-	// printf("DONE!\n\tSetting up programs...");
-	// setup_ata_cs0_read();
-	// setup_ata_cs0_write();
-	// setup_ata_cs1_read();
-	// setup_ata_cs1_write();
-	// configure_ata_cs0_read_dma();
-	// configure_ata_cs0_write_dma();
-	// configure_ata_cs1_read_dma();
-	// configure_ata_cs1_write_dma();
-	// printf("DONE!\n\tEnabling programs...");
-	// pio_sm_set_enabled(pio0, 0, true);
-	// pio_sm_set_enabled(pio0, 1, true);
-	// pio_sm_set_enabled(pio2, 0, true);
-	// pio_sm_set_enabled(pio2, 1, true);
-	// printf("DONE!\n");
-
 	printf("DONE!\n\tSetting up programs...");
 	setup_ata_bus_handler();
+
+	// start_dma_bus_handler();
+	// printf("Sending num transfers\n");
+	// pio_sm_put_blocking(pio0, DMA_HANDLER_SM, 20);
+	// dma_channel_set_trans_count(dma_bus_handler_dma_channel, 20, true);
+	// uint dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
+	// printf("DMA finished!\n");
+
+	// while(1);;
+
 	printf("DONE!\n");
 
 	// Launch the register loop on core 1
@@ -365,36 +445,6 @@ int main(void) {
 volatile uint32_t readWriteLineValues = 0;
 void __not_in_flash_func(process_ata_register_access)() {
 
-	// dma_channel_set_irq0_enabled(dma_channel_cs0_read1, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs0_read2, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs0_write1, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs0_write2, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs1_read1, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs1_read2, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs1_write1, true);
-	// dma_channel_set_irq0_enabled(dma_channel_cs1_write2, true);
-
-	// uint dmaChannels[] = {
-	// 	dma_channel_cs0_read1,
-	// 	dma_channel_cs0_read2,
-	// 	dma_channel_cs0_write1,
-	// 	dma_channel_cs0_write2,
-	// 	dma_channel_cs1_read1,
-	// 	dma_channel_cs1_read2,
-	// 	dma_channel_cs1_write1,
-	// 	dma_channel_cs1_write2
-	// };
-
-	// volatile uint16_t* dmaATAAddresses[] = {
-	// 	&cs0_read_dma_index_address,
-	// 	&cs0_read_dma_index_address,
-	// 	&cs0_write_dma_index_address,
-	// 	&cs0_write_dma_index_address,
-	// 	&cs1_read_dma_index_address,
-	// 	&cs1_read_dma_index_address,
-	// 	&cs1_write_dma_index_address,
-	// 	&cs1_write_dma_index_address
-	// };
 	volatile uint32_t bigbessie = 0;
 	pio_sm_set_enabled(pio0, 0, true);
 
@@ -1244,70 +1294,67 @@ static inline void process_data_read() {
 			// 	writtenRegisters[writtenRegisterIndex++] = 0xD8A00000;
 			// }
 
-			// do {
-				gdrom_buffer_has_more_data = gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
-				
-
-				// Put data on the bus
-				pio0->txf[IDE_WRITE_TO_HOST_SM] = SPI_registers[SPI_DATA_REGISTER_INDEX];
-
-				// Signal we have data and wait for dreamcast to acknowledge
-				gpio_put(PIN_DMARQ, 1);
-				while(gpio_get(PIN_DMACK) == 1 && numDmackWaits < 100) { 
-					numDmackWaits++;
-					tight_loop_contents(); 
-				}
-				if (numDmackWaits >= 100) {
-					dmaDidTimeout = 1;
-				}
-				numDmackWaits = 0;
-
-				// Dreamcast has acknowledged, send the data, and wait for dreamcast to be ready for the next word
-				gpio_put(PIN_DMARQ, 0);
-				while(gpio_get(PIN_DMACK) == 0) { tight_loop_contents(); }
-
-				// reset databus for next word
-				pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
-
-				dmaTransfersCompleted++;
-
-			// } while(gdrom_buffer_has_more_data);
-
-			// if(writtenRegisterIndex < 5000) {
-			// 	writtenRegisters[writtenRegisterIndex++] = 0xD8A01111;
-			// }
-
-			if (dmaDidTimeout) {
-				current_io_mode = IO_MODE_IDLE;
-				// Set the status register to indicate the data is finished
-				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
-				*status_register = 0x50; // DRQ = 0 BSY = 0
-
-				// Do we need to assert the irq line for a read?
-				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
-
-				if(writtenRegisterIndex < 5000) {
-					writtenRegisters[writtenRegisterIndex++] = dmaTransfersCompleted;
-					writtenRegisters[writtenRegisterIndex++] = 0xD8A07777;
-					dmaTransfersCompleted = 0;
-				}
-
-				return;
-			}
 			
-			if (!gdrom_buffer_has_more_data) {
-				// All the data has been sent, signal the end of the transfer
-				current_io_mode = IO_MODE_IDLE;
-				// Set the status register to indicate the data is finished
-				SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
-				*status_register = 0x50; // DRQ = 0 BSY = 0
+			// So the DMA transfer handshake is once
+			////after the dmack line asserts( low) the words are read via a read pin strobe
+			////
 
-				// Do we need to assert the irq line for a read?
-				gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+			// Assume that numTransfers will never be bigger than 16 bit int, that would be crazy amount of data to dma at once
+			uint16_t numTotalTransfers = gdrom_read_bytes_remanining / 2; // bytes divided by 2 since we are transfering 16bit words
 
-				if(writtenRegisterIndex < 5000) {
-					writtenRegisters[writtenRegisterIndex++] = 0xD8A01111;
+			// We can only hold 32 sectors of data at a time. If we need more then we need to fetch it
+			uint16_t numTransfers = numTotalTransfers; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
+
+			printf("Starting DMA. Num word transfers: %u\n", numTotalTransfers);
+
+			numTotalTransfers -= numTransfers; // when we need buffer refills, most of the time this should be 0?
+
+			start_dma_bus_handler();
+
+			printf("Sending num transfers\n");
+			// Push number of transfers
+			pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-2);
+
+			// And start dma
+			dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers, true);
+
+			// start dma
+			volatile uint dmaFinished = 0; // throw away value to read the finished signal from PIO
+
+			do {
+				// gdrom_buffer_has_more_data = gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+				// Wait for num transfers to finish
+				dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
+
+				if (numTotalTransfers > 0) {
+					numTotalTransfers -= numTransfers; // subtract the number of transfers we made
+					numTransfers = numTotalTransfers > 32 ? 32 : numTotalTransfers; // and recalculate the number for the next set
+					
+					// Push number of transfers
+					pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers);
+					// Restart the dma
+					dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers, true);
+				} else {
+					// If we are finished, then we should disable the dma state machine and restart the ata handler.
+					pio_sm_set_enabled(pio0, DMA_HANDLER_SM, false);
+					start_ata_bus_handler(); // stop the dma bus handler and start the ata one
 				}
+
+			} while(numTotalTransfers > 0);
+
+			printf("\nDMA finished\n");
+		
+			// All the data has been sent, signal the end of the transfer
+			current_io_mode = IO_MODE_IDLE;
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+
+			// Do we need to assert the irq line for a read?
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+			if(writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0xD8A01111;
 			}
 
 		// PIO
@@ -1400,6 +1447,55 @@ void main_processing_loop() {
 	printf("Opening default disc image...\n");
 	gdrom_read_default_disc_image();
 	printf("DONE!\n");
+
+
+	// // Test the read command
+	// SEGA_PACKET_CMD_REGISTER[0] = 0x30;
+	// SEGA_PACKET_CMD_REGISTER[1] = 0x24;
+	// SEGA_PACKET_CMD_REGISTER[2] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
+	// SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
+	// SEGA_PACKET_CMD_REGISTER[5] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[6] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[7] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[8] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[9] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[10] = 0x07;
+	// SEGA_PACKET_CMD_REGISTER[11] = 0x00;
+
+	// uint32_t endTime = 0;
+	// uint32_t startTime = time_us_32();
+	// gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
+	// endTime = time_us_32();
+
+	// printf("Read Time: %u\n", endTime - startTime);
+
+	// printf("GDROM Read Test\n");
+
+	// printf("SPI Command Packet:\t");
+	// for(int i = 0; i < 12; i++) {
+	// 	printf("(%u)%x ", i, SEGA_PACKET_CMD_REGISTER[i]);
+	// }
+	// printf("\n");
+
+	// printf("Sector Start: %u(0x%x), Sector Count: %u(0x%x), Sector Size: %u(0x%x)\n", gdrom_read_start_sector, gdrom_read_start_sector, gdrom_read_remaining_sectors, gdrom_read_remaining_sectors, gdrom_read_sector_size, gdrom_read_sector_size);
+	// printf("Data Buffer:");
+	// for (int i = 0; i < 32; i++) {
+	// 	if (i % 8 == 0) {
+	// 		printf("\n%d: ", i);
+	// 	}
+	// 	printf("%x ", gdrom_read_buffer[i]);
+	// }
+
+	// printf("\nData Register:");
+	// for (int i = 0; i < 32; i++) {
+	// 	gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
+	// 	if (i % 8 == 0) {
+	// 		printf("\n%d: ", i);
+	// 	}
+	// 	printf("%x ", SPI_registers[SPI_DATA_REGISTER_INDEX]);
+	// }
+	// printf("\n\n");
 
 	// printf("TOC dump...\n");
 	// GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), SingleDensity);

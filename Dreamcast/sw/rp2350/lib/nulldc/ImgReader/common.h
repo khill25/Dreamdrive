@@ -174,7 +174,14 @@ struct RawTrackFile
 		// 	printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
 		// 	return;
 		// }
-		FRESULT fr = f_read(&track_files[trackNum],dst,fmt,0);
+
+		// printf("offset: %x\n", (offset+FAD*fmt));
+		FRESULT fr = f_lseek(&track_files[trackNum], offset+FAD*fmt);
+		if (fr != FR_OK) {
+			printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
+		}
+
+		fr = f_read(&track_files[trackNum],dst,fmt,0);
 		if (fr != FR_OK) {
 			printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
 		}
