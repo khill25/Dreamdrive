@@ -46,6 +46,13 @@ void PatchRegion_6(uint8_t* sector,int size) {
 
 	//patch area symbols
 	uint8_t* p_area_text=&usersect[0x700];
+	for(int i = 0; i < 128; i++) {
+		if (i % 8 == 0) {
+			printf("\n");
+		}
+		printf("%x ", p_area_text[i]);
+	}
+	printf("\n\n\n\n");
 	memcpy(&p_area_text[4],"For JAPAN,TAIWAN,PHILIPINES.",28);
 	memcpy(&p_area_text[4 + 32],"For USA and CANADA.         ",28);
 	memcpy(&p_area_text[4 + 32 + 32],"For EUROPE.                 ",28);

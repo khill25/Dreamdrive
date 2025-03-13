@@ -142,6 +142,8 @@ volatile uint32_t register_index = SPI_REGISTER_COUNT;
 volatile uint32_t writtenRegisters[10000] = {0};
 volatile uint32_t writtenRegisterIndex = 0;
 
+volatile uint16_t* rom = 0;
+
 static inline uint16_t swap8(uint16_t value)
 {
 	// 0x1122 => 0x2211
@@ -321,8 +323,8 @@ int main(void) {
 
 	SPI_registers[SPI_STATUS_REGISTER_INDEX] = 0b01000000; // set drive ready bit
 	SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX] = 0xA0; // set drive select
-	SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX] = 0b01;
-	SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x80; // 4 if apparently this is the code for a "data disc" and it occupies the top 4 bits of the byte
+	SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX] = 0b00;
+	SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x80; // GDROM is 0x80
 
 	// For the rest of the values, just use a dump register
 	for(int i = 0; i < 128; i++) {
@@ -401,24 +403,25 @@ void __not_in_flash_func(process_ata_register_access)() {
 		readWriteLineValues = pio_sm_get_blocking(pio0, 0);
 
 		register_index = readWriteLineValues & 0x7F;
-
-
 		selectedRegister = registerIndex_map[register_index];
 
 		// WRITE TO DREAMCAST (write == 1, read == 0)
 		// read pin active low (so write is high)
 		if ((readWriteLineValues & READ_WRITE_PIN_MASK) == READ_PIN_MASK) {
 
-			// bigbessie = *selectedRegister;
+			// pio0->txf[0] = *selectedRegister;
 			pio_sm_put_blocking(pio0, 0, *selectedRegister);
 
 			if (writtenRegisterIndex < 5000 && register_index != 0x4e) {
-				writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
-				writtenRegisters[writtenRegisterIndex++] = register_index;
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
-
 				multicore_fifo_push_blocking(register_index);
+
+
+				if (register_index != 0x50 && register_index != 0x53) {
+					writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
+					writtenRegisters[writtenRegisterIndex++] = register_index;
+					writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+					writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
+				}
 			}
 
 		// READ FROM DREAMCAST (write == 0, read == 1)
@@ -438,106 +441,14 @@ void __not_in_flash_func(process_ata_register_access)() {
 			
 			multicore_fifo_push_blocking(register_index);
 			
-		} else {
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xCCCC;
-				writtenRegisters[writtenRegisterIndex++] = register_index;
-				writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
-				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
-			}
-		}
-
-		
-
-		// Check all the dma channels for irq status
-		// for(int i = 0; i < 8; i++) {
-		// 	if (dma_channel_get_irq0_status(dmaChannels[i])) {
-		// 		dma_channel_acknowledge_irq0(dmaChannels[i]);
-
-		// 		if (writtenRegisterIndex < 5000) {
-		// 			writtenRegisters[writtenRegisterIndex++] = *dmaATAAddresses[i];
-		// 		}
-		// 	}
-		// }
-
-		// multicore_fifo_push_blocking(register_index);
-
-		// readWriteLineValues = pio_sm_get_blocking(pio0, 0);
-		// register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16;
-		// selectedRegister = registerIndex_map[register_index];
-
-		// if (writtenRegisterIndex < 5000) {
-		// 	writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
-		// 	writtenRegisters[writtenRegisterIndex++] = register_index;
-		// }
-
-		// if (readWriteLineValues == 0) {
+		} 
+		// else {
 		// 	if (writtenRegisterIndex < 5000) {
-		// 		writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+		// 		writtenRegisters[writtenRegisterIndex++] = 0xCCCC;
+		// 		writtenRegisters[writtenRegisterIndex++] = register_index;
+		// 		writtenRegisters[writtenRegisterIndex++] = readWriteLineValues;
+		// 		writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
 		// 	}
-
-		// 	pio_sm_put_blocking(pio0, 0, *selectedRegister);
-
-		// } else if (readWriteLineValues == 1) {
-		// 	*selectedRegister = pio_sm_get_blocking(pio0, 0);
-
-		// 	if (writtenRegisterIndex < 5000) {
-		// 		writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-		// 	}
-		// }
-
-		// do {
-		// 	readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
-		// } while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
-
-		// do {
-		// 	readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
-		// } while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
-
-		// // Chatgpt suggested this, it seems to execute MUCH faster
-		// // Something about branch prediction taking a long time and the compiler directive 
-		// // fixes that
-		// // do {
-		// // 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
-		// // } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
-		
-		// // gpio_put(PIN_IORDY, 0);
-
-		// // Figure out the register index and get the pointer to the selected register
-		// register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
-		// selectedRegister = registerIndex_map[register_index];
-
-		// // Read from register send to Dreamcast
-		// if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
-		// 	pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
-
-		// 	multicore_fifo_push_blocking(register_index);
-		// 	// core_command_buffer[core0_buffer_index++] = register_index;
-
-		// 	gpio_put(PIN_IORDY, 1);
-		// 	// wait for latch
-		// 	while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
-			
-		// 	// Send a signal to pio to let it go back to input
-		// 	pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
-			
-		// 	gpio_put(PIN_IORDY, 0);
-
-		// // Write to Dreamcast from register
-		// } else {
-		// 	// Let pio know we are ready to read data
-		// 	pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
-		// 	*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
-
-		// 	if (register_index != 0x4e) {
-		// 		multicore_fifo_push_blocking(register_index);
-		// 	}
-		// 	// core_command_buffer[core0_buffer_index++] = register_index;
-
-		// 	gpio_put(PIN_IORDY, 1);
-		// 	// wait for latch
-		// 	while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
-		// 	gpio_put(PIN_IORDY, 0);
 		// }
 	}
 }
@@ -651,9 +562,6 @@ volatile uint16_t generic_data_buffer[64] = {0}; // Basic buffer to send data fo
 static uint8_t ide_current_mode = DATA_MODE_IDLE;
 static uint8_t ide_current_transfer_mode = 0; // 0 = PIO, 1 = DMA
 
-static uint8_t command71Flag = 0;
-static uint16_t* rom; 
-
 #define IO_MODE_IDLE 0
 #define IO_MODE_WRITE 1
 #define IO_MODE_READ 2
@@ -663,6 +571,9 @@ static uint8_t current_io_mode = 0;
 // There may be a point when we need to change to a better state machine.
 // But that will likely require rethinking the whole flow.
 static uint8_t current_io_packet_command = 0; // This is just the current SPI packet command we are processing, useful for sending canned responses vs actual data
+
+static uint8_t command71Flag = 0;
+static const uint8_t gdrom_version[] = "Rev 5.07";
 
 // Bake the offset into the starting and ending positions
 static uint32_t io_current_position = 0;
@@ -695,6 +606,7 @@ void process_packet() {
 		}
 		case TEST_UNIT_SEGA_PACKET_CMD: {
 			*status_register = 0x50; // only drive ready bit set
+			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x80;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
 			SPI_registers[SPI_ERROR_REGISTER_INDEX] = 0x00; // no error
 
@@ -706,12 +618,40 @@ void process_packet() {
 			if(writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x11111111;
 			}
+
+			// u8  *src = &rom[2188];
+			// u8  *dst = buffer;
+			// u32 size = buffer[4];
+
+			// memcpy(dst, src, size);
+			// count = size;
+			// gdrom.busy &= 0x76;
+			// gdrom.busy |= 0x08;
+			// hwInt(0x0100);
+			// break;
+
+			current_io_mode = IO_MODE_WRITE;
+			io_current_position = 2188 / 2;
+			io_ending_position = (io_current_position + 4) / 2;
+			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+			
+			// put first word in data register
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
+
+			// Put the correct values in the registers
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 4;
+			*status_register = 0x58; // DRQ = 1 BSY = 0 
+
+			// set irq
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
 			break;
 		}
 		case REQ_MODE_SEGA_PACKET_CMD: {
 			uint startingAddress = SEGA_PACKET_CMD_REGISTER[2];
-			uint length = SEGA_PACKET_CMD_REGISTER[4];	
-
+			uint length = SEGA_PACKET_CMD_REGISTER[4];
 			uint halfLength = length/2; // Divide by two because we are sending 2 bytes at a time (16bit bus)
 				
 			// Setup the IO infos
@@ -721,7 +661,6 @@ void process_packet() {
 			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 			
 			// put first word in data register
-			// SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++];
 			SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
 
 			// Put the correct values in the registers
@@ -736,17 +675,20 @@ void process_packet() {
 			// // TODO icegdrom does this with 3 specific cases but nulldc just has a whole canned response array
 			// // and none of this specific address checking. Might be worth condensing this without any magic numbers
 			// if (startingAddress == 18 && length == 8) {
-			// 	uint halfLength = length/2; // Divide by two because we are sending 2 bytes at a time (16bit bus)
+			// 	if(writtenRegisterIndex < 5000) {
+			// 		writtenRegisters[writtenRegisterIndex++] = 0x011F18F8;
+			// 	}
 				
+			// 	memcpy(&((uint8_t*)(generic_data_buffer))[0], gdrom_version, sizeof(gdrom_version));
+
 			// 	// Setup the IO infos
 			// 	current_io_mode = IO_MODE_WRITE;
-			// 	io_current_position = (1976 + startingAddress) / 2; //startingAddress / 2;
-			// 	io_ending_position = io_current_position + halfLength;
+			// 	io_current_position = 0;
+			// 	io_ending_position = 4;
 			// 	ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 				
 			// 	// put first word in data register
-			// 	// SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++];
-			// 	SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
+			// 	SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
 
 			// 	// Put the correct values in the registers
 			// 	SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
@@ -761,20 +703,22 @@ void process_packet() {
 			// 	if(writtenRegisterIndex < 5000) {
 			// 		writtenRegisters[writtenRegisterIndex++] = 0x011F0F10;
 			// 	}
+
+			// 	memcpy(&((uint8_t*)(generic_data_buffer))[0], 0, 10);
 				
 			// 	// Setup the IO infos
 			// 	current_io_mode = IO_MODE_WRITE;
-			// 	io_current_position = startingAddress / 2;
-			// 	io_ending_position = (startingAddress / 2) + (length / 2);
+			// 	io_current_position = 0;
+			// 	io_ending_position = 5;
 			// 	ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 				
 			// 	// put first word in data register
-			// 	SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++];
+			// 	SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
 
 			// 	// Put the correct values in the registers
 			// 	SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
-			// 	SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = length >> 8;
-			// 	SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = length & 0xFF;
+			// 	SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
+			// 	SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 10;
 			// 	*status_register = 0x58; // DRQ = 1 BSY = 0 
 
 			// 	// set irq
@@ -1079,25 +1023,37 @@ void process_packet() {
 			}
 
 			current_io_mode = IO_MODE_WRITE;
-			// io_current_position = 0;
-			// io_ending_position = reply_71_sz/2;
 			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 
 			SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
-			// SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_71[io_current_position++];
-			
-			// io_ending_position = sizeof(cmd71_reply)/2;
-			// SPI_registers[SPI_DATA_REGISTER_INDEX] = cmd71_reply[io_current_position++];
 
-			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x81;
-			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x83;
+			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x82;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = countData71 >> 8;
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = countData71 && 0xFF; 
 			*status_register = 0x58; // DRQ = 1 BSY = 0
 
-			// set irq
 			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+			// memcpy(&((uint8_t*)generic_data_buffer)[0], cmd71_reply, sizeof(cmd71_reply));
+
+			// current_io_mode = IO_MODE_WRITE;
+			// io_current_position = 0;
+			// io_ending_position = 2;//sizeof(generic_data_buffer)/2;
+			// ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
+
+			// SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
+		
+
+			// // SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x84;
+			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x82;
+			// SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
+			// SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
+			// SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 4; 
+			// *status_register = 0x58; // DRQ = 1 BSY = 0
+
+			// // set irq
+			// gpio_put(PIN_INTRQ, INTRQ_ASSERT);
 
 			break;
 		}
@@ -1174,15 +1130,37 @@ static inline void process_data_read() {
 	// TODO
 	// Dreamcast has read the data register. Put the next word in the register
 
-	if(current_io_packet_command == REQ_MODE_SEGA_PACKET_CMD) {
+	if (current_io_packet_command == REQ_STAT_SEGA_PACKET_CMD) {
+		SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
+
+		if (io_current_position >= io_ending_position) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x1000FFFF;
+			}
+
+			current_io_packet_command = 0;
+			io_current_position = 0;
+			io_ending_position = 0;
+			current_io_mode = IO_MODE_IDLE;
+
+			// Set the status register to indicate the data is finished
+			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
+			*status_register = 0x50; // DRQ = 0 BSY = 0
+			
+			// Assert the IRQ line to announce we are finished
+			gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+		}
+
+	} else if(current_io_packet_command == REQ_MODE_SEGA_PACKET_CMD) {
 		// SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_11[io_current_position++]; // put next word in data register
+		// SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
 		SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
 
 		if (io_current_position >= io_ending_position) {
 			if (writtenRegisterIndex < 5000) {
 				writtenRegisters[writtenRegisterIndex++] = 0x1100FFFF;
 			}
-			// printf("REQ_MODE finished\n");
+
 			current_io_packet_command = 0;
 			io_current_position = 0;
 			io_ending_position = 0;
@@ -1378,9 +1356,8 @@ static inline void process_data_read() {
 		}
 
 	} else if (current_io_packet_command == Code71_PACKET_CMD) {
+		// SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
 		SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
-		// SPI_registers[SPI_DATA_REGISTER_INDEX] = reply_71[io_current_position++]; // put next word in data register
-		// SPI_registers[SPI_DATA_REGISTER_INDEX] = cmd71_reply[io_current_position++]; // put next word in data register
 
 		if (io_current_position >= io_ending_position) {
 			current_io_packet_command = 0;
@@ -1389,7 +1366,7 @@ static inline void process_data_read() {
 			current_io_mode = IO_MODE_IDLE;
 
 			// Set the status register to indicate the data is finished
-			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x83;
+			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x80;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x03; // IO=1, CoD=1
 			*status_register = 0x50; // DRQ = 0 BSY = 0
 			
@@ -1424,8 +1401,6 @@ void main_processing_loop() {
 	gdrom_read_default_disc_image();
 	printf("DONE!\n");
 
-	rom = (uint16_t*)(gdrom_rom_data);
-
 	// printf("TOC dump...\n");
 	// GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), SingleDensity);
 	// for(int i = 0; i < 408; i++) {
@@ -1435,6 +1410,8 @@ void main_processing_loop() {
 	// 	printf("%x ", SEGA_PACKET_TOC_INFO[i]);
 	// }
 	// printf("DONE!\n");
+
+	rom = (uint16_t*)(gdrom_rom_data);
 
 	spi_packet_register = (uint16_t*)(&SEGA_PACKET_CMD_REGISTER);
 
@@ -1480,23 +1457,25 @@ void main_processing_loop() {
 			// 	printf(" = %x\n", SPI_registers[i]);
 			// }
 
-			// printf("----------------------------------------\n");
-			// printf("/n/n");
-			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-			// printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
-			// printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
-			// printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
-			// printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
-			// printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
-			// printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
-			// printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
-			// printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
-			// printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
-			// printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
-			// printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
-			// printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
-			// printf("sector count: %x\n", SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]);
-			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			printf("status: %x, alt_status: %x\n", *registerIndex_map[0x57], *registerIndex_map[0x4e]);
+
+			printf("----------------------------------------\n");
+			printf("/n/n");
+			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			printf("sector count: %x\n", SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]);
+			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
 
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
@@ -1525,31 +1504,24 @@ void main_processing_loop() {
 		// }
 
 		// Please skip all the stupid alt status register reads
-		if(writtenRegisterIndex < 5000 && core0CData != 0x4e) {
-			writtenRegisters[writtenRegisterIndex++] = core0CData;
+		// if(writtenRegisterIndex < 5000 && core0CData != 0x4e) {
+		// 	writtenRegisters[writtenRegisterIndex++] = core0CData;
 
-			// Debugging for when the dc polls disc status
-			// if (core0CData == 0x53) {
-			// 	writtenRegisters[writtenRegisterIndex++] = 0x53FFFFFF;
-			// 	secnr_poll_count++;
-			// 	if (secnr_poll_count > 10) {
-			// 		if (secnr_poll_next_status == 0x80) {
-			// 			secnr_poll_next_status = 0x81;
-			// 		} else if (secnr_poll_next_status == 0x81) {
-			// 			secnr_poll_next_status = 0x82;
-			// 		} else if (secnr_poll_next_status == 0x82) {
-			// 			secnr_poll_next_status = 0x83;
-			// 		} else if (secnr_poll_next_status == 0x83) {
-			// 			secnr_poll_next_status = 0x80;
-			// 		}
+		// 	if (core0CData == 0x53) {
+		// 		writtenRegisters[writtenRegisterIndex++] = 0x53FFFFFF;
+		// 		secnr_poll_count++;
+		// 		if (secnr_poll_count > 10) {
+		// 			secnr_poll_next_status = 0x80 + 1;
+		// 			if (secnr_poll_next_status == 0x86) {
+		// 				secnr_poll_next_status = 0x80;
+		// 			}
 
-			// 		writtenRegisters[writtenRegisterIndex++] = secnr_poll_next_status;
-			// 		SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = secnr_poll_next_status;
-			// 		writtenRegisters[writtenRegisterIndex++] = 0x53AAAAAA;
-					
-			// 	}
-			// }
-		}
+		// 			writtenRegisters[writtenRegisterIndex++] = secnr_poll_next_status;
+		// 			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = secnr_poll_next_status;
+		// 			writtenRegisters[writtenRegisterIndex++] = 0x53AAAAAA;
+		// 		}
+		// 	}
+		// }
 
 		// Host has read the status register
 		if (core0CData == CODED_STATUS_REGISTER_READ) {
@@ -1589,7 +1561,7 @@ void main_processing_loop() {
 
 			// !!!BSY bit must be set within 400ns, so if we need more time, this bit should be set
 			// .. update status register
-			*status_register = *status_register | 0x80; // BSY bit set
+			// *status_register = *status_register | 0x80; // BSY bit set
 
 			// We need to check the command register
 			core0commandRegister = SPI_registers[SPI_COMMAND_REGISTER_INDEX];
@@ -1607,10 +1579,31 @@ void main_processing_loop() {
 					case ATA_CMD_NOP:{
 						// Command can be received when BSY bit is 1 
 						// and device should terminate the command currently in execution
-						// printf(".");
+						printf(".\n");
+
+						SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x01; // IO=0, CoD=0
+						*status_register = 0x50; // DRQ = 0 BSY = 0
+		
+						// Assert the IRQ line to announce we are finished
+						gpio_put(PIN_INTRQ, INTRQ_ASSERT);
+
+						/*
+						The task file register is initialized as follows.
+						Status = 00h, 
+						Error = 01h, 
+						Sector Count = 01h, 
+						Sector Number = 01h, 
+						Cylinder Low = 14h, 
+						Cylinder High = EBh, 
+						Drive/Head = 00h
+						BSY = 0 
+						following after any reset indicates that 
+						the task file register is already initialized for the host.
+						*/
 						break;
 					}
 					case ATA_CMD_SOFT_RESET: {
+						printf("soft_reset\n");
 						break;
 					}
 					// case ATA_CMD_PACKET_COMMAND: { // now handled in it's own if block
@@ -1619,9 +1612,11 @@ void main_processing_loop() {
 					// 	break;
 					// }
 					case ATA_CMD_IDENTIFY_DEVICE: {
+						printf("identify_defice\n");
 						break;
 					}
 					case ATA_CMD_EXECUTE_DEVICE_DIAGNOSTIC: {
+						printf("device_diagnostics\n");
 						break;
 					}
 					case ATA_CMD_SET_FEATURES: {
@@ -1634,7 +1629,7 @@ void main_processing_loop() {
 				// IMPORANT this is really important, if something changes status_register, this busy bit might not be needed
 				// for now, only clear it after commands that aren't packet command as they don't do anything.
 				// Clear BSY bit
-				*status_register = *status_register ^ 0x80; 
+				// *status_register = *status_register ^ 0x80; 
 			}
 		}
 	}

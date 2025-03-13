@@ -62,23 +62,24 @@ check_rd_rw:
 
 clear_and_continue:
     ;; read the address and send to dma
-    mov osr, pins ;side 1
+    mov osr, pins
     out x, 16 ;; save the data pins
     out y, 7 ;; save the address pins
 
     mov isr, y ;; move adress pins into isr
-    push side 0 ;; DMA address
+    push side 0 ;; Push address to C
 
     jmp pin, write_to_dreamcast ;; if read is high, write to dreamcast
     
 ;; write low
 read_from_dreamcast:
     mov isr, x 
-    push ;; DMA data
+    push ;; Get data from C
 
-    wait 1 gpio 22 side 1;; wait for WR to go high
+    wait 1 gpio 22 side 1 [7];; wait for WR to go high
+
     ;; and back to the beginning
-    jmp check_cs_lines side 0
+    jmp check_cs_lines side 0 [7]
 
 ;; read low
 write_to_dreamcast:
@@ -89,10 +90,10 @@ write_to_dreamcast:
     pull;; get data from DMA
     out pins, 32
 
-    wait 1 gpio 21 side 1;; wait for RD to go high
+    wait 1 gpio 21 side 1 [7];; wait for RD to go high
 
     ;; set pins to input
-    mov pindirs, null side 0
+    mov pindirs, null side 0 [7]
 .wrap
 
 ; ;; pio0 sm = 0
