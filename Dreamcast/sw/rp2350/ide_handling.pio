@@ -119,5 +119,12 @@ finish:
     set pins, 0 side 0;; deassert dmarq
     wait 1 gpio 26;; wait for dmack deassert (high)
     push ;; tell C we are done
+.wrap
 
+.program square_wave_generator
+.wrap_target
+    nop [1]
+    set pins, 1 [1]
+    nop [1]
+    set pins, 0 [1]
 .wrap

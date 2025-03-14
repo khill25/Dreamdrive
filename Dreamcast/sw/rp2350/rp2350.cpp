@@ -199,6 +199,31 @@ void setup_write_to_dreamcast() {
 uint ata_bus_handler_offset = 0;
 uint dma_bus_handler_offset = 0;
 
+volatile uint8_t dma_bus_handler_dma_setup = 0;
+void setup_dma_bus_handler_dma() {
+	// setup dma unit
+	// DMA Channels
+	dma_bus_handler_dma_channel = dma_claim_unused_channel(true);
+
+	// DMA1: Read index from FIFO and store it
+	dma_channel_config c1 = dma_channel_get_default_config(dma_bus_handler_dma_channel);
+	channel_config_set_transfer_data_size(&c1, DMA_SIZE_16);
+	channel_config_set_read_increment(&c1, true);
+	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
+	channel_config_set_dreq(&c1, pio_get_dreq(pio0, sm, true));
+
+	dma_channel_configure(
+		dma_bus_handler_dma_channel,
+		&c1,
+		&pio0->txf[sm],		 // Push values to sm 
+		gdrom_read_buffer,  // Read from gdrom buffer
+		1,                   // Single transfer (index)
+		false                // Do not start yet
+	);
+
+	dma_bus_handler_dma_setup = 1;
+}
+
 uint dma_bus_handler_dma_channel = 0;
 void setup_dma_bus_handler() {
 	uint sm = DMA_HANDLER_SM;
@@ -220,29 +245,13 @@ void setup_dma_bus_handler() {
 
 	pio_sm_init(pio0, sm, dma_bus_handler_offset, &c);
 
-	// setup dma unit
-	// DMA Channels
-	dma_bus_handler_dma_channel = dma_claim_unused_channel(true);
-
-	// DMA1: Read index from FIFO and store it
-	dma_channel_config c1 = dma_channel_get_default_config(dma_bus_handler_dma_channel);
-	channel_config_set_transfer_data_size(&c1, DMA_SIZE_16);
-	channel_config_set_read_increment(&c1, true);
-	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
-	channel_config_set_dreq(&c1, pio_get_dreq(pio0, sm, true));
-
-	dma_channel_configure(
-		dma_bus_handler_dma_channel,
-		&c1,
-		&pio0->txf[sm],		 // Push values to sm 
-		gdrom_read_buffer,  // Read from gdrom buffer
-		1,                   // Single transfer (index)
-		false                // Do not start yet
-	);
+	if (!dma_bus_handler_dma_setup) {
+		setup_dma_bus_handler_dma();
+	}
 }
 
-uint8_t dma_bus_started = 0;
-uint8_t ata_bus_started = 0;
+volatile uint8_t dma_bus_started = 0;
+volatile uint8_t ata_bus_started = 0;
 
 void setup_ata_bus_handler() {
 	PIO pio = pio0;
@@ -266,15 +275,19 @@ void setup_ata_bus_handler() {
 	sm_config_set_sideset_pins(&c, PIN_IORDY);
 
 	pio_sm_init(pio, sm, ata_bus_handler_offset, &c);
-
-	ata_bus_started = 1;
 }
 
 void start_dma_bus_handler() {
 	if (ata_bus_started) {
+		if (writtenRegisterIndex < 5000) {
+			writtenRegisters[writtenRegisterIndex++] = 0x1234DEAD;
+		}
+		ata_bus_started = 0;
 		pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, false);
 		pio_remove_program(pio0, &ata_bus_handler_program, ata_bus_handler_offset);
-		ata_bus_started = 0;
+		if (writtenRegisterIndex < 5000) {
+			writtenRegisters[writtenRegisterIndex++] = 0x4321DEAD;
+		}
 	}
 
 	setup_dma_bus_handler();
@@ -290,8 +303,39 @@ void start_ata_bus_handler() {
 		dma_bus_started = 0;
 	}
 
-	setup_ata_bus_handler();
-	pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, true);
+	if (!ata_bus_started) {
+		setup_ata_bus_handler();
+		pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, true);
+		ata_bus_started = 1;
+	} else {
+		printf("Ata bus handler already started\n");
+	}
+}
+
+void setup_squarewave_generator() {
+	// float bClkDivider = 133;//266000000.0 / (33868800 * 2); //7.85
+
+	PIO pio = pio2;
+	uint sm = 0;
+	uint offset = pio_add_program(pio, &square_wave_generator_program);
+	pio_sm_config c = square_wave_generator_program_get_default_config(offset);
+
+	// gpio_init(PIN_CD_BCK);
+	// gpio_set_function(PIN_CD_BCK, GPIO_FUNC_PIO2);
+	pio_gpio_init(pio, PIN_CD_BCK);
+
+	// Set clock divider
+	// pio_sm_set_clkdiv(pio, sm, bClkDivider);
+
+	sm_config_set_out_pins(&c, PIN_CD_BCK, 1);
+	sm_config_set_set_pins(&c, PIN_CD_BCK, 1);
+
+	// Still set the initial pins to be output
+	// pio_sm_set_pindirs_with_mask(pio, sm, 0x10000000, 0x10000000);
+	pio_sm_set_consecutive_pindirs(pio, sm, PIN_CD_BCK, 1, true);  // Set pin as output
+
+	pio_sm_init(pio, sm, offset, &c);
+	pio_sm_set_enabled(pio, sm, true);
 }
 
 
@@ -372,6 +416,8 @@ int main(void) {
 	gpio_init(PIN_CD_SDAT);
 	gpio_set_function(PIN_CD_SDAT, GPIO_FUNC_PIO0);
 	pio_gpio_init(pio0, PIN_CD_SDAT);
+
+	setup_squarewave_generator();
 	
 	printf("Setting up register map...");
 
@@ -419,20 +465,6 @@ int main(void) {
 		}
 	}
 
-	printf("DONE!\n\tSetting up programs...");
-	setup_ata_bus_handler();
-
-	// start_dma_bus_handler();
-	// printf("Sending num transfers\n");
-	// pio_sm_put_blocking(pio0, DMA_HANDLER_SM, 20);
-	// dma_channel_set_trans_count(dma_bus_handler_dma_channel, 20, true);
-	// uint dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
-	// printf("DMA finished!\n");
-
-	// while(1);;
-
-	printf("DONE!\n");
-
 	// Launch the register loop on core 1
 	multicore_launch_core1(ide_register_controller_main);
 
@@ -442,16 +474,31 @@ int main(void) {
 	return 0;
 }
 
+volatile uint8_t restart_ata_bus_handler_loop = 0;
 volatile uint32_t readWriteLineValues = 0;
-void __not_in_flash_func(process_ata_register_access)() {
+void __not_in_flash_func(_process_ata_register_access)() {
 
-	volatile uint32_t bigbessie = 0;
-	pio_sm_set_enabled(pio0, 0, true);
+	if (!ata_bus_started) {
+		start_ata_bus_handler();
+	}
 
-	while(1) {
+	if (writtenRegisterIndex < 5000) {
+		writtenRegisters[writtenRegisterIndex++] = 0x87654321;
+	}
 
-		readWriteLineValues = pio_sm_get_blocking(pio0, 0);
+	while(ata_bus_started) {
 
+		while (pio_sm_is_rx_fifo_empty(pio0, ATA_BUS_HANDLER_SM) && ata_bus_started) { 
+			tight_loop_contents(); 
+			if (writtenRegisterIndex < 10) {
+				writtenRegisters[writtenRegisterIndex++] = 0xbee9;
+			}
+		}
+		if (!ata_bus_started) {
+			break;
+		}
+
+		readWriteLineValues = pio0->rxf[ATA_BUS_HANDLER_SM];
 		register_index = readWriteLineValues & 0x7F;
 		selectedRegister = registerIndex_map[register_index];
 
@@ -459,36 +506,53 @@ void __not_in_flash_func(process_ata_register_access)() {
 		// read pin active low (so write is high)
 		if ((readWriteLineValues & READ_WRITE_PIN_MASK) == READ_PIN_MASK) {
 
-			// pio0->txf[0] = *selectedRegister;
-			pio_sm_put_blocking(pio0, 0, *selectedRegister);
+			while (pio_sm_is_tx_fifo_full(pio0, ATA_BUS_HANDLER_SM) && ata_bus_started) {
+				tight_loop_contents();
+			}
+			if (!ata_bus_started) {
+				break;
+			}
+			pio0->txf[0] = *selectedRegister;
 
 			if (writtenRegisterIndex < 5000 && register_index != 0x4e) {
+				if (dma_bus_started) {
+					writtenRegisters[writtenRegisterIndex++] = 0xDEADBEEF;
+				}
 				multicore_fifo_push_blocking(register_index);
 
-
-				if (register_index != 0x50 && register_index != 0x53) {
-					writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
-					writtenRegisters[writtenRegisterIndex++] = register_index;
-					writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-					writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
-				}
+				// if (register_index != 0x50 && register_index != 0x53) {
+				// 	writtenRegisters[writtenRegisterIndex++] = 0xAAAA;
+				// 	writtenRegisters[writtenRegisterIndex++] = register_index;
+				// 	writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+				// 	writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
+				// }
 			}
 
 		// READ FROM DREAMCAST (write == 0, read == 1)
 		// write pin active low (so read is high)
 		} else if ((readWriteLineValues & READ_WRITE_PIN_MASK) == WRITE_PIN_MASK) {
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
-				writtenRegisters[writtenRegisterIndex++] = register_index;
+			// if (writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xBBBB;
+			// 	writtenRegisters[writtenRegisterIndex++] = register_index;
+			// }
+
+			while (pio_sm_is_rx_fifo_empty(pio0, ATA_BUS_HANDLER_SM) && ata_bus_started) { 
+				tight_loop_contents(); 
+			}
+			if (!ata_bus_started) {
+				break;
 			}
 
-			*selectedRegister = pio_sm_get_blocking(pio0, 0);
+			*selectedRegister = pio0->rxf[ATA_BUS_HANDLER_SM];
 
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
-				writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
-			}
+			// if (writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = *selectedRegister;
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xDDDD;
+			// }
 			
+			if (dma_bus_started) {
+				writtenRegisters[writtenRegisterIndex++] = 0xDEADBEEF;
+			}
 			multicore_fifo_push_blocking(register_index);
 			
 		} 
@@ -501,18 +565,30 @@ void __not_in_flash_func(process_ata_register_access)() {
 		// 	}
 		// }
 	}
+	if (writtenRegisterIndex < 5000) {
+		writtenRegisters[writtenRegisterIndex++] = 0x12345678;
+	}
+}
+
+void __not_in_flash_func(process_ata_register_access)() {
+	_process_ata_register_access();
+	while(1) {
+		if (restart_ata_bus_handler_loop) {
+			printf("Restarting ata bus handler\n");
+			restart_ata_bus_handler_loop = 0;
+			_process_ata_register_access();
+		}
+		tight_loop_contents();
+	}
+	printf("FATAL ERROR: process_ata_register_access ended\n");
 }
 
 void ide_register_controller_main() {
-
-
-	uint32_t t = 0x30;
-	uint32_t t1 = t & WRITE_PIN_MASK;
-	uint32_t t2 = t & READ_PIN_MASK;
-	uint32_t t3 = t & READ_WRITE_PIN_MASK;
-	printf("%x, %x, %x\n", t1, t2, t3); // 20, 0, 20
-
 	printf("Dreamcast booting...\n");
+
+	// printf("DONE!\n\tSetting up programs...");
+	// setup_ata_bus_handler();
+	// printf("DONE!\n");
 
 	// The Dreamcast(something?) does a startup with the cd drive and it toggles all the control, read, and write lines.
 	// Not sure if this is real data or just a fun little startup sequence
@@ -521,14 +597,9 @@ void ide_register_controller_main() {
 
 	printf("Dreamcast booted!\n");
 
-	busy_wait_ms(1000); // TODO this is likely not needed? 
+	busy_wait_ms(900); // TODO this is likely not needed? 
 
 	selectedRegister = registerIndex_map[SPI_REGISTER_COUNT];
-	volatile uint8_t dreamcastWantsRead = 0;
-	// 00 (0x0) - nothing
-	// 01 (0x1) - read
-	// 10 (0x2) - write
-	// 11 (0x3) - nothing
 
 	// By using the IORDY pin, we can slow down the control signaling.
 	// This makes it a lot slower to read/write to the dreamcast but does at least work
@@ -536,63 +607,6 @@ void ide_register_controller_main() {
 	gpio_put(PIN_IORDY, 1);
 
 	process_ata_register_access();
-
-	// while(1) {
-
-	// 	do {
-	// 		readWriteLineValues = sio_hw->gpio_in & CS_PINS_MASK;
-	// 	} while(readWriteLineValues == CS_PINS_MASK || readWriteLineValues == 0x00000);			// 12ns (3 cycles)
-
-	// 	do {
-	// 		readWriteLineValues = sio_hw->gpio_in & READ_WRITE_PIN_MASK;
-	// 	} while(readWriteLineValues == READ_WRITE_PIN_MASK || readWriteLineValues == 0x00000);
-
-	// 	// Chatgpt suggested this, it seems to execute MUCH faster
-	// 	// Something about branch prediction taking a long time and the compiler directive 
-	// 	// fixes that
-	// 	// do {
-	// 	// 	readWriteLineValues = sio_hw->gpio_in & (CS_PINS_MASK | READ_WRITE_PIN_MASK);
-	// 	// } while(__builtin_expect(readWriteLineValues == (CS_PINS_MASK | READ_WRITE_PIN_MASK) || readWriteLineValues == 0x00000, 0));
-		
-	// 	// gpio_put(PIN_IORDY, 0);
-
-	// 	// Figure out the register index and get the pointer to the selected register
-	// 	register_index = (sio_hw->gpio_in & REGISTER_PIN_MASK) >> 16; // shift by 16 to offset the data pins (0-15)
-	// 	selectedRegister = registerIndex_map[register_index];
-
-	// 	// Read from register send to Dreamcast
-	// 	if ((register_index & BIT_SHIFTED_READ_PIN_MASK) == BIT_SHIFTED_READ_PIN_MASK) {
-	// 		pio0->txf[IDE_WRITE_TO_HOST_SM] = *selectedRegister;
-
-	// 		multicore_fifo_push_blocking(register_index);
-	// 		// core_command_buffer[core0_buffer_index++] = register_index;
-
-	// 		gpio_put(PIN_IORDY, 1);
-	// 		// wait for latch
-	// 		while(gpio_get(PIN_RD) == 0) { tight_loop_contents(); };
-			
-	// 		// Send a signal to pio to let it go back to input
-	// 		pio0->txf[IDE_WRITE_TO_HOST_SM] = 0;
-			
-	// 		gpio_put(PIN_IORDY, 0);
-
-	// 	// Write to Dreamcast from register
-	// 	} else {
-	// 		// Let pio know we are ready to read data
-	// 		pio0->txf[IDE_READ_FROM_HOST_SM] = 1;
-	// 		*selectedRegister = pio_sm_get_blocking(pio0, IDE_READ_FROM_HOST_SM);
-
-	// 		if (register_index != 0x4e) {
-	// 			multicore_fifo_push_blocking(register_index);
-	// 		}
-	// 		// core_command_buffer[core0_buffer_index++] = register_index;
-
-	// 		gpio_put(PIN_IORDY, 1);
-	// 		// wait for latch
-	// 		while(gpio_get(PIN_WR) == 0) { tight_loop_contents(); };
-	// 		gpio_put(PIN_IORDY, 0);
-	// 	}
-	// }
 
 	printf("\nERROR!!! Register controller core main loop ended.\n");
 }
@@ -836,11 +850,11 @@ void process_packet() {
 			io_ending_position = 204; // 408 bytes / 2 bytes per word
 			// ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 
-			// printf("Read TOC - Double Density: %x:\n", (SEGA_PACKET_CMD_REGISTER[1] & 0x1));
-			// for(int i = 0; i < 12; i++) {
-			// 	printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
-			// }
-			// printf("\n");
+			printf("Read TOC - Double Density: %x:\n", (SEGA_PACKET_CMD_REGISTER[1] & 0x1));
+			for(int i = 0; i < 12; i++) {
+				printf("%x ", SEGA_PACKET_CMD_REGISTER[i]);
+			}
+			printf("\ntransfermode: %u\n", ide_current_transfer_mode);
 
 			DiskArea tocSelectBit = (SEGA_PACKET_CMD_REGISTER[1] & 0x1) ? DoubleDensity : SingleDensity;
 			GetDriveToc((uint32_t*)(SEGA_PACKET_TOC_INFO), tocSelectBit);
@@ -1307,7 +1321,6 @@ static inline void process_data_read() {
 
 			start_dma_bus_handler();
 
-			printf("Sending num transfers\n");
 			// Push number of transfers 
 			// Transfer count MINUS 2, 
 			// once for the inital word that is loaded on "setup" in the program
@@ -1325,7 +1338,7 @@ static inline void process_data_read() {
 				// Wait for num transfers to finish
 				
 				dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
-				
+				dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer[0], false);
 
 				if (gdrom_read_remaining_sectors > 0) {
 					// Fetch more data
@@ -1336,13 +1349,14 @@ static inline void process_data_read() {
 					
 					// Push number of transfers
 					pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-1);
-
+					
 					// Restart the dma
 					dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers+1, true);
 				} else {
 					// If we are finished, then we should disable the dma state machine and restart the ata handler.
 					pio_sm_set_enabled(pio0, DMA_HANDLER_SM, false);
-					start_ata_bus_handler(); // stop the dma bus handler and start the ata one
+					restart_ata_bus_handler_loop = 1;
+					// start_ata_bus_handler(); // stop the dma bus handler and start the ata one
 				}
 
 			} while(gdrom_read_remaining_sectors > 0);
@@ -1523,8 +1537,8 @@ void main_processing_loop() {
 			timetrack = time_us_32();
 			printf("----------------------------------------\n");
 			printf("Num Writes: %d\n", writtenRegisterIndex);
+
 			printf("Written Registers:\n");
-			int goodWrites = 0;
 
 			// uint32_t v0;
 			// uint32_t v1;
@@ -1558,25 +1572,25 @@ void main_processing_loop() {
 			// 	printf(" = %x\n", SPI_registers[i]);
 			// }
 
-			printf("status: %x, alt_status: %x\n", *registerIndex_map[0x57], *registerIndex_map[0x4e]);
+			// printf("status: %x, alt_status: %x\n", *registerIndex_map[0x57], *registerIndex_map[0x4e]);
 
-			printf("----------------------------------------\n");
-			printf("/n/n");
-			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-			printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
-			printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
-			printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
-			printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
-			printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
-			printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
-			printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
-			printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
-			printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
-			printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
-			printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
-			printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
-			printf("sector count: %x\n", SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]);
-			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			// printf("----------------------------------------\n");
+			// printf("/n/n");
+			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+			// printf("alt status: %x\n", SPI_registers[SPI_ALTERNATE_STATUS_REGISTER_INDEX]);
+			// printf("status: %x\n",SPI_registers[SPI_STATUS_REGISTER_INDEX]);
+			// printf("device control: %x\n",SPI_registers[SPI_DEVICE_CONTROL_REGISTER_INDEX]);
+			// printf("data: %x\n",SPI_registers[SPI_DATA_REGISTER_INDEX]); 
+			// printf("features: %x\n",SPI_registers[SPI_FEATURES_REGISTER_INDEX]);
+			// printf("error: %x\n",SPI_registers[SPI_ERROR_REGISTER_INDEX]);
+			// printf("interrupt: %x\n",SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX]);
+			// printf("sector number: %x\n",SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX]);
+			// printf("byte count low: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX]); 
+			// printf("byte count high: %x\n",SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX]);
+			// printf("drive select: %x\n",SPI_registers[SPI_DRIVE_SELECT_REGISTER_INDEX]);
+			// printf("cmd: %x\n",SPI_registers[SPI_COMMAND_REGISTER_INDEX]);
+			// printf("sector count: %x\n", SPI_registers[SPI_SECTOR_COUNT_REGISTER_INDEX]);
+			// printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 
 
 			printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
@@ -1723,6 +1737,9 @@ void main_processing_loop() {
 					case ATA_CMD_SET_FEATURES: {
 						printf("SET_FEATURES\n");
 						break;
+					}
+					default: {
+						printf("UNKNOWN COMMAND: %x\n", *selectedRegister);
 					}
 
 					
