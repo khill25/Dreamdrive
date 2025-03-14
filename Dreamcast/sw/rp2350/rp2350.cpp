@@ -1299,24 +1299,23 @@ static inline void process_data_read() {
 			////after the dmack line asserts( low) the words are read via a read pin strobe
 			////
 
-			// Assume that numTransfers will never be bigger than 16 bit int, that would be crazy amount of data to dma at once
-			uint16_t numTotalTransfers = gdrom_read_bytes_remanining / 2; // bytes divided by 2 since we are transfering 16bit words
 
 			// We can only hold 32 sectors of data at a time. If we need more then we need to fetch it
-			uint16_t numTransfers = numTotalTransfers; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
+			uint16_t numTransfers = gdrom_read_buffer_size / 2; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
 
-			printf("Starting DMA. Num word transfers: %u\n", numTotalTransfers);
-
-			numTotalTransfers -= numTransfers; // when we need buffer refills, most of the time this should be 0?
+			printf("Starting DMA. Num word transfers: %u\n", numTransfers);
 
 			start_dma_bus_handler();
 
 			printf("Sending num transfers\n");
-			// Push number of transfers
-			pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-2);
+			// Push number of transfers 
+			// Transfer count MINUS 2, 
+			// once for the inital word that is loaded on "setup" in the program
+			// and once more to skip a final jmp loop since it will take the loop if x is non zero BEFORE decrement
+			pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-1);
 
 			// And start dma
-			dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers, true);
+			dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers+1, true);
 
 			// start dma
 			volatile uint dmaFinished = 0; // throw away value to read the finished signal from PIO
@@ -1324,23 +1323,29 @@ static inline void process_data_read() {
 			do {
 				// gdrom_buffer_has_more_data = gdrom_read_consume_buffer(&SPI_registers[SPI_DATA_REGISTER_INDEX]); // read in another word
 				// Wait for num transfers to finish
+				
 				dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
+				
 
-				if (numTotalTransfers > 0) {
-					numTotalTransfers -= numTransfers; // subtract the number of transfers we made
-					numTransfers = numTotalTransfers > 32 ? 32 : numTotalTransfers; // and recalculate the number for the next set
+				if (gdrom_read_remaining_sectors > 0) {
+					// Fetch more data
+					gdrom_fill_read_buffer(); 
+
+					numTransfers = gdrom_read_buffer_size / 2;
+					printf("Refilling DMA buffer, Num word transfers: %u\n", numTransfers);
 					
 					// Push number of transfers
-					pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers);
+					pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-1);
+
 					// Restart the dma
-					dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers, true);
+					dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers+1, true);
 				} else {
 					// If we are finished, then we should disable the dma state machine and restart the ata handler.
 					pio_sm_set_enabled(pio0, DMA_HANDLER_SM, false);
 					start_ata_bus_handler(); // stop the dma bus handler and start the ata one
 				}
 
-			} while(numTotalTransfers > 0);
+			} while(gdrom_read_remaining_sectors > 0);
 
 			printf("\nDMA finished\n");
 		

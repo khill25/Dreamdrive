@@ -98,21 +98,8 @@ write_to_dreamcast:
 .program dma_bus_handler
 .side_set 1 opt
 .wrap_target
-setup:
-; pull 
-; mov x, osr
-; pull 
-; set pins, 1
-; loop:
-; set pins, 1 side 0
-; set pins, 0 side 1
-; jmp x-- loop
-; set pins, 0
-; push
-; .wrap
-
-   ; mov pindirs, ~null side 0;; set pins output
-
+setup:    
+    mov x, null ;; clear scratch register
     pull ;; get number of transfers (From C)
     mov x, osr;; move number of transfers into x
 
@@ -120,16 +107,17 @@ setup:
     
     set pins, 1;; assert dmarq
     wait 0 gpio 26 ;; wait for dmack assert (low)
+    
 transfer_data:
+    wait 0 gpio 21 side 0;; strobe on read pin, read is pin 21
     out pins, 16 side 1
-    wait 0 gpio 21 ;; strobe on read pin, read is pin 21
-    pull ;; load next word
-    wait 1 gpio 21 side 0;; wait for read pin to go high
+    pull;; load next word
+    wait 1 gpio 21;; wait for read pin to go high
     jmp x-- transfer_data ;; if we still have more data to transmit, do that
 
 finish:
-    set pins, 0 side 1;; deassert dmarq
-    ; wait 1 gpio 26;; wait for dmack deassert (high)
-    push side 0;; tell C we are done
-    ; mov pindirs, null ;; set pins input in case we are finished
+    set pins, 0 side 0;; deassert dmarq
+    wait 1 gpio 26;; wait for dmack deassert (high)
+    push ;; tell C we are done
+
 .wrap
