@@ -89,7 +89,8 @@ uint32_t _gdrom_get_sector_type(uint8_t dataSelect, uint8_t expectedDataType, ui
 // Main functions ////////////////////////////////////////////////
 
 // Use the crazy taxi image as our default image until we create a menu loader that we will load on startup.
-char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
+// char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
+char default_disc_image_path[] = "soulcalibur/soulcalibur.gdi";
 void gdrom_read_default_disc_image() {
     current_disc = gdi_parse(default_disc_image_path);
     if (current_disc == NULL) {
