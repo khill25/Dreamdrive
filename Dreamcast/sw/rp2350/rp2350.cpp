@@ -199,6 +199,7 @@ void setup_write_to_dreamcast() {
 uint ata_bus_handler_offset = 0;
 uint dma_bus_handler_offset = 0;
 
+volatile uint dma_bus_handler_dma_channel = 0;
 volatile uint8_t dma_bus_handler_dma_setup = 0;
 void setup_dma_bus_handler_dma() {
 	// setup dma unit
@@ -210,12 +211,12 @@ void setup_dma_bus_handler_dma() {
 	channel_config_set_transfer_data_size(&c1, DMA_SIZE_16);
 	channel_config_set_read_increment(&c1, true);
 	channel_config_set_write_increment(&c1, false);  // Store index in a fixed variable
-	channel_config_set_dreq(&c1, pio_get_dreq(pio0, sm, true));
+	channel_config_set_dreq(&c1, pio_get_dreq(pio0, DMA_HANDLER_SM, true));
 
 	dma_channel_configure(
 		dma_bus_handler_dma_channel,
 		&c1,
-		&pio0->txf[sm],		 // Push values to sm 
+		&pio0->txf[DMA_HANDLER_SM],		 // Push values to sm 
 		gdrom_read_buffer,  // Read from gdrom buffer
 		1,                   // Single transfer (index)
 		false                // Do not start yet
@@ -224,7 +225,6 @@ void setup_dma_bus_handler_dma() {
 	dma_bus_handler_dma_setup = 1;
 }
 
-uint dma_bus_handler_dma_channel = 0;
 void setup_dma_bus_handler() {
 	uint sm = DMA_HANDLER_SM;
 	dma_bus_handler_offset = pio_add_program(pio0, &dma_bus_handler_program);
@@ -250,6 +250,7 @@ void setup_dma_bus_handler() {
 	}
 }
 
+volatile uint8_t dma_bus_running = 0;
 volatile uint8_t dma_bus_started = 0;
 volatile uint8_t ata_bus_started = 0;
 
@@ -279,15 +280,9 @@ void setup_ata_bus_handler() {
 
 void start_dma_bus_handler() {
 	if (ata_bus_started) {
-		if (writtenRegisterIndex < 5000) {
-			writtenRegisters[writtenRegisterIndex++] = 0x1234DEAD;
-		}
 		ata_bus_started = 0;
 		pio_sm_set_enabled(pio0, ATA_BUS_HANDLER_SM, false);
 		pio_remove_program(pio0, &ata_bus_handler_program, ata_bus_handler_offset);
-		if (writtenRegisterIndex < 5000) {
-			writtenRegisters[writtenRegisterIndex++] = 0x4321DEAD;
-		}
 	}
 
 	setup_dma_bus_handler();
@@ -476,23 +471,16 @@ int main(void) {
 
 volatile uint8_t restart_ata_bus_handler_loop = 0;
 volatile uint32_t readWriteLineValues = 0;
-void __not_in_flash_func(_process_ata_register_access)() {
+void _process_ata_register_access() {
 
 	if (!ata_bus_started) {
 		start_ata_bus_handler();
 	}
 
-	if (writtenRegisterIndex < 5000) {
-		writtenRegisters[writtenRegisterIndex++] = 0x87654321;
-	}
-
 	while(ata_bus_started) {
 
 		while (pio_sm_is_rx_fifo_empty(pio0, ATA_BUS_HANDLER_SM) && ata_bus_started) { 
-			tight_loop_contents(); 
-			if (writtenRegisterIndex < 10) {
-				writtenRegisters[writtenRegisterIndex++] = 0xbee9;
-			}
+			tight_loop_contents();
 		}
 		if (!ata_bus_started) {
 			break;
@@ -565,9 +553,6 @@ void __not_in_flash_func(_process_ata_register_access)() {
 		// 	}
 		// }
 	}
-	if (writtenRegisterIndex < 5000) {
-		writtenRegisters[writtenRegisterIndex++] = 0x12345678;
-	}
 }
 
 void __not_in_flash_func(process_ata_register_access)() {
@@ -617,7 +602,7 @@ volatile uint32_t core0CData = 0;
 volatile uint16_t core0commandRegister = 0;
 volatile uint16_t* spi_packet_register = 0;
 volatile uint8_t spi_packet_word_count = 0;
-volatile uint16_t generic_data_buffer[64] = {0}; // Basic buffer to send data for things like req_ses, error, etc
+volatile uint16_t generic_data_buffer[128] = {0}; // Basic buffer to send data for things like req_ses, error, etc
 
 #define DATA_MODE_IDLE 		(0)
 #define DATA_MODE_SPI 		(1) // Sega SPI packet mode, processing their 12 byte packets
@@ -957,15 +942,13 @@ void process_packet() {
 			break;
 		}
 		case CD_READ2_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x1234BBBB;
-			}
+			printf("CD_READ2 Not implemented\n");
 			break;
 		}
 		case GET_SCD_SEGA_PACKET_CMD: {
-			if(writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0xCCCCCCCC;
-			}
+			// if(writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0xCCCCCCCC;
+			// }
 
 			uint8_t format = SEGA_PACKET_CMD_REGISTER[1] & 0xF;
 			uint32_t lengthFromPacket = (SEGA_PACKET_CMD_REGISTER[3] << 8) | (SEGA_PACKET_CMD_REGISTER[4]);
@@ -1004,14 +987,40 @@ void process_packet() {
 				bufferPtr[1] = 0x15; // no audio status information
 			}
 
-			bufferPtr[1] = 0x15;
+			bufferPtr[1] = 0x12;
 
 			if (format == 0) {
+
 				length = 100;
-				bufferPtr[2] = 0;
-				bufferPtr[3] = 100; // 0x64
 				// copy subchannel array?
 				memcpy(&bufferPtr[4], q_subchannel, 96);
+
+				bufferPtr[1] = 0x00;// cdda active ? 0x11 : 0x00 cdda_get_status();
+				bufferPtr[3] = 100;
+				uint8_t i, j, *p = &bufferPtr[4];
+				uint16_t crc = 0;
+				for (i=0; i<12; i++) {
+				uint8_t sc = q_subchannel[i];
+				for (j=0; j<8; j++) {
+				if (sc&0x80) {
+				crc ^= 0x8000;
+				*p++ = 0x7f;
+				} else {
+				*p++ = 0x3f;
+				}
+				if (crc & 0x8000)
+				crc = (crc << 1) ^ 0x1021;
+				else
+				crc <<= 1;
+				sc <<= 1;
+				}
+				if (i == 9) {
+				q_subchannel[10] = (~crc)>>8;
+				q_subchannel[11] = ~crc;
+				}
+				}
+
+
 			} else if (format == 1) {
 				length = 0xE; // 14 bytes
 				// Data length MSB (0 = 0x0)
@@ -1019,27 +1028,27 @@ void process_packet() {
 				// Data length LSB (14 = 0xE)
 				bufferPtr[3] = 0xE;
 				// Control(top 4 bits)/ADR (bottom 4 bits)
-				bufferPtr[4] = (4<<4) | (1);
-				// Copy the rest from nulldc, icegdrom's version looks really complicated :|
-				//5-13	DATA-Q
-				uint8_t* data_q = &bufferPtr[5-1];
-				//-When ADR = 1
-				//Byte	Description
-				//1	TNO
-				data_q[1]=1;//Track number .. duno whats it :P gota parse toc xD ;p
-				//2	X
-				data_q[2]=1;//gap #1 (main track)
-				//3-5	Elapsed FAD within track
-				//u32 FAD_el=cdda.CurrAddr.FAD-cdda.StartAddr.FAD;
-				data_q[3]=0;//(u8)(FAD_el>>16);
-				data_q[4]=0;//(u8)(FAD_el>>8);
-				data_q[5]=0;//(u8)(FAD_el>>0);
-				//6	0	0	0	0	0	0	0	0
-				data_q[6]=0;//
-				//7-9	-> seems to be FAD
-				data_q[7]=0;//(u8)(cdda.CurrAddr.FAD>>16);
-				data_q[8]=0x0;//(u8)(cdda.CurrAddr.FAD>>8);
-				data_q[9]=0x96;//(u8)(cdda.CurrAddr.FAD>>0);
+				// bufferPtr[4] = (4<<4) | (1);
+				// // Copy the rest from nulldc, icegdrom's version looks really complicated :|
+				// //5-13	DATA-Q
+				// uint8_t* data_q = &bufferPtr[5-1];
+				// //-When ADR = 1
+				// //Byte	Description
+				// //1	TNO
+				// data_q[1]=1;//Track number .. duno whats it :P gota parse toc xD ;p
+				// //2	X
+				// data_q[2]=1;//gap #1 (main track)
+				// //3-5	Elapsed FAD within track
+				// //u32 FAD_el=cdda.CurrAddr.FAD-cdda.StartAddr.FAD;
+				// data_q[3]=0;//(u8)(FAD_el>>16);
+				// data_q[4]=0;//(u8)(FAD_el>>8);
+				// data_q[5]=0;//(u8)(FAD_el>>0);
+				// //6	0	0	0	0	0	0	0	0
+				// data_q[6]=0;//
+				// //7-9	-> seems to be FAD
+				// data_q[7]=0;//(u8)(cdda.CurrAddr.FAD>>16);
+				// data_q[8]=0x0;//(u8)(cdda.CurrAddr.FAD>>8);
+				// data_q[9]=0x96;//(u8)(cdda.CurrAddr.FAD>>0);
 
 			} else {
 				// Unsupported, abort!
@@ -1091,7 +1100,8 @@ void process_packet() {
 
 			SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
 
-			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x82;
+			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x82;
+			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x81;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = countData71 >> 8;
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = countData71 && 0xFF; 
@@ -1136,7 +1146,7 @@ static inline void process_data_written() {
 
 		if (current_io_packet_command == SET_MODE_SEGA_PACKET_CMD) {
 
-			reply_11[io_current_position++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
+			rom[io_current_position++] = SPI_registers[SPI_DATA_REGISTER_INDEX];
 
 			if (io_current_position >= io_ending_position) {
 				// for(int i = 0; i < 16; i++) {
@@ -1198,9 +1208,9 @@ static inline void process_data_read() {
 		SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
 
 		if (io_current_position >= io_ending_position) {
-			if (writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x1000FFFF;
-			}
+			// if (writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0x1000FFFF;
+			// }
 
 			current_io_packet_command = 0;
 			io_current_position = 0;
@@ -1318,6 +1328,7 @@ static inline void process_data_read() {
 			uint16_t numTransfers = gdrom_read_buffer_size / 2; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
 
 			printf("Starting DMA. Num word transfers: %u\n", numTransfers);
+			dma_bus_running = 1;
 
 			start_dma_bus_handler();
 
@@ -1355,12 +1366,13 @@ static inline void process_data_read() {
 				} else {
 					// If we are finished, then we should disable the dma state machine and restart the ata handler.
 					pio_sm_set_enabled(pio0, DMA_HANDLER_SM, false);
-					restart_ata_bus_handler_loop = 1;
 					// start_ata_bus_handler(); // stop the dma bus handler and start the ata one
 				}
 
 			} while(gdrom_read_remaining_sectors > 0);
 
+			restart_ata_bus_handler_loop = 1;
+			dma_bus_running = 0;
 			printf("\nDMA finished\n");
 		
 			// All the data has been sent, signal the end of the transfer
@@ -1404,9 +1416,9 @@ static inline void process_data_read() {
 
 		if (io_current_position >= io_ending_position) {
 
-			if(writtenRegisterIndex < 5000) {
-				writtenRegisters[writtenRegisterIndex++] = 0x4000FFFF;
-			}
+			// if(writtenRegisterIndex < 5000) {
+			// 	writtenRegisters[writtenRegisterIndex++] = 0x4000FFFF;
+			// }
 
 			current_io_packet_command = 0;
 			io_current_position = 0;
