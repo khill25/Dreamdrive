@@ -4,6 +4,7 @@
 #include <memory.h>
 
 uint32_t NullDriveDiscType;
+uint8_t gdrom_read_temp_buffer[75264];
 
 Disc*(*drivers[])(char* path)=
 {

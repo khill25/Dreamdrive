@@ -116,6 +116,7 @@ void GetDriveToc(uint32_t* to,DiskArea area);
 void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz);
 void GetDriveSessionInfo(uint8_t* to,uint8_t session);
 extern uint8_t q_subchannel[96];
+extern uint8_t gdrom_read_temp_buffer[75264];
 
 // Originally in gd_driver.h ////////////////////////////////////////
 typedef void DriveRead(uint8_t * buff, uint32_t StartSector, uint32_t SectorCount, uint32_t secsz);
@@ -142,6 +143,7 @@ struct RawTrackFile
 	int32_t offset;
 	uint32_t fmt;
 	bool cleanup;
+	uint bytesRead = 0;
 
 	RawTrackFile(const char* filename, uint8_t trackNum) {
 		strcpy(this->filename, filename);
@@ -169,52 +171,17 @@ struct RawTrackFile
 			verify(false);
 		}
 
-		// FRESULT fr = f_open(&track_files[trackNum], filename, FA_READ);
-		// if (FR_OK != fr && FR_EXIST != fr) {
-		// 	printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-		// 	return;
-		// }
-
 		// printf("offset: %x\n", (offset+FAD*fmt));
 		FRESULT fr = f_lseek(&track_files[trackNum], offset+FAD*fmt);
 		if (fr != FR_OK) {
 			printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
 		}
 
-		fr = f_read(&track_files[trackNum],dst,fmt,0);
+		fr = f_read(&track_files[trackNum],dst,fmt,&bytesRead);
 		if (fr != FR_OK) {
 			printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
 		}
 
-		// TODO there has to be a better way to do this file reading
-		// without having to remount and reopen the file everytime...
-		// FIL file;
-		// FRESULT fr;
-		// FATFS fs;
-		// fr = f_mount(&fs, "", 1);
-		// if (FR_OK != fr) {
-		// 	printf("f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
-		// 	return;
-		// }
-
-		// fr = f_open(&file, filename, FA_READ);
-		// if (FR_OK != fr && FR_EXIST != fr) {
-		// 	printf("common.h: f_open(%s) error: %s (%d)\n", filename, FRESULT_str(fr), fr);
-		// 	return;
-		// }
-
-		// // printf("offset+FAD*fmt: %d", (offset+FAD*fmt));
-		// // Rewritten with supported methods
-		// fr = f_lseek(&file, offset+FAD*fmt);
-		// if (fr != FR_OK) {
-		// 	printf("Error [(%d)(%s)] seeking file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
-		// }
-		// fr = f_read(&file,dst,fmt,0);
-		// if (fr != FR_OK) {
-		// 	printf("Error [(%d)(%s)] reading file in RawTrackFile::Read()\n", fr, FRESULT_str(fr));
-		// }
-
-		// f_close(&file);
 	}
 	virtual ~RawTrackFile()
 	{
@@ -280,15 +247,21 @@ struct Disc
 
 	void ReadSectors(uint32_t FAD,uint32_t count,uint8_t* dst,uint32_t fmt)
 	{
-		uint8_t temp[2352] = {0};
+		// uint8_t temp[2352] = {0};
+		
 		SectorFormat secfmt;
 		SubcodeFormat subfmt;		
 		bool readError = false;
-		printf("ReadSectors: FAD: %u, Count: %u, FMT: %u\n", FAD, count, fmt);
+		// printf("ReadSectors: FAD: %u, Count: %u, FMT: %u\n", FAD, count, fmt);
 
 		while(count)
-		{			
-			if (!readError && !ReadSector(FAD,temp,&secfmt,q_subchannel,&subfmt))
+		{	
+			// uint32_t startTime = time_us_32();
+			//tracks[i].Read(FAD,dst,sector_type,subcode,subcode_type)
+			//file->Read(FAD,dst,sector_type,subcode,subcode_type)
+			// tracks[2].file->Read(FAD,dst,&secfmt,q_subchannel,&subfmt);
+    
+			if (!readError && !ReadSector(FAD,gdrom_read_temp_buffer,&secfmt,q_subchannel,&subfmt))
 			{				
 				readError = true; //verify(false);				
 				printf("ImgReader (common.h,201) - Sector read error!\n");
@@ -298,19 +271,29 @@ struct Disc
 			//TODO: Proper sector conversions
 			if (secfmt==SECFMT_2352)
 			{
-				ConvertSector(temp,dst,2352,fmt,FAD);
+				uint32_t bufferOffset = 0;
+				uint32_t dstOffset = 0;
+				// ConvertSector(temp,dst,2352,fmt,FAD);
+				// memcpy(out_buff,&in_buff[0x10],2048); //0x10 -> mode1
+				do {
+					memcpy(dst+dstOffset,gdrom_read_temp_buffer+0x10+bufferOffset,2048);
+					bufferOffset += 2352;
+					dstOffset += 2048;
+				} while (bufferOffset < fmt);
+			} else {
+				printf("FAIL\n");
 			}
-			else if (fmt == 2048 && secfmt==SECFMT_2336_MODE2)
-				memcpy(dst,temp+8,2048);
-			else if (fmt==2048 && (secfmt==SECFMT_2048_MODE1 || secfmt==SECFMT_2048_MODE2_FORM1 ))
-			{
-				memcpy(dst,temp,2048);
-			}
-			else if(!readError)
-			{
-				readError = true; //verify(false);
-				printf("ImgReader (common.h,218) - Sector conversion error!\n");
-			}
+			// else if (fmt == 2048 && secfmt==SECFMT_2336_MODE2)
+			// 	memcpy(dst,temp+8,2048);
+			// else if (fmt==2048 && (secfmt==SECFMT_2048_MODE1 || secfmt==SECFMT_2048_MODE2_FORM1 ))
+			// {
+			// 	memcpy(dst,temp,2048);
+			// }
+			// else if(!readError)
+			// {
+			// 	readError = true; //verify(false);
+			// 	printf("ImgReader (common.h,218) - Sector conversion error!\n");
+			// }
 
 			dst+=fmt;
 			FAD++;

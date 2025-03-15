@@ -106,7 +106,7 @@ setup:
     pull;; get first word (This should be from DMA)
     
     set pins, 1;; assert dmarq
-    wait 0 gpio 26 ;; wait for dmack assert (low)
+    ; wait 0 gpio 26 ;; wait for dmack assert (low)
     
 transfer_data:
     wait 0 gpio 21 side 0;; strobe on read pin, read is pin 21
@@ -117,7 +117,7 @@ transfer_data:
 
 finish:
     set pins, 0 side 0;; deassert dmarq
-    wait 1 gpio 26;; wait for dmack deassert (high)
+    ; wait 1 gpio 26;; wait for dmack deassert (high)
     push ;; tell C we are done
 .wrap
 

@@ -100,7 +100,6 @@ void gdrom_read_default_disc_image() {
 
 // Parses the data from the read command packet and sets up the state variables for the read
 void gdrom_read_start(uint8_t* packet, bool isDMA) {
-
     // Zero out all the values on a fresh read start / helps if a dma timed out
     gdrom_read_read_sectors = 0;
     gdrom_read_buffer_size = 0;
@@ -108,12 +107,15 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     gdrom_read_bytes_remanining_in_sector = 0;
     gdrom_read_bytes_remanining = 0;
     gdrom_read_current_byte_count = 0;
-    gdrom_read_bytes_remanining_in_sector = 0;
-    gdrom_read_bytes_remanining = 0;
 
     gdrom_read_data_select_value = (packet[1] & 0xFF00) >> 8;
     gdrom_read_expected_data_type = (packet[1] & 0xE) >> 1;
     gdrom_read_data_parameter_type = (packet[1] & 0x1);
+
+    for(int i = 0; i < 12; i++) {
+        printf("(%u)%x ", i, packet[i]);
+    }
+    printf("\n");
 
     gdrom_read_sector_size = _gdrom_get_sector_type(gdrom_read_data_select_value, gdrom_read_expected_data_type, gdrom_read_data_parameter_type);
     gdrom_read_start_sector = _gdrom_read_get_FAD(&packet[2], gdrom_read_data_parameter_type);
@@ -205,7 +207,7 @@ void gdrom_fill_read_buffer() {
 
 	gdrom_read_buffer_index = 0;
 	gdrom_read_buffer_size = count * gdrom_read_sector_size;
-
+    
     // Calcuate the start offset by adding gdrom_read_read_sectors to start sector
 	current_disc->ReadSectors(gdrom_read_start_sector+gdrom_read_read_sectors, count, gdrom_read_buffer, gdrom_read_sector_size);
 
