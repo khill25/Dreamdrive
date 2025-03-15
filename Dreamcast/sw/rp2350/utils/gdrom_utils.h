@@ -9,7 +9,7 @@
  */
 
 #define MAX_SECTOR_BYTE_SIZE (2352) // This is the size of a sector on the disc
-#define MAX_BUFFERED_SECTORS (32)   // This is the max number of sectors to buffer at a time
+#define MAX_BUFFERED_SECTORS (64)   // This is the max number of sectors to buffer at a time
 #define MAX_BUFFER_SIZE (MAX_SECTOR_BYTE_SIZE * MAX_BUFFERED_SECTORS)
 extern uint8_t gdrom_read_buffer[MAX_BUFFER_SIZE]; // This is about 73KB of ram
 extern uint16_t* gdrom_16bit_buffer_ptr;

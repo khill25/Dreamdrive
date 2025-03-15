@@ -1273,9 +1273,10 @@ static inline void process_data_read() {
 
 
 			// We can only hold 32 sectors of data at a time. If we need more then we need to fetch it
-			uint16_t numTransfers = gdrom_read_buffer_size / 2; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
+			uint32_t numTransfers = gdrom_read_buffer_size / 2; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
 
-			printf("Starting DMA. Num word transfers: %u\n", numTransfers);
+			printf("Starting DMA. Transfer Size(bytes): %u, Num word transfers: %u\n", gdrom_read_bytes_remanining, numTransfers);
+			gdrom_read_bytes_remanining -= gdrom_read_buffer_size;
 			dma_bus_running = 1;
 
 			start_dma_bus_handler();
@@ -1300,11 +1301,13 @@ static inline void process_data_read() {
 				dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer[0], false);
 
 				if (gdrom_read_remaining_sectors > 0) {
+					gdrom_read_bytes_remanining -= gdrom_read_buffer_size;
 					// Fetch more data
 					gdrom_fill_read_buffer(); 
 
+					
 					numTransfers = gdrom_read_buffer_size / 2;
-					printf("Refilling DMA buffer, Num word transfers: %u\n", numTransfers);
+					printf("Refilling buffer, bytes remaining: %u, Num word transfers: %u\n", gdrom_read_bytes_remanining, numTransfers);
 					
 					// Push number of transfers
 					pio_sm_put_blocking(pio0, DMA_HANDLER_SM, numTransfers-1);

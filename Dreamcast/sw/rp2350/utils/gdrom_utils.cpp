@@ -89,8 +89,8 @@ uint32_t _gdrom_get_sector_type(uint8_t dataSelect, uint8_t expectedDataType, ui
 // Main functions ////////////////////////////////////////////////
 
 // Use the crazy taxi image as our default image until we create a menu loader that we will load on startup.
-// char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
-char default_disc_image_path[] = "soulcalibur/soulcalibur.gdi";
+char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
+// char default_disc_image_path[] = "soulcalibur/soulcalibur.gdi";
 void gdrom_read_default_disc_image() {
     current_disc = gdi_parse(default_disc_image_path);
     if (current_disc == NULL) {
@@ -105,7 +105,6 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     gdrom_read_read_sectors = 0;
     gdrom_read_buffer_size = 0;
     gdrom_read_buffer_index = 0;
-    gdrom_read_buffer_size = 0;
     gdrom_read_bytes_remanining_in_sector = 0;
     gdrom_read_bytes_remanining = 0;
     gdrom_read_current_byte_count = 0;
@@ -202,7 +201,7 @@ void gdrom_read_sectors(uint8_t* buffer, uint32_t sector, uint32_t sectorCount, 
 
 // Fills the buffer up to a max of 32 sectors at a time, refill buffer as needed
 void gdrom_fill_read_buffer() {
-    uint32_t count = (gdrom_read_remaining_sectors > 32) ? 32 : gdrom_read_remaining_sectors;
+    uint32_t count = (gdrom_read_remaining_sectors > MAX_BUFFERED_SECTORS) ? MAX_BUFFERED_SECTORS : gdrom_read_remaining_sectors;
 
 	gdrom_read_buffer_index = 0;
 	gdrom_read_buffer_size = count * gdrom_read_sector_size;
