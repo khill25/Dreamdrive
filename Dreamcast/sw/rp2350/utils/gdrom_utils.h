@@ -8,10 +8,9 @@
  * 
  */
 
-#define MAX_SECTOR_BYTE_SIZE (2352) // This is the size of a sector on the disc
-#define MAX_BUFFERED_SECTORS (32)   // This is the max number of sectors to buffer at a time
-#define MAX_BUFFER_SIZE (MAX_SECTOR_BYTE_SIZE * MAX_BUFFERED_SECTORS)
+
 extern uint8_t gdrom_read_buffer[MAX_BUFFER_SIZE]; // This is about 74KB of ram
+extern uint8_t gdrom_read_buffer2[MAX_BUFFER_SIZE]; // This is about 74KB of ram
 extern uint16_t* gdrom_16bit_buffer_ptr;
 
 extern uint8_t gdrom_read_data_select_value;
@@ -85,7 +84,7 @@ void gdrom_read_sectors(uint8_t* buffer, uint32_t sector, uint32_t sectorCount, 
 
 // Used as a helper function to fill the read buffer with data from the disc
 // Probably dont need to call this method as it's called from gdrom_read_start
-void gdrom_fill_read_buffer();
+void gdrom_fill_read_buffer(uint8_t* buffer);
 
 static uint8_t gdrom_rom_data[] =
 {

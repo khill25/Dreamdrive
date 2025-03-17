@@ -32,6 +32,7 @@ FIL* track_files;
 FATFS ddrdc_fs;
 
 uint8_t gdrom_read_buffer[MAX_BUFFER_SIZE];
+uint8_t gdrom_read_buffer2[MAX_BUFFER_SIZE];
 uint16_t* gdrom_16bit_buffer_ptr = (uint16_t*)gdrom_read_buffer;
 
 uint8_t gdrom_read_data_select_value = 0;
@@ -89,8 +90,9 @@ uint32_t _gdrom_get_sector_type(uint8_t dataSelect, uint8_t expectedDataType, ui
 // Main functions ////////////////////////////////////////////////
 
 // Use the crazy taxi image as our default image until we create a menu loader that we will load on startup.
-char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
-// char default_disc_image_path[] = "soulcalibur/soulcalibur.gdi";
+// char default_disc_image_path[] = "/crazytaxi/Crazy Taxi v1.004 (1999)(Sega)(US)[!][6S].gdi";
+char default_disc_image_path[] = "soulcalibur/soulcalibur.gdi";
+// char default_disc_image_path[] = "re3/re3.gdi";
 void gdrom_read_default_disc_image() {
     current_disc = gdi_parse(default_disc_image_path);
     if (current_disc == NULL) {
@@ -112,10 +114,10 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     gdrom_read_expected_data_type = (packet[1] & 0xE) >> 1;
     gdrom_read_data_parameter_type = (packet[1] & 0x1);
 
-    for(int i = 0; i < 12; i++) {
-        printf("(%u)%x ", i, packet[i]);
-    }
-    printf("\n");
+    // for(int i = 0; i < 12; i++) {
+    //     printf("(%u)%x ", i, packet[i]);
+    // }
+    // printf("\n");
 
     gdrom_read_sector_size = _gdrom_get_sector_type(gdrom_read_data_select_value, gdrom_read_expected_data_type, gdrom_read_data_parameter_type);
     gdrom_read_start_sector = _gdrom_read_get_FAD(&packet[2], gdrom_read_data_parameter_type);
@@ -129,14 +131,14 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     // Setup a 16bit version of the buffer
     gdrom_16bit_buffer_ptr = (uint16_t*)gdrom_read_buffer;
 
-    if (isDMA) {
-        // Fill the buffer
-        gdrom_fill_read_buffer();
-    } else {
-        // Fill a single sector? 
-        // TODO fill buffer with the number of sectors to read.
-        gdrom_fill_read_buffer();
-    }
+    // if (isDMA) {
+    //     // Fill the buffer
+    //     gdrom_fill_read_buffer();
+    // } else {
+    //     // Fill a single sector? 
+    //     // TODO fill buffer with the number of sectors to read.
+    //     gdrom_fill_read_buffer();
+    // }
 
     // if (current_disc->type == GdRom && gdrom_read_start_sector == 45150 && gdrom_read_original_num_sectors_to_read == 7) {
     //     printf("Special buffer patching for sector 45150 with sector count of 7\n");
@@ -145,7 +147,7 @@ void gdrom_read_start(uint8_t* packet, bool isDMA) {
     // } else {
     //     printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
     // }
-    printf("Disc type: %d, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
+    printf("Disc type: %x, startSector: %u, numSectorsToRead: %u\n", current_disc->type, gdrom_read_start_sector, gdrom_read_original_num_sectors_to_read);
 }
 
 // Updates state variables for micro updates related to actually sending data over the 16-bit bus
@@ -169,7 +171,7 @@ bool gdrom_read_consume_buffer(uint16_t* toBuffer) {
         
         // and we have more sectors, buffer them
         if (gdrom_read_remaining_sectors > 0) {
-            gdrom_fill_read_buffer();
+            gdrom_fill_read_buffer(gdrom_read_buffer);
 
         // No more sectors to read
         } else {
@@ -202,14 +204,15 @@ void gdrom_read_sectors(uint8_t* buffer, uint32_t sector, uint32_t sectorCount, 
 }
 
 // Fills the buffer up to a max of 32 sectors at a time, refill buffer as needed
-void gdrom_fill_read_buffer() {
+void gdrom_fill_read_buffer(uint8_t* buffer) {
     uint32_t count = (gdrom_read_remaining_sectors > MAX_BUFFERED_SECTORS) ? MAX_BUFFERED_SECTORS : gdrom_read_remaining_sectors;
 
 	gdrom_read_buffer_index = 0;
 	gdrom_read_buffer_size = count * gdrom_read_sector_size;
     
     // Calcuate the start offset by adding gdrom_read_read_sectors to start sector
-	current_disc->ReadSectors(gdrom_read_start_sector+gdrom_read_read_sectors, count, gdrom_read_buffer, gdrom_read_sector_size);
+	// current_disc->ReadSectors(gdrom_read_start_sector+gdrom_read_read_sectors, count, gdrom_read_buffer, gdrom_read_sector_size);
+    current_disc->ReadSectors(gdrom_read_start_sector+gdrom_read_read_sectors, count, buffer, gdrom_read_sector_size);
 
 	gdrom_read_read_sectors+=count;
 	gdrom_read_remaining_sectors-=count;

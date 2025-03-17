@@ -9,6 +9,10 @@ using namespace std;
 
 #define verify(x) if((x)==false){ printf("Verify Failed  : " #x "\n in %s -> %s : %d \n",__FUNCTION__,__FILE__,__LINE__); }
 
+#define MAX_SECTOR_BYTE_SIZE (2352) // This is the size of a sector on the disc
+#define MAX_BUFFERED_SECTORS (16)   // This is the max number of sectors to buffer at a time
+#define MAX_BUFFER_SIZE (MAX_SECTOR_BYTE_SIZE * MAX_BUFFERED_SECTORS)
+
 enum DiscType
 {
 	CdDA=0x00,
@@ -116,7 +120,7 @@ void GetDriveToc(uint32_t* to,DiskArea area);
 void GetDriveSector(uint8_t * buff,uint32_t StartSector,uint32_t SectorCount,uint32_t secsz);
 void GetDriveSessionInfo(uint8_t* to,uint8_t session);
 extern uint8_t q_subchannel[96];
-extern uint8_t gdrom_read_temp_buffer[75264];
+extern uint8_t gdrom_read_temp_buffer[MAX_BUFFER_SIZE];
 
 // Originally in gd_driver.h ////////////////////////////////////////
 typedef void DriveRead(uint8_t * buff, uint32_t StartSector, uint32_t SectorCount, uint32_t secsz);
@@ -245,10 +249,31 @@ struct Disc
 		return false;
 	}
 
+	// #define BLOCK_SIZE  (16 + 2048 + 288) // 2352
+	// #define KEEP_SIZE   2048
+	// // #define TOTAL_SIZE  75264
+	// void extractInPlace(unsigned char *buffer, uint sectorCount)
+	// {
+	// 	size_t outOffset = 0;
+	// 	uint32_t totalSize = sectorCount * BLOCK_SIZE;
+
+	// 	// Process all 32 blocks
+	// 	for (size_t blockStart = 0; blockStart < totalSize; blockStart += BLOCK_SIZE) {
+	// 		// Move the 2048 bytes we want down to 'outOffset'
+	// 		memmove(buffer + outOffset,         // destination
+	// 				buffer + blockStart + 16,   // skip first 16 bytes
+	// 				KEEP_SIZE);                 // copy 2048 bytes
+	// 		outOffset += KEEP_SIZE;
+	// 	}
+
+	// 	// At this point:
+	// 	//  - The first 65536 bytes of 'buffer' are the “kept” data
+	// 	//  - The remainder is no longer needed
+	// }
+
 	void ReadSectors(uint32_t FAD,uint32_t count,uint8_t* dst,uint32_t fmt)
 	{
-		// uint8_t temp[2352] = {0};
-		
+		// uint8_t temp[2352];
 		SectorFormat secfmt;
 		SubcodeFormat subfmt;		
 		bool readError = false;
@@ -256,11 +281,7 @@ struct Disc
 
 		while(count)
 		{	
-			// uint32_t startTime = time_us_32();
-			//tracks[i].Read(FAD,dst,sector_type,subcode,subcode_type)
-			//file->Read(FAD,dst,sector_type,subcode,subcode_type)
-			// tracks[2].file->Read(FAD,dst,&secfmt,q_subchannel,&subfmt);
-    
+			// if (!readError && !ReadSector(FAD,temp,&secfmt,q_subchannel,&subfmt))
 			if (!readError && !ReadSector(FAD,gdrom_read_temp_buffer,&secfmt,q_subchannel,&subfmt))
 			{				
 				readError = true; //verify(false);				
@@ -271,10 +292,10 @@ struct Disc
 			//TODO: Proper sector conversions
 			if (secfmt==SECFMT_2352)
 			{
+				// ConvertSector(temp,dst,2352,fmt,FAD);
+
 				uint32_t bufferOffset = 0;
 				uint32_t dstOffset = 0;
-				// ConvertSector(temp,dst,2352,fmt,FAD);
-				// memcpy(out_buff,&in_buff[0x10],2048); //0x10 -> mode1
 				do {
 					memcpy(dst+dstOffset,gdrom_read_temp_buffer+0x10+bufferOffset,2048);
 					bufferOffset += 2352;

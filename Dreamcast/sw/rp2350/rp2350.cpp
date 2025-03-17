@@ -11,6 +11,7 @@
 #include "hardware/structs/systick.h"
 #include "hardware/clocks.h"
 #include "hardware/uart.h"
+#include "hardware/vreg.h"
 
 #include "rp2350_pins.h"
 #include "hardware/pio.h"
@@ -333,11 +334,13 @@ void setup_squarewave_generator() {
 	pio_sm_set_enabled(pio, sm, true);
 }
 
-
 int main(void) {
 	// Set clock speed to 266MHz (3.76ns per cycle)
+	// const int freq_khz = 166000;
 	const int freq_khz = 266000;
+	// const int freq_khz = 300000;
 	// const int freq_khz = 336000;
+	// const int freq_khz = 396000;
 	// vreg_set_voltage(VREG_VOLTAGE_1_25); // Usually needed for clocks over 266MHz
 	bool clockWasSet = set_sys_clock_khz(freq_khz, false);
 
@@ -552,7 +555,14 @@ void _process_ata_register_access() {
 	}
 }
 
+uint32_t gdrom_read_buffer_needs_refill = 0;
+uint8_t gdrom_read_buffer_select = 0;
+uint8_t gdrom_read_buffer_1_ready = 0;
+uint8_t gdrom_read_buffer_2_ready = 0;
+
 void __not_in_flash_func(process_ata_register_access)() {
+	uint32_t startTime = 0;
+	uint32_t endTime = 0;
 	_process_ata_register_access();
 	while(1) {
 		if (restart_ata_bus_handler_loop) {
@@ -560,6 +570,26 @@ void __not_in_flash_func(process_ata_register_access)() {
 			restart_ata_bus_handler_loop = 0;
 			_process_ata_register_access();
 		}
+
+		if(dma_bus_running && gdrom_read_buffer_needs_refill) {
+			gdrom_read_buffer_needs_refill = 0;
+			/// LOAD BUFFER
+			if (gdrom_read_buffer_select == 0) {
+				startTime = time_us_32();
+				gdrom_fill_read_buffer(gdrom_read_buffer);
+				endTime = time_us_32();
+				gdrom_read_buffer_1_ready = 1;
+				printf("Refill %u, in %uus...\n", gdrom_read_buffer_select, endTime - startTime);
+				
+			} else if (gdrom_read_buffer_select == 1) {
+				startTime = time_us_32();
+				gdrom_fill_read_buffer(gdrom_read_buffer2);
+				endTime = time_us_32();
+				gdrom_read_buffer_2_ready = 2;
+				printf("Refill %u, in %uus...\n", gdrom_read_buffer_select, endTime - startTime);
+			}
+		}
+
 		tight_loop_contents();
 	}
 	printf("FATAL ERROR: process_ata_register_access ended\n");
@@ -665,7 +695,7 @@ void process_packet() {
 				writtenRegisters[writtenRegisterIndex++] = 0x11111111;
 			}
 
-			// u8  *src = &rom[2188];
+			uint8_t *src = &gdrom_rom_data[2188];
 			// u8  *dst = buffer;
 			// u32 size = buffer[4];
 
@@ -676,18 +706,21 @@ void process_packet() {
 			// hwInt(0x0100);
 			// break;
 
+			uint length = SEGA_PACKET_CMD_REGISTER[4];
+
 			current_io_mode = IO_MODE_WRITE;
 			io_current_position = 2188 / 2;
-			io_ending_position = (io_current_position + 4) / 2;
+			io_ending_position = (io_current_position + length) / 2;
 			ide_current_transfer_mode = IDE_TRANSFER_MODE_PIO;
 			
 			// put first word in data register
-			SPI_registers[SPI_DATA_REGISTER_INDEX] = rom[io_current_position++];
+			memcpy(&((uint8_t*)(generic_data_buffer))[0], src, length);
+			SPI_registers[SPI_DATA_REGISTER_INDEX] = generic_data_buffer[io_current_position++];
 
 			// Put the correct values in the registers
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
-			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = 4;
+			SPI_registers[SPI_BYTE_COUNT_REGISTER_LOW_INDEX] = length;
 			*status_register = 0x58; // DRQ = 1 BSY = 0 
 
 			// set irq
@@ -911,6 +944,9 @@ void process_packet() {
 			// Read and buffer the data
 			gdrom_read_start(SEGA_PACKET_CMD_REGISTER, ide_current_transfer_mode);
 
+			// Fill the first buffer
+			gdrom_fill_read_buffer(gdrom_read_buffer);
+
 			if (ide_current_transfer_mode == IDE_TRANSFER_MODE_PIO) {
 				printf("cd_read pio\n");
 				// Read the first word
@@ -929,7 +965,7 @@ void process_packet() {
 				if(writtenRegisterIndex < 5000) {
 					writtenRegisters[writtenRegisterIndex++] = 0xD8A10000;
 				}
-			}	
+			}
 
 			break;
 		}
@@ -1058,6 +1094,8 @@ void process_packet() {
 		
 
 			// SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x84;
+			// 80 seems to cause lots of requests for drive status when it stalls
+			// When that happens I'm not sure what it's looking for
 			SPI_registers[SPI_SECTOR_NUMBER_REGISTER_INDEX] = 0x83;
 			SPI_registers[SPI_INTERRUPT_REASON_REGISTER_INDEX] = 0x02; // IO=1, CoD=0
 			SPI_registers[SPI_BYTE_COUNT_REGISTER_HIGH_INDEX] = 0;
@@ -1267,18 +1305,21 @@ static inline void process_data_read() {
 			////after the dmack line asserts( low) the words are read via a read pin strobe
 			////
 
+			// When the ata loop exits the pio handler, this should start loading a seconday buffer
 
 			// We can only hold 32 sectors of data at a time. If we need more then we need to fetch it
 			uint32_t numTransfers = gdrom_read_buffer_size / 2; // We are transferring num words not sectors... todo fix this > 32 ? 32 : numTotalTransfers;
 			uint32_t startTime = 0;
-			uint32_t lapTimeStart[32] = {0};
-			uint32_t lapTimeEnd[32] = {0};
-			uint8_t lapTimeIndex = 0;
 			
 			// printf("Starting DMA. Num word transfers: %u\n", numTransfers);
 			dma_bus_running = 1;
 
 			start_dma_bus_handler();
+
+			if (gdrom_read_remaining_sectors > 0) {
+				gdrom_read_buffer_select = 1;
+				gdrom_read_buffer_needs_refill = 1;
+			}
 
 			// Push number of transfers 
 			// Transfer count MINUS 2, 
@@ -1289,6 +1330,7 @@ static inline void process_data_read() {
 			startTime = time_us_32();
 
 			// And start dma
+			dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer[0], false);
 			dma_channel_set_trans_count(dma_bus_handler_dma_channel, numTransfers+1, true);
 
 			// start dma
@@ -1299,17 +1341,35 @@ static inline void process_data_read() {
 				// Wait for num transfers to finish
 				
 				dmaFinished = pio_sm_get_blocking(pio0, DMA_HANDLER_SM);
-				dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer[0], false);
+				
 
 				if (gdrom_read_remaining_sectors > 0) {
 					
 					gdrom_read_bytes_remanining -= gdrom_read_buffer_size;
 
-					lapTimeStart[lapTimeIndex] = time_us_32();
-					// Fetch more data
-					gdrom_fill_read_buffer(); 
-					lapTimeEnd[lapTimeIndex++] = time_us_32();
+					// if gdrom_read_buffer_select is 0 then the primary buffer is ready and get the secondary buffer ready
+					if (gdrom_read_buffer_select == 0) {
+						gdrom_read_buffer_select = 1;
+						while (!gdrom_read_buffer_1_ready) {
+							tight_loop_contents();
+						}
+						dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer[0], false);
+						gdrom_read_buffer_1_ready = 0;
+						
+					// If gdrom_read_buffer_select is 1 then use secondary buffer and get the primary buffer ready
+					} else if (gdrom_read_buffer_select == 1) {
+						gdrom_read_buffer_select = 0;
+						while (!gdrom_read_buffer_2_ready) {
+							tight_loop_contents();
+						}
+						dma_channel_set_read_addr(dma_bus_handler_dma_channel, &gdrom_read_buffer2[0], false);
+						
+						gdrom_read_buffer_2_ready = 0;
+					}
 					
+					// Request the next buffer refill from core 1
+					gdrom_read_buffer_needs_refill = 1;
+
 					numTransfers = gdrom_read_buffer_size / 2;
 					// printf("Refilling buffer, bytes remaining: %u, Num word transfers: %u\n", gdrom_read_bytes_remanining, numTransfers);
 					
@@ -1330,17 +1390,20 @@ static inline void process_data_read() {
 			uint32_t endTime = time_us_32();
 			restart_ata_bus_handler_loop = 1;
 			dma_bus_running = 0;
-			printf("\nDMA finished in: %uus\n", endTime - startTime);
+			gdrom_read_buffer_needs_refill = 0;
+			gdrom_read_buffer_1_ready = 0;
+			gdrom_read_buffer_2_ready = 0;
+			printf("DMA finished in: %uus\n\n", endTime - startTime);
 
 
-			if (lapTimeIndex > 0) {
-				printf("DMA Lap Times: ");
-				for(int i = 0; i < lapTimeIndex; i++) {
-					printf("%u ", lapTimeEnd[i] - lapTimeStart[i]);
-				}
-				printf("\n");
-				lapTimeIndex = 0;
-			}
+			// if (lapTimeIndex > 0) {
+			// 	printf("DMA Lap Times: ");
+			// 	for(int i = 0; i < lapTimeIndex; i++) {
+			// 		printf("%u ", lapTimeEnd[i] - lapTimeStart[i]);
+			// 	}
+			// 	printf("\n");
+			// 	lapTimeIndex = 0;
+			// }
 		
 			// All the data has been sent, signal the end of the transfer
 			current_io_mode = IO_MODE_IDLE;
@@ -1442,7 +1505,7 @@ static inline void process_data_read() {
 }
 
 void main_processing_loop() {
-	printf("Opening default disc image...\n");
+	printf("3Opening default disc image...\n");
 	gdrom_read_default_disc_image();
 	printf("DONE!\n");
 
@@ -1451,14 +1514,14 @@ void main_processing_loop() {
 	SEGA_PACKET_CMD_REGISTER[1] = 0x24;
 	
 	// 45150
-	// SEGA_PACKET_CMD_REGISTER[2] = 0x00;
-	// SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
-	// SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
+	SEGA_PACKET_CMD_REGISTER[2] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[3] = 0xb0;
+	SEGA_PACKET_CMD_REGISTER[4] = 0x5e;
 	
 	//548433
-	SEGA_PACKET_CMD_REGISTER[2] = 0x08;
-	SEGA_PACKET_CMD_REGISTER[3] = 0x5E;
-	SEGA_PACKET_CMD_REGISTER[4] = 0x51;
+	// SEGA_PACKET_CMD_REGISTER[2] = 0x08;
+	// SEGA_PACKET_CMD_REGISTER[3] = 0x5E;
+	// SEGA_PACKET_CMD_REGISTER[4] = 0x51;
 
 	SEGA_PACKET_CMD_REGISTER[5] = 0x00;
 	SEGA_PACKET_CMD_REGISTER[6] = 0x00;
@@ -1470,15 +1533,21 @@ void main_processing_loop() {
 	// SEGA_PACKET_CMD_REGISTER[10] = 0x07;
 
 	// 717 sectors
+	// SEGA_PACKET_CMD_REGISTER[8] = 0x00;
+	// SEGA_PACKET_CMD_REGISTER[9] = 0x02;
+	// SEGA_PACKET_CMD_REGISTER[10] = 0xCD;
+
+	// 32 sectors
 	SEGA_PACKET_CMD_REGISTER[8] = 0x00;
-	SEGA_PACKET_CMD_REGISTER[9] = 0x02;
-	SEGA_PACKET_CMD_REGISTER[10] = 0xCD;
+	SEGA_PACKET_CMD_REGISTER[9] = 0x00;
+	SEGA_PACKET_CMD_REGISTER[10] = 0x20;
 
 	SEGA_PACKET_CMD_REGISTER[11] = 0x00;
 
 	uint32_t endTime = 0;
 	uint32_t startTime = time_us_32();
 	gdrom_read_start(SEGA_PACKET_CMD_REGISTER, 0);
+	gdrom_fill_read_buffer(gdrom_read_buffer);
 	endTime = time_us_32();
 
 	printf("Read Time: %u\n", endTime - startTime);
@@ -1629,6 +1698,9 @@ void main_processing_loop() {
 
 		// Host has read the status register
 		if (core0CData == CODED_STATUS_REGISTER_READ) {
+			if (writtenRegisterIndex < 5000) {
+				writtenRegisters[writtenRegisterIndex++] = 0x01010101;
+			}
 			gpio_put(PIN_INTRQ, INTRQ_DEASSERT); // negate the interrupt line
 			continue;
 		}
